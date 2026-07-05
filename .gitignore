@@ -87,4 +87,5 @@ data/processed/
 # Frontend generated files
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
 frontend/*.tsbuildinfo

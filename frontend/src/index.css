@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-app: "Work Sans", sans-serif;
+  --color-bg: #070707;
+  --color-panel: #121212;
+  --color-panel-alt: #1b1b1b;
+  --color-line: #303030;
+  --color-f1-red: #e10600;
+  --color-text: #f7f7f7;
+  --color-muted: #a2a2a2;
+  --color-track: #e8e8e8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-bg);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-app);
+}
+
+button,
+svg [tabindex="0"] {
+  outline: none;
+}
+
+button:focus-visible,
+svg [tabindex="0"]:focus-visible {
+  outline: 2px solid var(--color-f1-red);
+  outline-offset: 2px;
+}
