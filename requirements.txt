@@ -3,3 +3,5 @@ pandas>=2.0.0
 numpy>=1.24.0
 plotly>=5.0.0
 python-dotenv>=1.0.0
+requests>=2.30.0
+fastapi[standard]>=0.115.0

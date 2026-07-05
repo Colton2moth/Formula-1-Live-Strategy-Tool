@@ -10,6 +10,8 @@ dependencies = [
     "numpy>=1.24.0",
     "plotly>=5.0.0",
     "python-dotenv>=1.0.0",
+    "requests>=2.30.0",
+    "fastapi[standard]>=0.115.0",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +25,7 @@ dev = [
 
 [project.scripts]
 f1-strategy = "formula1_strategy_tool.cli:main"
+f1-download-openf1 = "formula1_strategy_tool.acquisition.cli:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]

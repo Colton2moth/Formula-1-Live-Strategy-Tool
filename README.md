@@ -44,7 +44,7 @@ OpenF1 live feed
 
 Include:
 
-- Race and Sprint sessions from 2023 onward
+- Race sessions from 2023 onward
 - Laps
 - Stints
 - Pit stops
@@ -110,6 +110,34 @@ Copy `.env.example` to `.env` if you need local configuration.
 
 ## Usage
 
+### Historical data download (run once)
+
+Downloads all completed Race sessions from 2023 through the current year into `data/raw/`. Re-running skips files already on disk.
+
+```bash
+source .venv/bin/activate
+pip install -e .
+
+# Foreground (watch progress in terminal)
+f1-download-openf1
+
+# Background — survives closing the terminal (good for a work-day run)
+nohup f1-download-openf1 > download.log 2>&1 &
+
+# Watch progress
+tail -f download.log
+```
+
+Options:
+
+```bash
+f1-download-openf1 --start-year 2023 --end-year 2025
+```
+
+Expect roughly 1–3 hours for all races at the API rate limit (~2s per request). Failures are logged to `data/raw/download_errors.jsonl`; re-run the same command to retry only what failed.
+
+### CLI stub
+
 ```bash
 source .venv/bin/activate
 f1-strategy --help
@@ -118,6 +146,7 @@ f1-strategy --help
 Or run directly:
 
 ```bash
+python -m formula1_strategy_tool.acquisition
 python -m formula1_strategy_tool
 ```
 
