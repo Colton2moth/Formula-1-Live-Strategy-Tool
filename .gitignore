@@ -83,3 +83,8 @@ data/processed/
 *.csv
 *.parquet
 !data/.gitkeep
+
+# Frontend generated files
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
