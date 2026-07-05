@@ -69,6 +69,8 @@ style:
 - Tighten strategy panel spacing for the dashboard layout.
 ```
 
+You may look through previous commits for more examples
+
 ## Simplicity rules
 
 - Prefer plain functions and simple data structures.
