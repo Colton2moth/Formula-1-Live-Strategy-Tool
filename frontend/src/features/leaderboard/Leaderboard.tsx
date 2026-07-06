@@ -45,7 +45,11 @@ export function Leaderboard({ drivers, selectedDriver, timingMode, onTimingModeC
               const gap = timingMode === "interval" ? formatGap(driver.interval_ahead) : formatGap(driver.gap_to_leader);
               const { firstName, lastName } = splitDriverName(driver.name);
               return (
-                <tr key={driver.driver_number} className={`leaderboard-row ${isSelected ? "leaderboard-row--selected" : ""}`}>
+                <tr
+                  key={driver.driver_number}
+                  className={`leaderboard-row ${isSelected ? "leaderboard-row--selected" : ""}`}
+                  style={{ "--team-accent-color": `#${driver.team_colour}` } as React.CSSProperties}
+                >
                   <td className="leaderboard-cell"><span className="leaderboard-position">{driver.position}</span></td>
                   <td className="leaderboard-cell"><button onClick={() => onSelectDriver(driver.driver_number)} className="leaderboard-driver-button">{firstName ? <span className="leaderboard-driver-first-name">{firstName}</span> : null}<span className="leaderboard-driver-last-name">{lastName.toUpperCase()}</span></button></td>
                   <td className="leaderboard-cell"><span className="leaderboard-team-dot" style={{ backgroundColor: `#${driver.team_colour}` }} /><span className="leaderboard-team-name">{driver.team_name}</span></td>
