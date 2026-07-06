@@ -1,3 +1,11 @@
+.leaderboard-panel {
+  @apply border-0 bg-transparent;
+}
+
+.leaderboard-panel .panel-header {
+  @apply border-b-0 px-0 pt-0;
+}
+
 .leaderboard-toolbar {
   @apply flex items-center justify-between gap-3 border-b border-app-line px-4 py-3;
 }
@@ -23,11 +31,12 @@
 }
 
 .leaderboard-table {
-  @apply w-full min-w-[760px] border-collapse;
+  @apply w-full min-w-[760px] border-separate;
+  border-spacing: 0 0.5rem;
 }
 
 .leaderboard-header-row {
-  @apply border-b border-app-line text-left;
+  @apply text-left;
 }
 
 .leaderboard-header-cell,
@@ -40,12 +49,36 @@
 }
 
 .leaderboard-row {
-  @apply border-b;
-  border-color: color-mix(in srgb, var(--color-line) 70%, transparent);
+  @apply transition-colors;
+  background: color-mix(in srgb, var(--color-panel-alt) 92%, white 8%);
+  box-shadow: 0 8px 18px rgb(0 0 0 / 0.18);
+}
+
+.leaderboard-row:hover {
+  background: color-mix(in srgb, var(--color-panel-alt) 82%, white 18%);
 }
 
 .leaderboard-row--selected {
-  background-color: color-mix(in srgb, var(--color-f1-red) 10%, transparent);
+  background: color-mix(in srgb, var(--color-f1-red) 14%, var(--color-panel-alt));
+}
+
+.leaderboard-row--selected:hover {
+  background: color-mix(in srgb, var(--color-f1-red) 20%, var(--color-panel-alt));
+}
+
+.leaderboard-row .leaderboard-cell {
+  background: inherit;
+  border-block: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
+}
+
+.leaderboard-row .leaderboard-cell:first-child {
+  @apply rounded-l-md;
+  border-left: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
+}
+
+.leaderboard-row .leaderboard-cell:last-child {
+  @apply rounded-r-md;
+  border-right: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
 }
 
 .leaderboard-position {
@@ -53,15 +86,15 @@
 }
 
 .leaderboard-driver-button {
-  @apply text-left;
+  @apply grid gap-0.5 text-left leading-none;
 }
 
-.leaderboard-driver-code {
-  @apply text-sm font-black text-white;
+.leaderboard-driver-first-name {
+  @apply text-[11px] font-medium leading-none text-app-muted;
 }
 
-.leaderboard-driver-name {
-  @apply ml-2 text-xs font-medium text-app-muted;
+.leaderboard-driver-last-name {
+  @apply text-sm font-black uppercase leading-none tracking-wide text-white;
 }
 
 .leaderboard-team-dot {

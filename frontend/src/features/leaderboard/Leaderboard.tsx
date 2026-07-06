@@ -10,9 +10,19 @@ type LeaderboardProps = {
   onSelectDriver: (driverNumber: number) => void;
 };
 
+function splitDriverName(name: string) {
+  const nameParts = name.trim().split(/\s+/);
+  const lastName = nameParts.pop() ?? name;
+
+  return {
+    firstName: nameParts.join(" "),
+    lastName,
+  };
+}
+
 export function Leaderboard({ drivers, selectedDriver, timingMode, onTimingModeChange, onSelectDriver }: LeaderboardProps) {
   return (
-    <Panel label="Live driver table">
+    <Panel label="Live driver table" className="leaderboard-panel">
       <div className="leaderboard-toolbar">
         <div className="leaderboard-title">Leaderboard</div>
         <div className="timing-toggle" aria-label="Timing display mode">
@@ -33,10 +43,11 @@ export function Leaderboard({ drivers, selectedDriver, timingMode, onTimingModeC
             {drivers.map((driver) => {
               const isSelected = driver.driver_number === selectedDriver.driver_number;
               const gap = timingMode === "interval" ? formatGap(driver.interval_ahead) : formatGap(driver.gap_to_leader);
+              const { firstName, lastName } = splitDriverName(driver.name);
               return (
                 <tr key={driver.driver_number} className={`leaderboard-row ${isSelected ? "leaderboard-row--selected" : ""}`}>
                   <td className="leaderboard-cell"><span className="leaderboard-position">{driver.position}</span></td>
-                  <td className="leaderboard-cell"><button onClick={() => onSelectDriver(driver.driver_number)} className="leaderboard-driver-button"><span className="leaderboard-driver-code">{driver.acronym}</span><span className="leaderboard-driver-name">{driver.name}</span></button></td>
+                  <td className="leaderboard-cell"><button onClick={() => onSelectDriver(driver.driver_number)} className="leaderboard-driver-button">{firstName ? <span className="leaderboard-driver-first-name">{firstName}</span> : null}<span className="leaderboard-driver-last-name">{lastName.toUpperCase()}</span></button></td>
                   <td className="leaderboard-cell"><span className="leaderboard-team-dot" style={{ backgroundColor: `#${driver.team_colour}` }} /><span className="leaderboard-team-name">{driver.team_name}</span></td>
                   <td className="leaderboard-cell"><span className="leaderboard-value">{formatLapTime(driver.last_lap_time)}</span></td>
                   <td className="leaderboard-cell"><span className="leaderboard-value">{gap}</span></td>

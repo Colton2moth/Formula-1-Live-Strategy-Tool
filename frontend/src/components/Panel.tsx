@@ -4,11 +4,12 @@ type PanelProps = {
   label: string;
   children: ReactNode;
   prominent?: boolean;
+  className?: string;
 };
 
-export function Panel({ label, children, prominent = false }: PanelProps) {
+export function Panel({ label, children, prominent = false, className = "" }: PanelProps) {
   return (
-    <section className={`panel ${prominent ? "panel--prominent" : ""}`}>
+    <section className={`panel ${prominent ? "panel--prominent" : ""} ${className}`.trim()}>
       <div className={`panel-header ${prominent ? "panel-header--prominent" : ""}`}>
         <div role="heading" aria-level={2} className="panel-title">
           {label}
