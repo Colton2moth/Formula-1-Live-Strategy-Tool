@@ -1,41 +1,114 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-type Driver = {
-  id: string;
-  position: number;
-  code: string;
-  name: string;
-  team: string;
-  country: string;
-  lastLap: string;
-  interval: string;
-  leaderGap: string;
-  tyre: "Medium" | "Hard" | "Soft";
-  tyreColor: string;
-  teamColor: string;
-  mapX: number;
-  mapY: number;
+type ApiSession = {
+  meeting_name: string;
+  session_name: string;
+  session_status: string;
+  current_lap: number;
+  total_laps: number;
+  track_temperature: number;
+  air_temperature: number;
+  rainfall: boolean;
+  race_control_status: string;
 };
 
-const demoDrivers: Driver[] = [
-  { id: "lec", position: 1, code: "LEC", name: "Charles Leclerc", team: "Ferrari", country: "MC", lastLap: "1:33.912", interval: "Leader", leaderGap: "Leader", tyre: "Medium", tyreColor: "#ffd447", teamColor: "#e10600", mapX: 68, mapY: 23 },
-  { id: "ver", position: 2, code: "VER", name: "Max Verstappen", team: "Red Bull", country: "NL", lastLap: "1:34.104", interval: "+0.842", leaderGap: "+0.842", tyre: "Hard", tyreColor: "#f5f5f5", teamColor: "#3671c6", mapX: 78, mapY: 43 },
-  { id: "nor", position: 3, code: "NOR", name: "Lando Norris", team: "McLaren", country: "GB", lastLap: "1:34.281", interval: "+1.112", leaderGap: "+1.954", tyre: "Medium", tyreColor: "#ffd447", teamColor: "#ff8000", mapX: 47, mapY: 72 },
-  { id: "ham", position: 4, code: "HAM", name: "Lewis Hamilton", team: "Mercedes", country: "GB", lastLap: "1:34.510", interval: "+2.430", leaderGap: "+4.384", tyre: "Soft", tyreColor: "#ff3b3b", teamColor: "#27f4d2", mapX: 28, mapY: 58 },
-  { id: "alo", position: 5, code: "ALO", name: "Fernando Alonso", team: "Aston Martin", country: "ES", lastLap: "1:35.021", interval: "+1.008", leaderGap: "+5.392", tyre: "Hard", tyreColor: "#f5f5f5", teamColor: "#229971", mapX: 18, mapY: 31 },
-];
+type ApiDriver = {
+  driver_number: number;
+  name: string;
+  acronym: string;
+  team_name: string;
+  team_colour: string;
+  position: number;
+  compound: string;
+  tyre_age: number;
+  last_lap_time: number;
+  gap_to_leader: number;
+  interval_ahead: number | null;
+  pit_stops: number;
+};
 
-const selectedDriver = demoDrivers[0];
-const demoPitWindows = [
-  { label: "3 laps", value: 28 },
-  { label: "5 laps", value: 54 },
-  { label: "10 laps", value: 71 },
-];
-const demoCompounds = [
-  { label: "Hard", value: 62, color: "#f5f5f5" },
-  { label: "Medium", value: 27, color: "#ffd447" },
-  { label: "Soft", value: 11, color: "#ff3b3b" },
-];
+type ApiPrediction = {
+  driver_number: number;
+  pit_within_5_laps: number;
+  predicted_pit_window_start: number;
+  predicted_pit_window_end: number;
+  predicted_next_compound: string;
+  updated_at: string;
+};
+
+type RaceState = {
+  session: ApiSession;
+  drivers: ApiDriver[];
+  predictions: ApiPrediction[];
+};
+
+type TrackPoint = { x: number; y: number };
+type TrackState = { circuit_name: string; path: TrackPoint[] };
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
+const tyreColors: Record<string, string> = {
+  HARD: "#f5f5f5",
+  MEDIUM: "#ffd447",
+  SOFT: "#ff3b3b",
+  INTERMEDIATE: "#43d65d",
+  WET: "#3a7dff",
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function assertRaceState(value: unknown): RaceState {
+  if (!isRecord(value) || !isRecord(value.session) || !Array.isArray(value.drivers) || !Array.isArray(value.predictions)) {
+    throw new Error("Race state response did not match the expected shape.");
+  }
+  return value as RaceState;
+}
+
+function assertTrackState(value: unknown): TrackState {
+  if (!isRecord(value) || !Array.isArray(value.path)) {
+    throw new Error("Track response did not match the expected shape.");
+  }
+  return value as TrackState;
+}
+
+async function fetchJson<T>(path: string, parse: (value: unknown) => T): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`);
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+  return parse(await response.json());
+}
+
+function formatLapTime(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remaining = (seconds - minutes * 60).toFixed(3).padStart(6, "0");
+  return `${minutes}:${remaining}`;
+}
+
+function formatGap(value: number | null) {
+  if (value === null || value === 0) {
+    return "Leader";
+  }
+  return `+${value.toFixed(1)}`;
+}
+
+function formatUpdatedAt(value: string) {
+  return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+
+function trackPath(points: TrackPoint[]) {
+  return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x * 100} ${point.y * 80}`).join(" ");
+}
+
+function markerPoint(points: TrackPoint[], index: number, total: number) {
+  if (points.length === 0) {
+    return { x: 50, y: 40 };
+  }
+  const pathIndex = Math.floor((index / Math.max(total, 1)) * (points.length - 1));
+  const point = points[pathIndex] ?? points[0];
+  return { x: point.x * 100, y: point.y * 80 };
+}
 
 function Panel({ label, children, prominent = false }: { label: string; children: React.ReactNode; prominent?: boolean }) {
   return (
@@ -55,7 +128,7 @@ function StatusChip({ label, tone = "neutral" }: { label: string; tone?: "red" |
   return <span className={`inline-flex items-center rounded-sm border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${toneClass}`}>{label}</span>;
 }
 
-function ProbabilityBar({ label, value, color }: { label: string; value: number; color?: string }) {
+function ProbabilityBar({ label, value, color = "var(--color-f1-red)" }: { label: string; value: number; color?: string }) {
   return (
     <div className="grid gap-1">
       <div className="flex items-center justify-between gap-3">
@@ -63,14 +136,71 @@ function ProbabilityBar({ label, value, color }: { label: string; value: number;
         <span className="text-xs font-semibold tabular-nums text-app-muted">{value}%</span>
       </div>
       <div className="h-2 overflow-hidden rounded-sm bg-app-panelAlt" aria-label={`${label} probability ${value}%`}>
-        <div className="h-full rounded-sm bg-app-red" style={{ width: `${value}%`, backgroundColor: color }} />
+        <div className="h-full rounded-sm" style={{ width: `${value}%`, backgroundColor: color }} />
       </div>
     </div>
   );
 }
 
 function App() {
+  const [raceState, setRaceState] = useState<RaceState | null>(null);
+  const [track, setTrack] = useState<TrackState | null>(null);
+  const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
   const [timingMode, setTimingMode] = useState<"interval" | "leaderGap">("interval");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetchJson("/api/race-state", assertRaceState),
+      fetchJson("/api/track", assertTrackState),
+    ])
+      .then(([raceStateResponse, trackResponse]) => {
+        if (!active) return;
+        setRaceState(raceStateResponse);
+        setTrack(trackResponse);
+        setSelectedDriverNumber(raceStateResponse.drivers[0]?.driver_number ?? null);
+      })
+      .catch((requestError: unknown) => {
+        if (!active) return;
+        setError(requestError instanceof Error ? requestError.message : "Unable to load race data.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedDriver = raceState?.drivers.find((driver) => driver.driver_number === selectedDriverNumber) ?? raceState?.drivers[0] ?? null;
+  const selectedPrediction = raceState?.predictions.find((prediction) => prediction.driver_number === selectedDriver?.driver_number) ?? null;
+  const sortedDrivers = useMemo(() => [...(raceState?.drivers ?? [])].sort((a, b) => a.position - b.position), [raceState]);
+  const mapPath = track ? trackPath(track.path) : "";
+
+  if (error) {
+    return (
+      <main className="min-h-screen bg-app-bg px-4 py-4 font-sans text-app-text md:px-6">
+        <div className="mx-auto grid max-w-[760px] gap-3 border border-app-red bg-app-panel p-5">
+          <div role="heading" aria-level={1} className="text-xl font-black uppercase text-white">Race data unavailable</div>
+          <div className="text-sm font-medium leading-6 text-app-muted">{error}</div>
+          <div className="text-sm font-semibold text-app-text">Start FastAPI, then refresh the Vite app.</div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!raceState || !track || !selectedDriver) {
+    return (
+      <main className="min-h-screen bg-app-bg px-4 py-4 font-sans text-app-text md:px-6">
+        <div className="mx-auto grid max-w-[760px] gap-3 border border-app-line bg-app-panel p-5">
+          <div role="heading" aria-level={1} className="text-xl font-black uppercase text-white">Loading race snapshot</div>
+          <div className="text-sm font-medium leading-6 text-app-muted">Waiting for the mock REST API.</div>
+        </div>
+      </main>
+    );
+  }
+
+  const flagTone = raceState.session.race_control_status === "GREEN" ? "green" : "red";
+  const selectedTeamColor = `#${selectedDriver.team_colour}`;
+  const pitProbability = selectedPrediction ? Math.round(selectedPrediction.pit_within_5_laps * 100) : null;
 
   return (
     <main className="min-h-screen bg-app-bg px-4 py-4 font-sans text-app-text md:px-6">
@@ -78,15 +208,15 @@ function App() {
         <header className="grid gap-3 border-l-4 border-app-red bg-app-panel px-4 py-4 md:grid-cols-[1fr_auto] md:items-center">
           <div className="grid gap-1">
             <div role="heading" aria-level={1} className="text-2xl font-black uppercase leading-none tracking-normal text-white md:text-3xl">
-              Canadian Grand Prix
+              {raceState.session.meeting_name}
             </div>
-            <div className="text-sm font-medium text-app-muted">Circuit Gilles Villeneuve · Race strategy dashboard skeleton</div>
+            <div className="text-sm font-medium text-app-muted">{track.circuit_name} - mock REST snapshot</div>
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
-            <StatusChip label="No live race data connected yet" />
-            <StatusChip label="Green flag" tone="green" />
-            <StatusChip label="Race · Lap 31/70" />
-            <StatusChip label="21 C · Dry" />
+            <StatusChip label={raceState.session.session_status} />
+            <StatusChip label={`${raceState.session.race_control_status} flag`} tone={flagTone} />
+            <StatusChip label={`${raceState.session.session_name} - lap ${raceState.session.current_lap}/${raceState.session.total_laps}`} />
+            <StatusChip label={`${raceState.session.air_temperature} C air - ${raceState.session.rainfall ? "wet" : "dry"}`} />
           </div>
         </header>
 
@@ -94,28 +224,32 @@ function App() {
           <div className="grid gap-4">
             <Panel label="Track map">
               <div className="relative min-h-[390px] overflow-hidden bg-app-panelAlt p-4">
-                <svg viewBox="0 0 100 80" className="h-full min-h-[340px] w-full" role="img" aria-label="Static demo circuit map with selected driver markers">
-                  <path d="M17 27 C20 8 49 8 67 17 C86 27 89 49 75 62 C60 78 33 74 21 61 C9 48 9 37 17 27 Z" fill="none" stroke="var(--color-track)" strokeWidth="5" strokeLinecap="round" />
-                  <path d="M17 27 C20 8 49 8 67 17 C86 27 89 49 75 62 C60 78 33 74 21 61 C9 48 9 37 17 27 Z" fill="none" stroke="var(--color-f1-red)" strokeWidth="1.4" strokeLinecap="round" strokeDasharray="7 9" />
-                  {demoDrivers.map((driver) => (
-                    <g key={driver.id} tabIndex={0} aria-label={`${driver.code} ${driver.position === selectedDriver.position ? "selected driver" : "driver"} marker`}>
-                      <circle cx={driver.mapX} cy={driver.mapY} r={driver.id === selectedDriver.id ? 4.7 : 3.8} fill={driver.teamColor} stroke={driver.id === selectedDriver.id ? "white" : "var(--color-bg)"} strokeWidth="1.8" />
-                      <text x={driver.mapX + 4.8} y={driver.mapY + 1.3} fill="white" fontSize="4" fontWeight="700">
-                        {driver.code}
-                      </text>
-                    </g>
-                  ))}
+                <svg viewBox="0 0 100 80" className="h-full min-h-[340px] w-full" role="img" aria-label={`${track.circuit_name} circuit map with selectable driver markers`}>
+                  <path d={mapPath} fill="none" stroke="var(--color-track)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d={mapPath} fill="none" stroke="var(--color-f1-red)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="7 9" />
+                  {sortedDrivers.map((driver, index) => {
+                    const marker = markerPoint(track.path, index, sortedDrivers.length);
+                    const isSelected = driver.driver_number === selectedDriver.driver_number;
+                    return (
+                      <g key={driver.driver_number} role="button" tabIndex={0} className="cursor-pointer outline-none" aria-label={`Select ${driver.acronym} marker`} onClick={() => setSelectedDriverNumber(driver.driver_number)} onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") setSelectedDriverNumber(driver.driver_number);
+                      }}>
+                        <circle cx={marker.x} cy={marker.y} r={isSelected ? 4.7 : 3.8} fill={`#${driver.team_colour}`} stroke={isSelected ? "white" : "var(--color-bg)"} strokeWidth="1.8" />
+                        <text x={marker.x + 4.8} y={marker.y + 1.3} fill="white" fontSize="4" fontWeight="700">{driver.acronym}</text>
+                      </g>
+                    );
+                  })}
                 </svg>
                 <div className="absolute left-4 top-4 rounded-sm border border-app-line bg-app-bg px-3 py-2">
                   <span className="text-xs font-semibold uppercase tracking-wide text-app-muted">Selected </span>
-                  <span className="text-xs font-black text-white">{selectedDriver.code}</span>
+                  <span className="text-xs font-black text-white">{selectedDriver.acronym}</span>
                 </div>
               </div>
             </Panel>
 
             <Panel label="Live driver table">
               <div className="flex items-center justify-between gap-3 border-b border-app-line px-4 py-3">
-                <div className="text-sm font-semibold text-white">Leaderboard placeholder</div>
+                <div className="text-sm font-semibold text-white">Leaderboard</div>
                 <div className="flex rounded-sm border border-app-line p-0.5" aria-label="Timing display mode">
                   <button onClick={() => setTimingMode("interval")} className={`px-3 py-1 text-xs font-semibold ${timingMode === "interval" ? "bg-app-red text-white" : "text-app-muted"}`}>Interval</button>
                   <button onClick={() => setTimingMode("leaderGap")} className={`px-3 py-1 text-xs font-semibold ${timingMode === "leaderGap" ? "bg-app-red text-white" : "text-app-muted"}`}>Leader gap</button>
@@ -125,23 +259,27 @@ function App() {
                 <table className="w-full min-w-[760px] border-collapse">
                   <thead>
                     <tr className="border-b border-app-line text-left">
-                      {["Pos", "Driver", "Team", "Last lap", "Gap", "Tyre", "Country"].map((label) => (
+                      {["Pos", "Driver", "Team", "Last lap", "Gap", "Tyre", "Stops"].map((label) => (
                         <th key={label} className="px-4 py-2"><span className="text-[11px] font-semibold uppercase tracking-wide text-app-muted">{label}</span></th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {demoDrivers.map((driver) => (
-                      <tr key={driver.id} className={`border-b border-app-line/70 ${driver.id === selectedDriver.id ? "bg-app-red/10" : ""}`}>
-                        <td className="px-4 py-2"><span className="text-sm font-black tabular-nums text-white">{driver.position}</span></td>
-                        <td className="px-4 py-2"><span className="text-sm font-black text-white">{driver.code}</span><span className="ml-2 text-xs font-medium text-app-muted">{driver.name}</span></td>
-                        <td className="px-4 py-2"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: driver.teamColor }} /><span className="ml-2 text-sm font-semibold text-app-text">{driver.team}</span></td>
-                        <td className="px-4 py-2"><span className="text-sm font-semibold tabular-nums text-app-text">{driver.lastLap}</span></td>
-                        <td className="px-4 py-2"><span className="text-sm font-semibold tabular-nums text-app-text">{driver[timingMode]}</span></td>
-                        <td className="px-4 py-2"><span className="rounded-sm border border-app-line px-2 py-1 text-xs font-black uppercase text-white" style={{ borderColor: driver.tyreColor }}>{driver.tyre}</span></td>
-                        <td className="px-4 py-2"><span className="text-sm font-semibold text-app-muted">{driver.country}</span></td>
-                      </tr>
-                    ))}
+                    {sortedDrivers.map((driver) => {
+                      const isSelected = driver.driver_number === selectedDriver.driver_number;
+                      const gap = timingMode === "interval" ? formatGap(driver.interval_ahead) : formatGap(driver.gap_to_leader);
+                      return (
+                        <tr key={driver.driver_number} className={`border-b border-app-line/70 ${isSelected ? "bg-app-red/10" : ""}`}>
+                          <td className="px-4 py-2"><span className="text-sm font-black tabular-nums text-white">{driver.position}</span></td>
+                          <td className="px-4 py-2"><button onClick={() => setSelectedDriverNumber(driver.driver_number)} className="text-left"><span className="text-sm font-black text-white">{driver.acronym}</span><span className="ml-2 text-xs font-medium text-app-muted">{driver.name}</span></button></td>
+                          <td className="px-4 py-2"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: `#${driver.team_colour}` }} /><span className="ml-2 text-sm font-semibold text-app-text">{driver.team_name}</span></td>
+                          <td className="px-4 py-2"><span className="text-sm font-semibold tabular-nums text-app-text">{formatLapTime(driver.last_lap_time)}</span></td>
+                          <td className="px-4 py-2"><span className="text-sm font-semibold tabular-nums text-app-text">{gap}</span></td>
+                          <td className="px-4 py-2"><span className="rounded-sm border border-app-line px-2 py-1 text-xs font-black uppercase text-white" style={{ borderColor: tyreColors[driver.compound] ?? "var(--color-line)" }}>{driver.compound} {driver.tyre_age}L</span></td>
+                          <td className="px-4 py-2"><span className="text-sm font-semibold tabular-nums text-app-muted">{driver.pit_stops}</span></td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -150,43 +288,42 @@ function App() {
 
           <Panel label="AI strategy panel" prominent>
             <div className="grid gap-5 p-5">
-              <div className="grid gap-1 border-l-4 border-app-red pl-4">
+              <div className="grid gap-1 border-l-4 border-app-red pl-4" style={{ borderColor: selectedTeamColor }}>
                 <span className="text-xs font-semibold uppercase tracking-wide text-app-muted">Selected driver</span>
-                <span className="text-4xl font-black uppercase leading-none text-white">{selectedDriver.code}</span>
-                <span className="text-sm font-semibold text-app-muted">{selectedDriver.name} · {selectedDriver.team}</span>
+                <span className="text-4xl font-black uppercase leading-none text-white">{selectedDriver.acronym}</span>
+                <span className="text-sm font-semibold text-app-muted">{selectedDriver.name} - {selectedDriver.team_name}</span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                {demoPitWindows.map((window) => (
-                  <div key={window.label} className="border border-app-line bg-app-panelAlt p-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-app-muted">{window.label}</div>
-                    <div className="mt-2 text-2xl font-black tabular-nums text-white">{window.value}%</div>
-                    <div className="mt-1 text-xs font-medium text-app-muted">pit probability</div>
+              {selectedPrediction ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="border border-app-line bg-app-panelAlt p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-app-muted">Pit within 5 laps</div>
+                      <div className="mt-2 text-2xl font-black tabular-nums text-white">{pitProbability}%</div>
+                      <div className="mt-1 text-xs font-medium text-app-muted">model estimate</div>
+                    </div>
+                    <div className="border border-app-line bg-app-panelAlt p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-app-muted">Predicted window</div>
+                      <div className="mt-2 text-2xl font-black tabular-nums text-white">{selectedPrediction.predicted_pit_window_start}-{selectedPrediction.predicted_pit_window_end}</div>
+                      <div className="mt-1 text-xs font-medium text-app-muted">race laps</div>
+                    </div>
                   </div>
-                ))}
-              </div>
-
-              <div className="grid gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-black uppercase text-white">Likely next tyre</span>
-                  <span className="rounded-sm bg-white px-2 py-1 text-xs font-black uppercase text-black">Hard</span>
+                  <ProbabilityBar label="Pit probability" value={pitProbability ?? 0} />
+                  <div className="flex items-center justify-between gap-3 border-t border-app-line pt-4">
+                    <span className="text-sm font-black uppercase text-white">Likely next tyre</span>
+                    <span className="rounded-sm border px-2 py-1 text-xs font-black uppercase text-white" style={{ borderColor: tyreColors[selectedPrediction.predicted_next_compound] ?? "var(--color-line)" }}>{selectedPrediction.predicted_next_compound}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusChip label={`Updated ${formatUpdatedAt(selectedPrediction.updated_at)}`} />
+                    <StatusChip label="Mock model output" />
+                  </div>
+                </>
+              ) : (
+                <div className="grid gap-2 border border-app-line bg-app-panelAlt p-4">
+                  <div className="text-sm font-semibold text-white">Prediction unavailable</div>
+                  <div className="text-sm font-medium leading-6 text-app-muted">No model estimate exists for the selected driver in the current snapshot.</div>
                 </div>
-                {demoCompounds.map((compound) => (
-                  <ProbabilityBar key={compound.label} label={compound.label} value={compound.value} color={compound.color} />
-                ))}
-              </div>
-
-              <div className="grid gap-2 border-t border-app-line pt-4">
-                <div className="text-sm font-semibold text-white">Model estimate placeholder</div>
-                <div className="text-sm font-medium leading-6 text-app-muted">
-                  Static layout data only. No live API, WebSocket, prediction model, or backend data is connected yet.
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <StatusChip label="Snapshot unavailable" tone="red" />
-                  <StatusChip label="Freshness pending" />
-                  <StatusChip label="Demo UI state" />
-                </div>
-              </div>
+              )}
             </div>
           </Panel>
         </div>
