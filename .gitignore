@@ -80,6 +80,7 @@ logs/
 # Local data
 data/raw/
 data/processed/
+download_errors.jsonl
 *.csv
 *.parquet
 !data/.gitkeep
