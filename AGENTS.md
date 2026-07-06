@@ -52,24 +52,8 @@ The main goal is to help the developer understand the system.
 - Put all visible new functionality under `feat`, but also add project-area sections such as `api`, `types`, `data`, or `state` when those parts changed.
 - Keep each grouped bullet specific enough that the developer can see what changed without reading the diff.
 - Do not create empty sections or list tags that did not change.
-
-Example:
-
-```text
-feat(strategy-panel): added pit prediction cards
-
-feat:
-- Added pit probability cards for the selected driver.
-- Show likely next tyre compound and model freshness.
-
-api:
-- Read pit prediction fields from the race snapshot response.
-
-style:
-- Tighten strategy panel spacing for the dashboard layout.
-```
-
-You may look through previous commits for more examples
+- When making commit messages make sure to use past tense since you will be talking about changes that have already been implemented.
+- You may look through previous commits for more examples.
 
 ## Simplicity rules
 

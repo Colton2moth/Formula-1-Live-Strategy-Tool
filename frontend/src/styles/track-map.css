@@ -1,0 +1,23 @@
+.track-map-frame {
+  @apply relative min-h-[390px] overflow-hidden bg-app-panelAlt p-4;
+}
+
+.track-map-svg {
+  @apply h-full min-h-[340px] w-full;
+}
+
+.track-map-marker {
+  @apply cursor-pointer outline-none;
+}
+
+.track-map-selected-chip {
+  @apply absolute left-4 top-4 rounded-sm border border-app-line bg-app-bg px-3 py-2;
+}
+
+.track-map-selected-label {
+  @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.track-map-selected-value {
+  @apply text-xs font-black text-white;
+}

@@ -1,0 +1,95 @@
+.dashboard-shell {
+  @apply min-h-screen bg-app-bg px-4 py-4 font-sans text-app-text md:px-6;
+}
+
+.dashboard-container {
+  @apply mx-auto grid max-w-[1440px] gap-4;
+}
+
+.dashboard-layout {
+  @apply grid gap-4 xl:grid-cols-[1.55fr_0.95fr];
+}
+
+.dashboard-stack {
+  @apply grid gap-4;
+}
+
+.dashboard-state-card {
+  @apply mx-auto grid max-w-[760px] gap-3 border border-app-line bg-app-panel p-5;
+}
+
+.dashboard-state-card--error {
+  @apply border-app-red;
+}
+
+.dashboard-state-title {
+  @apply text-xl font-black uppercase text-white;
+}
+
+.dashboard-state-message {
+  @apply text-sm font-medium leading-6 text-app-muted;
+}
+
+.dashboard-state-help {
+  @apply text-sm font-semibold text-app-text;
+}
+
+.panel {
+  @apply rounded border border-app-line bg-app-panel;
+}
+
+.panel--prominent {
+  @apply border-app-red;
+}
+
+.panel-header {
+  @apply border-b border-app-line px-4 py-3;
+}
+
+.panel-header--prominent {
+  @apply border-app-red;
+}
+
+.panel-title {
+  @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.status-chip {
+  @apply inline-flex items-center rounded-sm border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide;
+}
+
+.status-chip--neutral {
+  @apply border-app-line text-app-muted;
+}
+
+.status-chip--green {
+  @apply border-emerald-500 text-emerald-200;
+}
+
+.status-chip--red {
+  @apply border-app-red text-white;
+}
+
+.probability-bar {
+  @apply grid gap-1;
+}
+
+.probability-bar-header {
+  @apply flex items-center justify-between gap-3;
+}
+
+.probability-bar-label {
+  @apply text-xs font-semibold text-app-text;
+}
+
+.probability-bar-value {
+  @apply text-xs font-semibold tabular-nums text-app-muted;
+}
+
+.probability-bar-track {
+  @apply h-2 overflow-hidden rounded-sm bg-app-panelAlt;
+}
+
+.probability-bar-fill {
+  @apply h-full rounded-sm;
+}

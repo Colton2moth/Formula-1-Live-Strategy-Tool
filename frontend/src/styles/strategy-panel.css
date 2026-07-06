@@ -1,0 +1,67 @@
+.strategy-panel-body {
+  @apply grid gap-5 p-5;
+}
+
+.strategy-driver-summary {
+  @apply grid gap-1 border-l-4 border-app-red pl-4;
+}
+
+.strategy-eyebrow {
+  @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.strategy-driver-code {
+  @apply text-4xl font-black uppercase leading-none text-white;
+}
+
+.strategy-driver-meta {
+  @apply text-sm font-semibold text-app-muted;
+}
+
+.strategy-card-grid {
+  @apply grid grid-cols-2 gap-3;
+}
+
+.strategy-card {
+  @apply border border-app-line bg-app-panelAlt p-3;
+}
+
+.strategy-card-label {
+  @apply text-[11px] font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.strategy-card-value {
+  @apply mt-2 text-2xl font-black tabular-nums text-white;
+}
+
+.strategy-card-help {
+  @apply mt-1 text-xs font-medium text-app-muted;
+}
+
+.strategy-next-tyre-row {
+  @apply flex items-center justify-between gap-3 border-t border-app-line pt-4;
+}
+
+.strategy-next-tyre-label {
+  @apply text-sm font-black uppercase text-white;
+}
+
+.strategy-tyre-chip {
+  @apply rounded-sm border px-2 py-1 text-xs font-black uppercase text-white;
+}
+
+.strategy-status-row {
+  @apply flex flex-wrap gap-2;
+}
+
+.strategy-empty-state {
+  @apply grid gap-2 border border-app-line bg-app-panelAlt p-4;
+}
+
+.strategy-empty-title {
+  @apply text-sm font-semibold text-white;
+}
+
+.strategy-empty-copy {
+  @apply text-sm font-medium leading-6 text-app-muted;
+}

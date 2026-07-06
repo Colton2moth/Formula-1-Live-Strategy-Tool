@@ -13,15 +13,15 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
 
   return (
     <Panel label="Track map">
-      <div className="relative min-h-[390px] overflow-hidden bg-app-panelAlt p-4">
-        <svg viewBox="0 0 100 80" className="h-full min-h-[340px] w-full" role="img" aria-label={`${track.circuit_name} circuit map with selectable driver markers`}>
+      <div className="track-map-frame">
+        <svg viewBox="0 0 100 80" className="track-map-svg" role="img" aria-label={`${track.circuit_name} circuit map with selectable driver markers`}>
           <path d={mapPath} fill="none" stroke="var(--color-track)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
           <path d={mapPath} fill="none" stroke="var(--color-f1-red)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="7 9" />
           {drivers.map((driver, index) => {
             const marker = markerPoint(track.path, index, drivers.length);
             const isSelected = driver.driver_number === selectedDriver.driver_number;
             return (
-              <g key={driver.driver_number} role="button" tabIndex={0} className="cursor-pointer outline-none" aria-label={`Select ${driver.acronym} marker`} onClick={() => onSelectDriver(driver.driver_number)} onKeyDown={(event) => {
+              <g key={driver.driver_number} role="button" tabIndex={0} className="track-map-marker" aria-label={`Select ${driver.acronym} marker`} onClick={() => onSelectDriver(driver.driver_number)} onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") onSelectDriver(driver.driver_number);
               }}>
                 <circle cx={marker.x} cy={marker.y} r={isSelected ? 2.4 : 2} fill={`#${driver.team_colour}`} stroke={isSelected ? "white" : "var(--color-bg)"} strokeWidth="0.8" />
@@ -30,9 +30,9 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
             );
           })}
         </svg>
-        <div className="absolute left-4 top-4 rounded-sm border border-app-line bg-app-bg px-3 py-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-app-muted">Selected </span>
-          <span className="text-xs font-black text-white">{selectedDriver.acronym}</span>
+        <div className="track-map-selected-chip">
+          <span className="track-map-selected-label">Selected </span>
+          <span className="track-map-selected-value">{selectedDriver.acronym}</span>
         </div>
       </div>
     </Panel>

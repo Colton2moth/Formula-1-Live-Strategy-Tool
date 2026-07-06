@@ -1,0 +1,19 @@
+.race-header {
+  @apply grid gap-3 border-l-4 border-app-red bg-app-panel px-4 py-4 md:grid-cols-[1fr_auto] md:items-center;
+}
+
+.race-header-copy {
+  @apply grid gap-1;
+}
+
+.race-header-title {
+  @apply text-2xl font-black uppercase leading-none tracking-normal text-white md:text-3xl;
+}
+
+.race-header-subtitle {
+  @apply text-sm font-medium text-app-muted;
+}
+
+.race-header-statuses {
+  @apply flex flex-wrap gap-2 md:justify-end;
+}

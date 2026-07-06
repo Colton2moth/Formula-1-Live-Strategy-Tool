@@ -37,11 +37,11 @@ function App() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-app-bg px-4 py-4 font-sans text-app-text md:px-6">
-        <div className="mx-auto grid max-w-[760px] gap-3 border border-app-red bg-app-panel p-5">
-          <div role="heading" aria-level={1} className="text-xl font-black uppercase text-white">Race data unavailable</div>
-          <div className="text-sm font-medium leading-6 text-app-muted">{error}</div>
-          <div className="text-sm font-semibold text-app-text">Start FastAPI, then refresh the Vite app.</div>
+      <main className="dashboard-shell">
+        <div className="dashboard-state-card dashboard-state-card--error">
+          <div role="heading" aria-level={1} className="dashboard-state-title">Race data unavailable</div>
+          <div className="dashboard-state-message">{error}</div>
+          <div className="dashboard-state-help">Start FastAPI, then refresh the Vite app.</div>
         </div>
       </main>
     );
@@ -49,21 +49,21 @@ function App() {
 
   if (!raceState || !track || !selectedDriver) {
     return (
-      <main className="min-h-screen bg-app-bg px-4 py-4 font-sans text-app-text md:px-6">
-        <div className="mx-auto grid max-w-[760px] gap-3 border border-app-line bg-app-panel p-5">
-          <div role="heading" aria-level={1} className="text-xl font-black uppercase text-white">Loading race snapshot</div>
-          <div className="text-sm font-medium leading-6 text-app-muted">Waiting for the mock REST API.</div>
+      <main className="dashboard-shell">
+        <div className="dashboard-state-card">
+          <div role="heading" aria-level={1} className="dashboard-state-title">Loading race snapshot</div>
+          <div className="dashboard-state-message">Waiting for the mock REST API.</div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-app-bg px-4 py-4 font-sans text-app-text md:px-6">
-      <div className="mx-auto grid max-w-[1440px] gap-4">
+    <main className="dashboard-shell">
+      <div className="dashboard-container">
         <RaceHeader session={raceState.session} track={track} />
-        <div className="grid gap-4 xl:grid-cols-[1.55fr_0.95fr]">
-          <div className="grid gap-4">
+        <div className="dashboard-layout">
+          <div className="dashboard-stack">
             <TrackMap track={track} drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriverNumber} />
             <Leaderboard drivers={sortedDrivers} selectedDriver={selectedDriver} timingMode={timingMode} onTimingModeChange={setTimingMode} onSelectDriver={setSelectedDriverNumber} />
           </div>
