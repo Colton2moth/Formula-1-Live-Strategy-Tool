@@ -13,6 +13,7 @@ export default {
           panelAlt: "var(--color-panel-alt)",
           line: "var(--color-line)",
           red: "var(--color-f1-red)",
+          selectionBlue: "var(--color-selection-blue)",
           text: "var(--color-text)",
           muted: "var(--color-muted)",
         },

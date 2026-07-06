@@ -36,6 +36,7 @@
 
 .panel {
   @apply rounded border border-app-line bg-app-panel;
+  transition: border-color var(--motion-duration-standard) var(--motion-easing-standard), box-shadow var(--motion-duration-standard) var(--motion-easing-standard);
 }
 
 .panel--prominent {
@@ -56,6 +57,7 @@
 
 .status-chip {
   @apply inline-flex items-center rounded-sm border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide;
+  transition: border-color var(--motion-duration-fast) var(--motion-easing-standard), color var(--motion-duration-fast) var(--motion-easing-standard), background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
 .status-chip--neutral {
@@ -92,4 +94,5 @@
 
 .probability-bar-fill {
   @apply h-full rounded-sm;
+  transition: width var(--motion-duration-standard) var(--motion-easing-standard), background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }

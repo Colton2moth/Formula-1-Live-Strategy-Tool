@@ -87,6 +87,7 @@ The main goal is to help the developer understand the system.
 - Organize frontend code by feature, such as `track-map`, `leaderboard`, `strategy-panel`, and `race-header`.
 - Create reusable UI elements for repeated patterns like panels, buttons, status chips, tables, and probability bars when it makes the app easier to understand. Keep them simple and named by visible purpose.
 - Add routing only when the app gains multiple pages.
+- Whenever a user interaction feature is added, such as hover states, click states, selected states, toggles, expandable panels, tooltips, focus states, or any other visual change triggered by user input, include a subtle accompanying animation or transition. Prefer short, consistent transitions for opacity, transform, colour, shadow, border, background, scale, or position changes so the UI feels cohesive without becoming distracting.
 
 
 ## Text and typography rules
