@@ -1,9 +1,9 @@
 .track-map-frame {
-  @apply relative min-h-[390px] overflow-hidden bg-app-panelAlt p-4;
+  @apply relative h-[200px] overflow-hidden bg-app-panelAlt p-4;
 }
 
 .track-map-svg {
-  @apply h-full min-h-[340px] w-full;
+  @apply h-full min-h-[180px] w-full;
 }
 
 .track-map-marker {

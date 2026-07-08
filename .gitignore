@@ -45,7 +45,9 @@ env/
 *~
 
 # Documentation (local working notes)
-docs/
+docs/*
+!docs/
+!docs/DEVELOPMENT_STARTUP.md
 
 # Testing / coverage
 .pytest_cache/

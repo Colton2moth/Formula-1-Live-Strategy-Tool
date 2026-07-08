@@ -90,6 +90,7 @@
     ),
     var(--leaderboard-row-base);
   box-shadow: 0 8px 18px rgb(0 0 0 / 0.18);
+  cursor: pointer;
   transition: --leaderboard-row-base var(--motion-duration-standard) var(--motion-easing-standard), border-color var(--motion-duration-fast) var(--motion-easing-standard), box-shadow var(--motion-duration-standard) var(--motion-easing-standard), transform var(--motion-duration-standard) var(--motion-easing-standard);
 }
 
@@ -97,6 +98,11 @@
   --leaderboard-row-base: color-mix(in srgb, var(--color-panel-alt) 82%, white 18%);
   box-shadow: 0 10px 22px rgb(0 0 0 / 0.24);
   transform: translateY(-1px);
+}
+
+.leaderboard-row:focus-visible {
+  outline: 2px solid var(--color-f1-red);
+  outline-offset: 2px;
 }
 
 .leaderboard-row .leaderboard-cell {
@@ -134,13 +140,8 @@
   @apply text-[18px] font-black tabular-nums text-white;
 }
 
-.leaderboard-driver-button {
+.leaderboard-driver-name {
   @apply grid gap-0.5 text-left leading-none;
-  transition: color var(--motion-duration-fast) var(--motion-easing-standard), transform var(--motion-duration-fast) var(--motion-easing-standard);
-}
-
-.leaderboard-driver-button:hover {
-  transform: translateX(2px);
 }
 
 .leaderboard-driver-first-name {

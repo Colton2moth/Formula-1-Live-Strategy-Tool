@@ -65,9 +65,9 @@ function App() {
         <div className="dashboard-layout">
           <div className="dashboard-stack">
             <TrackMap track={track} drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriverNumber} />
-            <Leaderboard drivers={sortedDrivers} selectedDriver={selectedDriver} timingMode={timingMode} onTimingModeChange={setTimingMode} onSelectDriver={setSelectedDriverNumber} />
+            <StrategyPanel selectedDriver={selectedDriver} prediction={selectedPrediction} />
           </div>
-          <StrategyPanel selectedDriver={selectedDriver} prediction={selectedPrediction} />
+          <Leaderboard drivers={sortedDrivers} selectedDriver={selectedDriver} timingMode={timingMode} onTimingModeChange={setTimingMode} onSelectDriver={setSelectedDriverNumber} />
         </div>
       </div>
     </main>

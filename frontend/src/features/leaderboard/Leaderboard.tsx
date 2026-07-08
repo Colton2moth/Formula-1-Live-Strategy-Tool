@@ -48,10 +48,16 @@ export function Leaderboard({ drivers, selectedDriver, timingMode, onTimingModeC
                 <tr
                   key={driver.driver_number}
                   className={`leaderboard-row ${isSelected ? "leaderboard-row--selected" : ""}`}
+                  tabIndex={0}
+                  aria-label={`Select ${driver.acronym}`}
+                  onClick={() => onSelectDriver(driver.driver_number)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") onSelectDriver(driver.driver_number);
+                  }}
                   style={{ "--team-accent-color": `#${driver.team_colour}` } as React.CSSProperties}
                 >
                   <td className="leaderboard-cell"><span className="leaderboard-position">{driver.position}</span></td>
-                  <td className="leaderboard-cell"><button onClick={() => onSelectDriver(driver.driver_number)} className="leaderboard-driver-button">{firstName ? <span className="leaderboard-driver-first-name">{firstName}</span> : null}<span className="leaderboard-driver-last-name">{lastName.toUpperCase()}</span></button></td>
+                  <td className="leaderboard-cell"><span className="leaderboard-driver-name">{firstName ? <span className="leaderboard-driver-first-name">{firstName}</span> : null}<span className="leaderboard-driver-last-name">{lastName.toUpperCase()}</span></span></td>
                   <td className="leaderboard-cell"><span className="leaderboard-team-dot" style={{ backgroundColor: `#${driver.team_colour}` }} /><span className="leaderboard-team-name">{driver.team_name}</span></td>
                   <td className="leaderboard-cell"><span className="leaderboard-value">{formatLapTime(driver.last_lap_time)}</span></td>
                   <td className="leaderboard-cell"><span className="leaderboard-value">{gap}</span></td>
