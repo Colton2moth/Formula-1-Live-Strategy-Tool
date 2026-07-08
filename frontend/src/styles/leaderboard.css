@@ -7,7 +7,9 @@
 }
 
 .leaderboard-toolbar {
-  @apply flex items-center justify-between gap-3 border-b border-app-line px-4 py-3;
+  @apply flex items-center justify-between gap-3 border border-app-line bg-app-panel px-4 py-3;
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-surface);
 }
 
 .leaderboard-title {
@@ -15,11 +17,13 @@
 }
 
 .timing-toggle {
-  @apply flex rounded-sm border border-app-line p-0.5;
+  @apply flex border border-app-line p-0.5;
+  border-radius: var(--radius-control);
 }
 
 .timing-toggle-button {
   @apply px-3 py-1 text-xs font-semibold text-app-muted;
+  border-radius: var(--radius-compact);
   transition: background-color var(--motion-duration-fast) var(--motion-easing-standard), color var(--motion-duration-fast) var(--motion-easing-standard), transform var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
@@ -89,14 +93,14 @@
       transparent var(--stripe-5-end)
     ),
     var(--leaderboard-row-base);
-  box-shadow: 0 8px 18px rgb(0 0 0 / 0.18);
+  box-shadow: var(--shadow-surface);
   cursor: pointer;
   transition: --leaderboard-row-base var(--motion-duration-standard) var(--motion-easing-standard), border-color var(--motion-duration-fast) var(--motion-easing-standard), box-shadow var(--motion-duration-standard) var(--motion-easing-standard), transform var(--motion-duration-standard) var(--motion-easing-standard);
 }
 
 .leaderboard-row:hover {
   --leaderboard-row-base: color-mix(in srgb, var(--color-panel-alt) 82%, white 18%);
-  box-shadow: 0 10px 22px rgb(0 0 0 / 0.24);
+  box-shadow: var(--shadow-surface-hover);
   transform: translateY(-1px);
 }
 
@@ -112,12 +116,12 @@
 }
 
 .leaderboard-row .leaderboard-cell:first-child {
-  @apply rounded-l-md;
+  border-radius: var(--radius-surface) 0 0 var(--radius-surface);
   border-left: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
 }
 
 .leaderboard-row .leaderboard-cell:last-child {
-  @apply rounded-r-md;
+  border-radius: 0 var(--radius-surface) var(--radius-surface) 0;
   border-right: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
 }
 
@@ -169,5 +173,6 @@
 }
 
 .leaderboard-tyre-chip {
-  @apply rounded-sm border border-app-line px-2 py-1 text-xs font-black uppercase text-white;
+  @apply border border-app-line px-2 py-1 text-xs font-black uppercase text-white;
+  border-radius: var(--radius-control);
 }

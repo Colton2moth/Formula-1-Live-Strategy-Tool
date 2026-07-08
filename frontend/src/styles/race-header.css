@@ -1,5 +1,7 @@
 .race-header {
   @apply grid gap-3 border-l-4 border-app-red bg-app-panel px-4 py-4 md:grid-cols-[1fr_auto] md:items-center;
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-surface);
 }
 
 .race-header-copy {

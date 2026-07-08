@@ -16,6 +16,8 @@
 
 .dashboard-state-card {
   @apply mx-auto grid max-w-[760px] gap-3 border border-app-line bg-app-panel p-5;
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-surface);
 }
 
 .dashboard-state-card--error {
@@ -35,8 +37,10 @@
 }
 
 .panel {
-  @apply rounded border border-app-line bg-app-panel;
-  transition: border-color var(--motion-duration-standard) var(--motion-easing-standard), box-shadow var(--motion-duration-standard) var(--motion-easing-standard);
+  @apply border border-app-line bg-app-panel;
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-surface);
+  transition: border-color var(--motion-duration-standard) var(--motion-easing-standard), box-shadow var(--motion-duration-standard) var(--motion-easing-standard), transform var(--motion-duration-standard) var(--motion-easing-standard);
 }
 
 .panel--prominent {
@@ -56,7 +60,8 @@
 }
 
 .status-chip {
-  @apply inline-flex items-center rounded-sm border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide;
+  @apply inline-flex items-center border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide;
+  border-radius: var(--radius-control);
   transition: border-color var(--motion-duration-fast) var(--motion-easing-standard), color var(--motion-duration-fast) var(--motion-easing-standard), background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
@@ -89,11 +94,12 @@
 }
 
 .probability-bar-track {
-  @apply h-2 overflow-hidden rounded-sm bg-app-panelAlt;
+  @apply h-2 overflow-hidden bg-app-panelAlt;
+  border-radius: var(--radius-control);
 }
 
 .probability-bar-fill {
-  @apply h-full rounded-sm;
+  @apply h-full;
+  border-radius: var(--radius-control);
   transition: width var(--motion-duration-standard) var(--motion-easing-standard), background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
-

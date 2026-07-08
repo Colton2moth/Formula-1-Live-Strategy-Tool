@@ -1,9 +1,10 @@
 .track-map-frame {
-  @apply relative h-[200px] overflow-hidden bg-app-panelAlt p-4;
+  @apply relative aspect-square overflow-hidden bg-app-panelAlt p-4;
+  border-radius: var(--radius-surface);
 }
 
 .track-map-svg {
-  @apply h-full min-h-[180px] w-full;
+  @apply h-full w-full;
 }
 
 .track-map-marker {
@@ -23,7 +24,9 @@
 }
 
 .track-map-selected-chip {
-  @apply absolute left-4 top-4 rounded-sm border border-app-line bg-app-bg px-3 py-2;
+  @apply absolute left-4 top-4 border border-app-line bg-app-bg px-3 py-2;
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-surface);
 }
 
 .track-map-selected-label {

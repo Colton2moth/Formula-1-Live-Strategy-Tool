@@ -3,7 +3,8 @@
 }
 
 .strategy-driver-summary {
-  @apply grid gap-1 border-l-4 border-app-red pl-4;
+  @apply grid gap-1 border border-l-4 border-app-line border-l-app-red bg-app-panelAlt p-4;
+  border-radius: var(--radius-surface);
 }
 
 .strategy-eyebrow {
@@ -24,6 +25,8 @@
 
 .strategy-card {
   @apply border border-app-line bg-app-panelAlt p-3;
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-surface);
 }
 
 .strategy-card-label {
@@ -47,7 +50,8 @@
 }
 
 .strategy-tyre-chip {
-  @apply rounded-sm border px-2 py-1 text-xs font-black uppercase text-white;
+  @apply border px-2 py-1 text-xs font-black uppercase text-white;
+  border-radius: var(--radius-control);
 }
 
 .strategy-status-row {
@@ -56,6 +60,8 @@
 
 .strategy-empty-state {
   @apply grid gap-2 border border-app-line bg-app-panelAlt p-4;
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-surface);
 }
 
 .strategy-empty-title {
