@@ -36,19 +36,29 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
           <path
             d={mapPath}
             fill="none"
-            stroke="var(--color-track)"
-            strokeWidth="3"
+            stroke="black"
+            strokeWidth="4.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeOpacity="1"
+          />
+          <path
+            d={mapPath}
+            fill="none"
+            stroke="var(--color-panel-alt)"
+            strokeWidth="3.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
             d={mapPath}
             fill="none"
-            stroke="var(--color-panel-alt)"
-            strokeWidth="1"
-            strokeLinecap="round"
+            stroke="var(--color-track)"
+            strokeWidth=".5"
+            strokeLinecap="square"
             strokeLinejoin="round"
             strokeOpacity="1"
+            strokeDasharray="2 3"
           />
           <g
             aria-label="Start finish line"
