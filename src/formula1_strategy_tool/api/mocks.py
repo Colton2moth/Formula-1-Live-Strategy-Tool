@@ -42,6 +42,7 @@ MOCK_DRIVERS: list[DriverState] = [
         team_name="Red Bull Racing",
         team_colour="3671C6",
         position=1,
+        track_progress=0.08,
         current_lap=25,
         compound="HARD",
         tyre_age=18,
@@ -58,6 +59,7 @@ MOCK_DRIVERS: list[DriverState] = [
         team_name="McLaren",
         team_colour="FF8000",
         position=2,
+        track_progress=0.31,
         current_lap=25,
         compound="MEDIUM",
         tyre_age=14,
@@ -74,6 +76,7 @@ MOCK_DRIVERS: list[DriverState] = [
         team_name="Ferrari",
         team_colour="E80020",
         position=3,
+        track_progress=0.57,
         current_lap=25,
         compound="MEDIUM",
         tyre_age=12,
@@ -90,6 +93,7 @@ MOCK_DRIVERS: list[DriverState] = [
         team_name="Mercedes",
         team_colour="27F4D2",
         position=4,
+        track_progress=0.80,
         current_lap=25,
         compound="SOFT",
         tyre_age=8,
@@ -163,7 +167,7 @@ MOCK_TRACK = TrackState(
     circuit_key=901,
     start_finish=TrackPoint(x=0.60, y=0.88),
     path=[
-        TrackPoint(x=0.09, y=0.88),
+        TrackPoint(x=0.60, y=0.88),
         TrackPoint(x=0.87, y=0.88),
         TrackPoint(x=0.94, y=0.82),
         TrackPoint(x=0.86, y=0.58),
@@ -187,5 +191,6 @@ MOCK_TRACK = TrackState(
         TrackPoint(x=0.11, y=0.62),
         TrackPoint(x=0.14, y=0.78),
         TrackPoint(x=0.09, y=0.88),
-    ],
+        TrackPoint(x=0.60, y=0.88),
+    ]
 )

@@ -29,12 +29,14 @@ def test_get_drivers_returns_list():
     drivers = response.json()
     assert len(drivers) >= 1
     assert drivers[0]["driver_number"] == 1
+    assert 0 <= drivers[0]["track_progress"] <= 1
 
 
 def test_get_driver_found():
     response = client.get("/api/drivers/4")
     assert response.status_code == 200
     assert response.json()["acronym"] == "NOR"
+    assert 0 <= response.json()["track_progress"] <= 1
 
 
 def test_get_driver_not_found():
@@ -51,6 +53,7 @@ def test_get_race_state_snapshot():
     assert "drivers" in data
     assert "predictions" in data
     assert len(data["drivers"]) == len(data["predictions"])
+    assert all(0 <= driver["track_progress"] <= 1 for driver in data["drivers"])
 
 
 def test_get_track():

@@ -36,6 +36,7 @@ class DriverState(BaseModel):
     team_name: str
     team_colour: str  # hex without '#', e.g. "FF8000"
     position: int
+    track_progress: float = Field(ge=0.0, le=1.0)
     current_lap: int
     compound: str
     tyre_age: int
