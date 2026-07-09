@@ -10,11 +10,18 @@ type TrackMapProps = {
 
 type SvgPoint = { x: number; y: number };
 
+const START_FINISH_SQUARE_COUNT = 8;
+const START_FINISH_SQUARE_SIZE = 1.2;
+const START_FINISH_COLUMN_COUNT = 2;
+const START_FINISH_OUTSIDE_OFFSET = 6;
+
 export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
   const centeredTrack = centerTrackPoints(track.path);
   const displayPoints = smoothTrackPoints(centeredTrack.points);
   const mapPath = trackPath(displayPoints);
   const startFinish = applyCenterOffset(scalePoint(track.start_finish), centeredTrack);
+  const startFinishSquares = startFinishMarkerSquares(startFinish);
+  const startFinishRotation = startFinishMarkerRotation(displayPoints, startFinish);
   const selectedDriverLastName = selectedDriver ? driverLastName(selectedDriver.name).toUpperCase() : "NONE";
 
   return (
@@ -43,11 +50,30 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
             strokeLinejoin="round"
             strokeOpacity="1"
           />
-          <g aria-label="Start finish line">
-            <rect x={startFinish.x - 1.2} y={startFinish.y - 3.2} width="1.2" height="1.6" fill="white" />
-            <rect x={startFinish.x} y={startFinish.y - 3.2} width="1.2" height="1.6" fill="var(--color-bg)" />
-            <rect x={startFinish.x - 1.2} y={startFinish.y - 1.6} width="1.2" height="1.6" fill="var(--color-bg)" />
-            <rect x={startFinish.x} y={startFinish.y - 1.6} width="1.2" height="1.6" fill="white" />
+          <g
+            aria-label="Start finish line"
+            transform={`rotate(${startFinishRotation}, ${startFinish.x}, ${startFinish.y})`}
+          >
+            <line
+              x1={startFinish.x}
+              x2={startFinish.x}
+              y1={startFinish.y - START_FINISH_SQUARE_SIZE * 1.5}
+              y2={startFinish.y + START_FINISH_SQUARE_SIZE * 1.5}
+              stroke="var(--color-f1-red)"
+              strokeWidth="1"
+              strokeLinecap="square"
+            />
+            {startFinishSquares.map((square) => (
+              <rect
+                key={`${square.row}-${square.column}`}
+                className="track-map-start-finish-square"
+                x={square.x}
+                y={square.y}
+                width={START_FINISH_SQUARE_SIZE}
+                height={START_FINISH_SQUARE_SIZE}
+                fill={square.isLight ? "white" : "var(--color-bg)"}
+              />
+            ))}
           </g>
           {drivers.map((driver) => {
             const marker = pointAtTrackProgress(displayPoints, driver.track_progress);
@@ -88,6 +114,73 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
   );
 }
 
+function startFinishMarkerSquares(startFinish: SvgPoint) {
+  const squareCount = evenSquareCount(START_FINISH_SQUARE_COUNT);
+  const rowCount = squareCount / START_FINISH_COLUMN_COUNT;
+  const markerLeft = startFinish.x - START_FINISH_SQUARE_SIZE * (START_FINISH_COLUMN_COUNT / 2);
+  const markerTop = startFinish.y + START_FINISH_OUTSIDE_OFFSET;
+
+  return Array.from({ length: squareCount }, (_, index) => {
+    const row = Math.floor(index / START_FINISH_COLUMN_COUNT);
+    const column = index % START_FINISH_COLUMN_COUNT;
+    return {
+      row,
+      column,
+      x: markerLeft + column * START_FINISH_SQUARE_SIZE,
+      y: markerTop + row * START_FINISH_SQUARE_SIZE - (rowCount * START_FINISH_SQUARE_SIZE) / 2,
+      isLight: (row + column) % 2 === 0,
+    };
+  });
+}
+
+function evenSquareCount(squareCount: number) {
+  return Math.max(2, squareCount - (squareCount % START_FINISH_COLUMN_COUNT));
+}
+
+function startFinishMarkerRotation(points: SvgPoint[], startFinish: SvgPoint) {
+  const segment = nearestSegment(points, startFinish);
+  if (!segment) {
+    return 0;
+  }
+
+  return radiansToDegrees(Math.atan2(segment.end.y - segment.start.y, segment.end.x - segment.start.x));
+}
+
+function nearestSegment(points: SvgPoint[], point: SvgPoint) {
+  let nearest: { start: SvgPoint; end: SvgPoint; distance: number } | null = null;
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    if (distance(start, end) === 0) {
+      continue;
+    }
+
+    const projected = projectPointToSegment(point, start, end);
+    const projectedDistance = distance(point, projected);
+    if (!nearest || projectedDistance < nearest.distance) {
+      nearest = { start, end, distance: projectedDistance };
+    }
+  }
+
+  return nearest;
+}
+
+function projectPointToSegment(point: SvgPoint, start: SvgPoint, end: SvgPoint) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const segmentLengthSquared = dx * dx + dy * dy;
+  if (segmentLengthSquared === 0) {
+    return start;
+  }
+
+  const progress = clampProgress(((point.x - start.x) * dx + (point.y - start.y) * dy) / segmentLengthSquared);
+  return { x: start.x + dx * progress, y: start.y + dy * progress };
+}
+
+function radiansToDegrees(radians: number) {
+  return (radians * 180) / Math.PI;
+}
 function driverLastName(name: string) {
   return name.trim().split(/\s+/).pop() ?? name;
 }

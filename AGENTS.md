@@ -55,6 +55,11 @@ The main goal is to help the developer understand the system.
 - When making commit messages make sure to use past tense since you will be talking about changes that have already been implemented.
 - You may look through previous commits for more examples.
 
+### Commit-message request protocol
+
+- Whenever the developer asks for a commit message, follow the full commit-message protocol before answering: inspect recent commits, check staged and unstaged changes, review the relevant diff, and apply every commit-message instruction in this section.
+- Return a complete commit message when the visible change set has multiple meaningful parts, including the subject and grouped body sections that match the actual diff.
+
 ## Simplicity rules
 
 - Prefer plain functions and simple data structures.

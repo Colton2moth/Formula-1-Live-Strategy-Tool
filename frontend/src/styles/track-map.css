@@ -7,6 +7,10 @@
   @apply h-full w-full;
 }
 
+.track-map-start-finish-square {
+  shape-rendering: crispEdges;
+}
+
 .track-map-marker {
   @apply cursor-pointer outline-none;
 }
