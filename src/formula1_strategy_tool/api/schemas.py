@@ -77,4 +77,5 @@ class TrackState(BaseModel):
 
     circuit_name: str
     circuit_key: int
+    start_finish: TrackPoint
     path: list[TrackPoint]

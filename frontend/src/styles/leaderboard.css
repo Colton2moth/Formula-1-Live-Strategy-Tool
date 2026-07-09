@@ -187,7 +187,6 @@
   @apply grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-black leading-none;
   background: var(--tyre-color);
   color: var(--tyre-text-color);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 28%, transparent);
   transition:
     background-color var(--motion-duration-fast) var(--motion-easing-standard),
     color var(--motion-duration-fast) var(--motion-easing-standard),

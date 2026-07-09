@@ -41,5 +41,5 @@ export type RaceState = {
 };
 
 export type TrackPoint = { x: number; y: number };
-export type TrackState = { circuit_name: string; path: TrackPoint[] };
+export type TrackState = { circuit_name: string; start_finish: TrackPoint; path: TrackPoint[] };
 export type TimingMode = "interval" | "leaderGap";

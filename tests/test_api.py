@@ -57,5 +57,6 @@ def test_get_track():
     response = client.get("/api/track")
     assert response.status_code == 200
     data = response.json()
-    assert data["circuit_name"] == "Circuit Gilles Villeneuve"
+    assert data["circuit_name"] == "Demo Switchback Circuit"
+    assert data["start_finish"] == {"x": 0.6, "y": 0.88}
     assert len(data["path"]) > 2
