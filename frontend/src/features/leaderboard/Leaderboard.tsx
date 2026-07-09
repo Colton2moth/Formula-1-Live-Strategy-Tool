@@ -2,6 +2,14 @@ import { Panel } from "../../components/Panel";
 import type { ApiDriver, TimingMode } from "../../types/race";
 import { formatGap, formatLapTime, tyreColors } from "../../utils/raceDisplay";
 
+const tyreCompoundLetters: Record<string, string> = {
+  SOFT: "S",
+  MEDIUM: "M",
+  HARD: "H",
+  INTERMEDIATE: "I",
+  WET: "W",
+};
+
 type LeaderboardProps = {
   drivers: ApiDriver[];
   selectedDriver: ApiDriver;
@@ -44,6 +52,12 @@ export function Leaderboard({ drivers, selectedDriver, timingMode, onTimingModeC
               const isSelected = driver.driver_number === selectedDriver.driver_number;
               const gap = timingMode === "interval" ? formatGap(driver.interval_ahead) : formatGap(driver.gap_to_leader);
               const { firstName, lastName } = splitDriverName(driver.name);
+              const compound = driver.compound.trim().toUpperCase();
+              const tyreLetter = (tyreCompoundLetters[compound] ?? compound.charAt(0)) || "?";
+              const tyreColor = tyreColors[compound] ?? "var(--color-line)";
+              const tyreTextColor = compound === "HARD" || compound === "MEDIUM" ? "#111318" : "#ffffff";
+              const tyreAgeLabel = Number.isFinite(driver.tyre_age) ? String(driver.tyre_age) : "--";
+              const tyreAgeDescription = tyreAgeLabel === "--" ? "tyre age unavailable" : `${tyreAgeLabel} laps old`;
               return (
                 <tr
                   key={driver.driver_number}
@@ -61,7 +75,12 @@ export function Leaderboard({ drivers, selectedDriver, timingMode, onTimingModeC
                   <td className="leaderboard-cell"><span className="leaderboard-team-dot" style={{ backgroundColor: `#${driver.team_colour}` }} /><span className="leaderboard-team-name">{driver.team_name}</span></td>
                   <td className="leaderboard-cell"><span className="leaderboard-value">{formatLapTime(driver.last_lap_time)}</span></td>
                   <td className="leaderboard-cell"><span className="leaderboard-value">{gap}</span></td>
-                  <td className="leaderboard-cell"><span className="leaderboard-tyre-chip" style={{ borderColor: tyreColors[driver.compound] ?? "var(--color-line)" }}>{driver.compound} {driver.tyre_age}L</span></td>
+                  <td className="leaderboard-cell">
+                    <span className="leaderboard-tyre-chip" aria-label={`${compound} tyre, ${tyreAgeDescription}`}>
+                      <span className="leaderboard-tyre-dot" style={{ "--tyre-color": tyreColor, "--tyre-text-color": tyreTextColor } as React.CSSProperties}>{tyreLetter}</span>
+                      <span className={`leaderboard-tyre-age ${tyreAgeLabel === "--" ? "leaderboard-tyre-age--missing" : ""}`}>{tyreAgeLabel}</span>
+                    </span>
+                  </td>
                   <td className="leaderboard-cell"><span className="leaderboard-muted-value">{driver.pit_stops}</span></td>
                 </tr>
               );

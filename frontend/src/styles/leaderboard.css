@@ -24,7 +24,10 @@
 .timing-toggle-button {
   @apply px-3 py-1 text-xs font-semibold text-app-muted;
   border-radius: var(--radius-compact);
-  transition: background-color var(--motion-duration-fast) var(--motion-easing-standard), color var(--motion-duration-fast) var(--motion-easing-standard), transform var(--motion-duration-fast) var(--motion-easing-standard);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
 .timing-toggle-button:hover {
@@ -58,14 +61,13 @@
 }
 
 .leaderboard-row {
-  --leaderboard-row-base: color-mix(in srgb, var(--color-panel-alt) 92%, white 8%);
   --team-accent-color: var(--color-f1-red);
-  --stripe-gap: 2px;
+  --stripe-gap: 0px;
   --stripe-1-width: 55px;
-  --stripe-2-width: 16px;
-  --stripe-3-width: 12px;
-  --stripe-4-width: 8px;
-  --stripe-5-width: 6px;
+  --stripe-2-width: 22px;
+  --stripe-3-width: 15px;
+  --stripe-4-width: 10px;
+  --stripe-5-width: 8px;
 
   --stripe-1-start: 0px;
   --stripe-1-end: var(--stripe-1-width);
@@ -92,10 +94,13 @@
       color-mix(in srgb, var(--team-accent-color) 5%, transparent) var(--stripe-5-start) var(--stripe-5-end),
       transparent var(--stripe-5-end)
     ),
-    var(--leaderboard-row-base);
+    color-mix(in srgb, var(--team-accent-color) 10%, transparent);
   box-shadow: var(--shadow-surface);
   cursor: pointer;
-  transition: --leaderboard-row-base var(--motion-duration-standard) var(--motion-easing-standard), border-color var(--motion-duration-fast) var(--motion-easing-standard), box-shadow var(--motion-duration-standard) var(--motion-easing-standard), transform var(--motion-duration-standard) var(--motion-easing-standard);
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-standard) var(--motion-easing-standard),
+    transform var(--motion-duration-standard) var(--motion-easing-standard);
 }
 
 .leaderboard-row:hover {
@@ -112,7 +117,9 @@
 .leaderboard-row .leaderboard-cell {
   background: transparent;
   border-block: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
-  transition: border-color var(--motion-duration-fast) var(--motion-easing-standard), border-width var(--motion-duration-fast) var(--motion-easing-standard);
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    border-width var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
 .leaderboard-row .leaderboard-cell:first-child {
@@ -173,6 +180,28 @@
 }
 
 .leaderboard-tyre-chip {
-  @apply border border-app-line px-2 py-1 text-xs font-black uppercase text-white;
-  border-radius: var(--radius-control);
+  @apply inline-flex items-center gap-1.5 text-xs font-black tabular-nums text-white;
+}
+
+.leaderboard-tyre-dot {
+  @apply grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-black leading-none;
+  background: var(--tyre-color);
+  color: var(--tyre-text-color);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 28%, transparent);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.leaderboard-row:hover .leaderboard-tyre-dot {
+  transform: scale(1.04);
+}
+
+.leaderboard-tyre-age {
+  @apply min-w-4 text-left text-sm font-black leading-none text-white;
+}
+
+.leaderboard-tyre-age--missing {
+  @apply text-app-muted;
 }
