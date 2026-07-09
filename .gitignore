@@ -48,6 +48,7 @@ env/
 docs/*
 !docs/
 !docs/DEVELOPMENT_STARTUP.md
+!docs/FEATURE_IDEAS.md
 
 # Testing / coverage
 .pytest_cache/

@@ -20,7 +20,6 @@ function App() {
         if (!active) return;
         setRaceState(raceStateResponse);
         setTrack(trackResponse);
-        setSelectedDriverNumber(raceStateResponse.drivers[0]?.driver_number ?? null);
       })
       .catch((requestError: unknown) => {
         if (!active) return;
@@ -31,9 +30,12 @@ function App() {
     };
   }, []);
 
-  const selectedDriver = raceState?.drivers.find((driver) => driver.driver_number === selectedDriverNumber) ?? raceState?.drivers[0] ?? null;
+  const selectedDriver = raceState?.drivers.find((driver) => driver.driver_number === selectedDriverNumber) ?? null;
   const selectedPrediction = raceState?.predictions.find((prediction) => prediction.driver_number === selectedDriver?.driver_number) ?? null;
   const sortedDrivers = useMemo(() => [...(raceState?.drivers ?? [])].sort((a, b) => a.position - b.position), [raceState]);
+  const toggleSelectedDriver = (driverNumber: number) => {
+    setSelectedDriverNumber((currentDriverNumber) => (currentDriverNumber === driverNumber ? null : driverNumber));
+  };
 
   if (error) {
     return (
@@ -47,7 +49,7 @@ function App() {
     );
   }
 
-  if (!raceState || !track || !selectedDriver) {
+  if (!raceState || !track) {
     return (
       <main className="dashboard-shell">
         <div className="dashboard-state-card">
@@ -64,10 +66,10 @@ function App() {
         <RaceHeader session={raceState.session} track={track} />
         <div className="dashboard-layout">
           <div className="dashboard-stack">
-            <TrackMap track={track} drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriverNumber} />
+            <TrackMap track={track} drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={toggleSelectedDriver} />
             <StrategyPanel selectedDriver={selectedDriver} prediction={selectedPrediction} />
           </div>
-          <Leaderboard drivers={sortedDrivers} selectedDriver={selectedDriver} timingMode={timingMode} onTimingModeChange={setTimingMode} onSelectDriver={setSelectedDriverNumber} />
+          <Leaderboard drivers={sortedDrivers} selectedDriver={selectedDriver} timingMode={timingMode} onTimingModeChange={setTimingMode} onSelectDriver={toggleSelectedDriver} />
         </div>
       </div>
     </main>

@@ -11,8 +11,20 @@
   @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
 }
 
-.strategy-driver-code {
-  @apply text-4xl font-black uppercase leading-none text-white;
+.strategy-driver-name {
+  @apply grid gap-0.5 text-left leading-none;
+}
+
+.strategy-driver-first-name {
+  @apply text-[11px] font-medium leading-none text-app-muted;
+}
+
+.strategy-driver-last-name {
+  @apply text-4xl font-black uppercase leading-none tracking-wide text-white;
+}
+
+.strategy-driver-empty {
+  @apply text-2xl font-black uppercase leading-none tracking-wide text-white;
 }
 
 .strategy-driver-meta {

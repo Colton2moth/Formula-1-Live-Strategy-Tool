@@ -4,12 +4,13 @@ import type { ApiDriver, TrackPoint, TrackState } from "../../types/race";
 type TrackMapProps = {
   track: TrackState;
   drivers: ApiDriver[];
-  selectedDriver: ApiDriver;
+  selectedDriver: ApiDriver | null;
   onSelectDriver: (driverNumber: number) => void;
 };
 
 export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
   const mapPath = trackPath(track.path);
+  const selectedDriverLastName = selectedDriver ? driverLastName(selectedDriver.name).toUpperCase() : "NONE";
 
   return (
     <Panel label="Track map">
@@ -19,9 +20,9 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
           <path d={mapPath} fill="none" stroke="var(--color-f1-red)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="7 9" />
           {drivers.map((driver, index) => {
             const marker = markerPoint(track.path, index, drivers.length);
-            const isSelected = driver.driver_number === selectedDriver.driver_number;
+            const isSelected = driver.driver_number === selectedDriver?.driver_number;
             return (
-              <g key={driver.driver_number} role="button" tabIndex={0} className="track-map-marker" aria-label={`Select ${driver.acronym} marker`} onClick={() => onSelectDriver(driver.driver_number)} onKeyDown={(event) => {
+              <g key={driver.driver_number} role="button" tabIndex={0} className="track-map-marker" aria-label={`${isSelected ? "Unselect" : "Select"} ${driver.acronym} marker`} onClick={() => onSelectDriver(driver.driver_number)} onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") onSelectDriver(driver.driver_number);
               }}>
                 <circle cx={marker.x} cy={marker.y} r={isSelected ? 2.4 : 2} fill={`#${driver.team_colour}`} stroke={isSelected ? "white" : "var(--color-bg)"} strokeWidth="0.8" />
@@ -32,11 +33,15 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
         </svg>
         <div className="track-map-selected-chip">
           <span className="track-map-selected-label">Selected </span>
-          <span className="track-map-selected-value">{selectedDriver.acronym}</span>
+          <span className="track-map-selected-value">{selectedDriverLastName}</span>
         </div>
       </div>
     </Panel>
   );
+}
+
+function driverLastName(name: string) {
+  return name.trim().split(/\s+/).pop() ?? name;
 }
 
 function trackPath(points: TrackPoint[]) {

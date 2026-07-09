@@ -12,7 +12,7 @@ const tyreCompoundLetters: Record<string, string> = {
 
 type LeaderboardProps = {
   drivers: ApiDriver[];
-  selectedDriver: ApiDriver;
+  selectedDriver: ApiDriver | null;
   timingMode: TimingMode;
   onTimingModeChange: (mode: TimingMode) => void;
   onSelectDriver: (driverNumber: number) => void;
@@ -49,7 +49,7 @@ export function Leaderboard({ drivers, selectedDriver, timingMode, onTimingModeC
           </thead>
           <tbody>
             {drivers.map((driver) => {
-              const isSelected = driver.driver_number === selectedDriver.driver_number;
+              const isSelected = driver.driver_number === selectedDriver?.driver_number;
               const gap = timingMode === "interval" ? formatGap(driver.interval_ahead) : formatGap(driver.gap_to_leader);
               const { firstName, lastName } = splitDriverName(driver.name);
               const compound = driver.compound.trim().toUpperCase();
@@ -63,7 +63,7 @@ export function Leaderboard({ drivers, selectedDriver, timingMode, onTimingModeC
                   key={driver.driver_number}
                   className={`leaderboard-row ${isSelected ? "leaderboard-row--selected" : ""}`}
                   tabIndex={0}
-                  aria-label={`Select ${driver.acronym}`}
+                  aria-label={`${isSelected ? "Unselect" : "Select"} ${driver.acronym}`}
                   onClick={() => onSelectDriver(driver.driver_number)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") onSelectDriver(driver.driver_number);
