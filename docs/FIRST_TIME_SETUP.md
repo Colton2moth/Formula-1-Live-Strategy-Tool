@@ -1,8 +1,10 @@
-# Development Startup Guide
+# First-Time Setup
 
-Use this when you want to view the dashboard locally with the FastAPI backend and Vite frontend running together.
+Use this guide the first time you set up the project on a computer. It installs the backend and frontend dependencies, then starts both parts of the dashboard.
 
-## First-time setup
+After completing this once, use [FAST_START.md](FAST_START.md) for normal startup.
+
+## Set up the backend
 
 Run these from the repo root:
 
@@ -14,14 +16,16 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-Then install the frontend packages:
+## Set up the frontend
+
+Install the frontend packages from the repo root:
 
 ```powershell
 cd frontend
 npm install
 ```
 
-## Start the backend
+## Start the backend for the first time
 
 Open one terminal at the repo root:
 
@@ -37,7 +41,7 @@ Useful checks:
 - `http://127.0.0.1:8000/docs`
 - `http://127.0.0.1:8000/api/race-state`
 
-## Start the website in development
+## Start the website for the first time
 
 Open a second terminal:
 
@@ -62,7 +66,7 @@ npm run preview
 
 Keep the FastAPI terminal running while previewing the production build. Vite will print the preview URL, usually `http://127.0.0.1:4173/`.
 
-## Common issues
+## First-time setup issues
 
 - If the website loads but data does not, confirm FastAPI is running and `http://127.0.0.1:8000/api/race-state` returns JSON.
 - If `fastapi` is not recognized, reactivate `.venv` and rerun `pip install -r requirements.txt`.

@@ -47,7 +47,8 @@ env/
 # Documentation (local working notes)
 docs/*
 !docs/
-!docs/DEVELOPMENT_STARTUP.md
+!docs/FIRST_TIME_SETUP.md
+!docs/FAST_START.md
 !docs/FEATURE_IDEAS.md
 
 # Testing / coverage
