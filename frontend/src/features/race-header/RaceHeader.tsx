@@ -1,12 +1,11 @@
 import { StatusChip } from "../../components/StatusChip";
-import type { ApiSession, TrackState } from "../../types/race";
+import type { ApiSession } from "../../types/race";
 
 type RaceHeaderProps = {
   session: ApiSession;
-  track: TrackState;
 };
 
-export function RaceHeader({ session, track }: RaceHeaderProps) {
+export function RaceHeader({ session }: RaceHeaderProps) {
   const flagTone: "green" | "red" = session.race_control_status === "GREEN" ? "green" : "red";
 
   return (
@@ -15,7 +14,7 @@ export function RaceHeader({ session, track }: RaceHeaderProps) {
         <div role="heading" aria-level={1} className="race-header-title">
           {session.meeting_name}
         </div>
-        <div className="race-header-subtitle">{track.circuit_name} - mock REST snapshot</div>
+        <div className="race-header-subtitle">Mock REST snapshot</div>
       </div>
       <div className="race-header-statuses">
         <StatusChip label={session.session_status} />

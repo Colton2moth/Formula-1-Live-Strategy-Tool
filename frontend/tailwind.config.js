@@ -16,6 +16,8 @@ export default {
           selectionBlue: "var(--color-selection-blue)",
           text: "var(--color-text)",
           muted: "var(--color-muted)",
+          trackSurface: "var(--color-track-surface)",
+          trackDepth: "var(--color-track-depth)",
         },
       },
     },

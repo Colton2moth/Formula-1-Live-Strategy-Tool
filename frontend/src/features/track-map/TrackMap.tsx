@@ -10,9 +10,9 @@ type TrackMapProps = {
 
 type SvgPoint = { x: number; y: number };
 
-const START_FINISH_SQUARE_COUNT = 8;
+const START_FINISH_SQUARE_COUNT = 12;
 const START_FINISH_SQUARE_SIZE = 1.2;
-const START_FINISH_COLUMN_COUNT = 2;
+const START_FINISH_COLUMN_COUNT = 3;
 const START_FINISH_OUTSIDE_OFFSET = 6;
 
 export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
@@ -22,44 +22,34 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
   const startFinish = applyCenterOffset(scalePoint(track.start_finish), centeredTrack);
   const startFinishSquares = startFinishMarkerSquares(startFinish);
   const startFinishRotation = startFinishMarkerRotation(displayPoints, startFinish);
-  const selectedDriverLastName = selectedDriver ? driverLastName(selectedDriver.name).toUpperCase() : "NONE";
-
   return (
-    <Panel label="Track map">
+    <Panel label="">
       <div className="track-map-frame">
+        <div role="heading" aria-level={3} className="track-map-current-label">
+          <span className="material-symbols-rounded track-map-current-icon" aria-hidden="true">
+            map
+          </span>
+          Current Map: {track.circuit_name}
+        </div>
         <svg
           viewBox="0 0 100 80"
           className="track-map-svg"
           role="img"
           aria-label={`${track.circuit_name} circuit map with selectable driver markers`}
         >
-          <path
-            d={mapPath}
-            fill="none"
-            stroke="black"
-            strokeWidth="4.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeOpacity="1"
-          />
-          <path
-            d={mapPath}
-            fill="none"
-            stroke="var(--color-panel-alt)"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d={mapPath}
-            fill="none"
-            stroke="var(--color-track)"
-            strokeWidth=".5"
-            strokeLinecap="square"
-            strokeLinejoin="round"
-            strokeOpacity="1"
-            strokeDasharray="2 3"
-          />
+          <defs>
+            <filter id="track-extrusion" x="-20%" y="-20%" width="140%" height="160%" colorInterpolationFilters="sRGB">
+              <feMorphology in="SourceAlpha" operator="dilate" radius="0 1.5" result="stretched" />
+              <feOffset in="stretched" dy="1.5" result="extrudedAlpha" />
+              <feFlood floodColor="var(--color-track-depth)" result="extrusionColour" />
+              <feComposite in="extrusionColour" in2="extrudedAlpha" operator="in" result="extrusion" />
+              <feMerge>
+                <feMergeNode in="extrusion" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <path d={mapPath} className="track-map-road" filter="url(#track-extrusion)" />
           <g
             aria-label="Start finish line"
             transform={`rotate(${startFinishRotation}, ${startFinish.x}, ${startFinish.y})`}
@@ -70,7 +60,7 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
               y1={startFinish.y - START_FINISH_SQUARE_SIZE * 1.5}
               y2={startFinish.y + START_FINISH_SQUARE_SIZE * 1.5}
               stroke="var(--color-f1-red)"
-              strokeWidth="1"
+              strokeWidth=".75"
               strokeLinecap="square"
             />
             {startFinishSquares.map((square) => (
@@ -103,22 +93,18 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
                 <circle
                   cx={marker.x}
                   cy={marker.y}
-                  r={isSelected ? 2.4 : 2}
+                  r={isSelected ? 2.2 : 2}
                   fill={`#${driver.team_colour}`}
                   stroke={isSelected ? "white" : "var(--color-bg)"}
-                  strokeWidth="0.8"
+                  strokeWidth={isSelected ? ".7" : ".6"}
                 />
-                <text x={marker.x + 3.2} y={marker.y + 1} fill="white" fontSize="3.2" fontWeight="700">
+                <text x={marker.x + 3} y={marker.y + 1} fill="white" fontSize="3" fontWeight="600">
                   {driver.acronym}
                 </text>
               </g>
             );
           })}
         </svg>
-        <div className="track-map-selected-chip">
-          <span className="track-map-selected-label">Selected </span>
-          <span className="track-map-selected-value">{selectedDriverLastName}</span>
-        </div>
       </div>
     </Panel>
   );
@@ -191,10 +177,6 @@ function projectPointToSegment(point: SvgPoint, start: SvgPoint, end: SvgPoint) 
 function radiansToDegrees(radians: number) {
   return (radians * 180) / Math.PI;
 }
-function driverLastName(name: string) {
-  return name.trim().split(/\s+/).pop() ?? name;
-}
-
 function trackPath(points: SvgPoint[]) {
   return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
 }

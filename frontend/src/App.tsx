@@ -63,7 +63,7 @@ function App() {
   return (
     <main className="dashboard-shell">
       <div className="dashboard-container">
-        <RaceHeader session={raceState.session} track={track} />
+        <RaceHeader session={raceState.session} />
         <div className="dashboard-layout">
           <div className="dashboard-stack">
             <TrackMap track={track} drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={toggleSelectedDriver} />
