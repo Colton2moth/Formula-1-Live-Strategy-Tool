@@ -16,7 +16,7 @@ export function formatGap(value: number | null) {
   if (value === null || value === 0) {
     return "Leader";
   }
-  return `+${value.toFixed(1)}`;
+  return `+${value.toFixed(3)}`;
 }
 
 export function formatUpdatedAt(value: string) {

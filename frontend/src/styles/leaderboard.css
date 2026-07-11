@@ -16,28 +16,6 @@
   @apply text-sm font-semibold text-white;
 }
 
-.timing-toggle {
-  @apply flex border border-app-line p-0.5;
-  border-radius: var(--radius-control);
-}
-
-.timing-toggle-button {
-  @apply px-3 py-1 text-xs font-semibold text-app-muted;
-  border-radius: var(--radius-compact);
-  transition:
-    background-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard),
-    transform var(--motion-duration-fast) var(--motion-easing-standard);
-}
-
-.timing-toggle-button:hover {
-  transform: translateY(-1px);
-}
-
-.timing-toggle-button--active {
-  @apply bg-app-red text-white;
-}
-
 .leaderboard-scroll {
   @apply overflow-x-auto;
 }
@@ -173,6 +151,24 @@
 
 .leaderboard-value {
   @apply text-sm font-semibold tabular-nums text-app-text;
+}
+
+.leaderboard-timing {
+  @apply inline-grid gap-1 text-center tabular-nums;
+}
+
+.leaderboard-timing-header,
+.leaderboard-timing-cell {
+  @apply text-center;
+}
+
+.leaderboard-timing-gap {
+  @apply text-base font-semibold leading-none text-app-text;
+}
+
+.leaderboard-timing-interval {
+  @apply text-xs font-semibold leading-none;
+  color: var(--team-accent-color);
 }
 
 .leaderboard-muted-value {

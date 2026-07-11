@@ -4,13 +4,12 @@ import { Leaderboard } from "./features/leaderboard/Leaderboard";
 import { RaceHeader } from "./features/race-header/RaceHeader";
 import { StrategyPanel } from "./features/strategy-panel/StrategyPanel";
 import { TrackMap } from "./features/track-map/TrackMap";
-import type { RaceState, TimingMode, TrackState } from "./types/race";
+import type { RaceState, TrackState } from "./types/race";
 
 function App() {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [track, setTrack] = useState<TrackState | null>(null);
   const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
-  const [timingMode, setTimingMode] = useState<TimingMode>("interval");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,7 +68,7 @@ function App() {
             <TrackMap track={track} drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={toggleSelectedDriver} />
             <StrategyPanel selectedDriver={selectedDriver} prediction={selectedPrediction} />
           </div>
-          <Leaderboard drivers={sortedDrivers} selectedDriver={selectedDriver} timingMode={timingMode} onTimingModeChange={setTimingMode} onSelectDriver={toggleSelectedDriver} />
+          <Leaderboard drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={toggleSelectedDriver} />
         </div>
       </div>
     </main>
