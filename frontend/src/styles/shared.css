@@ -6,6 +6,16 @@
   @apply mx-auto grid max-w-[1440px] gap-4;
 }
 
+.dashboard-brand {
+  @apply w-fit justify-self-center border border-app-red bg-app-panel px-4 py-2;
+  border-radius: 20px;
+  box-shadow: var(--shadow-surface);
+}
+
+.dashboard-brand-title {
+  @apply text-3xl font-black uppercase tracking-[0.12em] text-white;
+}
+
 .dashboard-layout {
   @apply grid gap-4 xl:grid-cols-[0.95fr_1.55fr];
 }

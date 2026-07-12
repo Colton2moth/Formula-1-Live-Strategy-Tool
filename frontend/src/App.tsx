@@ -30,8 +30,12 @@ function App() {
   }, []);
 
   const selectedDriver = raceState?.drivers.find((driver) => driver.driver_number === selectedDriverNumber) ?? null;
-  const selectedPrediction = raceState?.predictions.find((prediction) => prediction.driver_number === selectedDriver?.driver_number) ?? null;
-  const sortedDrivers = useMemo(() => [...(raceState?.drivers ?? [])].sort((a, b) => a.position - b.position), [raceState]);
+  const selectedPrediction =
+    raceState?.predictions.find((prediction) => prediction.driver_number === selectedDriver?.driver_number) ?? null;
+  const sortedDrivers = useMemo(
+    () => [...(raceState?.drivers ?? [])].sort((a, b) => a.position - b.position),
+    [raceState],
+  );
   const toggleSelectedDriver = (driverNumber: number) => {
     setSelectedDriverNumber((currentDriverNumber) => (currentDriverNumber === driverNumber ? null : driverNumber));
   };
@@ -40,7 +44,9 @@ function App() {
     return (
       <main className="dashboard-shell">
         <div className="dashboard-state-card dashboard-state-card--error">
-          <div role="heading" aria-level={1} className="dashboard-state-title">Race data unavailable</div>
+          <div role="heading" aria-level={1} className="dashboard-state-title">
+            Race data unavailable
+          </div>
           <div className="dashboard-state-message">{error}</div>
           <div className="dashboard-state-help">Start FastAPI, then refresh the Vite app.</div>
         </div>
@@ -52,7 +58,9 @@ function App() {
     return (
       <main className="dashboard-shell">
         <div className="dashboard-state-card">
-          <div role="heading" aria-level={1} className="dashboard-state-title">Loading race snapshot</div>
+          <div role="heading" aria-level={1} className="dashboard-state-title">
+            Loading race snapshot
+          </div>
           <div className="dashboard-state-message">Waiting for the mock REST API.</div>
         </div>
       </main>
@@ -62,12 +70,28 @@ function App() {
   return (
     <main className="dashboard-shell">
       <div className="dashboard-container">
-        <RaceHeader session={raceState.session} />
+        <div className="dashboard-brand">
+          <div role="heading" aria-level={1} className="dashboard-brand-title">
+            F1 Live Strategy Tool
+          </div>
+        </div>
         <div className="dashboard-layout">
-          <TrackMap track={track} drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={toggleSelectedDriver} />
           <div className="dashboard-stack">
-            <Leaderboard drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={toggleSelectedDriver} />
+            <TrackMap
+              track={track}
+              drivers={sortedDrivers}
+              selectedDriver={selectedDriver}
+              onSelectDriver={toggleSelectedDriver}
+            />
+            <RaceHeader session={raceState.session} />
+          </div>
+          <div className="dashboard-stack">
             <StrategyPanel selectedDriver={selectedDriver} prediction={selectedPrediction} />
+            <Leaderboard
+              drivers={sortedDrivers}
+              selectedDriver={selectedDriver}
+              onSelectDriver={toggleSelectedDriver}
+            />
           </div>
         </div>
       </div>

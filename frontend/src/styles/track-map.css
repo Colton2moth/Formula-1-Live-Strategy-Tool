@@ -1,3 +1,7 @@
+.track-map-panel {
+  height: fit-content;
+}
+
 .track-map-frame {
   @apply relative aspect-[4/3] overflow-hidden bg-app-panelAlt p-4;
   border-radius: var(--radius-surface);

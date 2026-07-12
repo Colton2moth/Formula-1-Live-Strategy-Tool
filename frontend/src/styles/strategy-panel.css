@@ -3,24 +3,24 @@
 }
 
 .strategy-driver-summary {
-  @apply grid content-start gap-1 p-4;
+  @apply grid  gap-1 p-4 justify-items-center;
   box-shadow: inset 4px 0 var(--strategy-team-colour);
 }
 
 .strategy-eyebrow {
-  @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
+  @apply text-xs font-semibold uppercase tracking-wide text-app-muted justify-self-center;
 }
 
 .strategy-driver-name {
-  @apply grid gap-0.5 text-left leading-none;
+  @apply grid gap-0.5 leading-none justify-items-center;
 }
 
 .strategy-driver-first-name {
-  @apply text-[11px] font-medium leading-none text-app-muted;
+  @apply text-lg font-medium leading-none text-app-muted;
 }
 
 .strategy-driver-last-name {
-  @apply text-2xl font-black uppercase leading-none tracking-wide text-white;
+  @apply text-lg font-black uppercase leading-none tracking-wide text-white;
 }
 
 .strategy-driver-empty {
@@ -28,16 +28,17 @@
 }
 
 .strategy-driver-meta {
-  @apply text-sm font-semibold text-app-muted;
+  @apply text-sm font-normal text-app-muted;
 }
 
 .strategy-category-grid {
   @apply grid grid-cols-2 overflow-hidden border border-app-line bg-app-panelAlt xl:grid-cols-[1.15fr_1.65fr_0.9fr_1.15fr];
   border-radius: var(--radius-surface);
+  height: 7.5rem;
 }
 
 .strategy-category {
-  @apply grid content-start gap-3 p-4;
+  @apply grid content-start p-4 justify-items-center items-center;
 }
 
 .strategy-category:nth-child(even) {
@@ -49,11 +50,15 @@
 }
 
 .strategy-category-title {
-  @apply text-[11px] font-semibold uppercase leading-tight tracking-wide text-app-muted;
+  @apply text-[11px] font-semibold uppercase leading-tight tracking-wide text-app-muted justify-self-center pb-3;
+}
+
+.stat-category-body {
+  @apply grid justify-items-center gap-1 text-center;
 }
 
 .strategy-pit-stats {
-  @apply grid grid-cols-2 gap-3;
+  @apply grid grid-cols-2;
 }
 
 .strategy-pit-stat {
@@ -65,7 +70,7 @@
 }
 
 .strategy-card-value {
-  @apply mt-2 text-2xl font-black tabular-nums text-white;
+  @apply text-2xl font-black tabular-nums text-white;
 }
 
 .strategy-card-help {
@@ -91,7 +96,7 @@
 }
 
 .strategy-category-unavailable {
-  @apply text-sm font-semibold text-white;
+  @apply text-sm font-semibold text-white justify-items-center;
 }
 
 .strategy-category-help {
@@ -105,7 +110,7 @@
 }
 
 .strategy-empty-title {
-  @apply text-sm font-semibold text-white;
+  @apply text-sm font-semibold text-white justify-self-center;
 }
 
 .strategy-empty-copy {
@@ -113,6 +118,10 @@
 }
 
 @media (min-width: 1280px) {
+  .strategy-category-grid {
+    min-height: 7rem;
+  }
+
   .strategy-category:nth-child(n + 2) {
     border-left: 1px solid var(--color-line);
   }

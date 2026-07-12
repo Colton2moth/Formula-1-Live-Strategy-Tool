@@ -30,9 +30,12 @@ export function RaceHeader({ session }: RaceHeaderProps) {
 
   return (
     <header className="race-header">
+      <div role="heading" aria-level={2} className="race-header-section-title">
+        Race info
+      </div>
       <div className="race-header-copy">
         <div className="race-header-kicker">Current Event</div>
-        <div role="heading" aria-level={1} className="race-header-title">
+        <div role="heading" aria-level={3} className="race-header-title">
           {session.meeting_name}
         </div>
       </div>

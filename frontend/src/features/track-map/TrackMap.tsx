@@ -24,10 +24,10 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
   const startFinishSquares = startFinishMarkerSquares(startFinish);
   const startFinishRotation = startFinishMarkerRotation(displayPoints, startFinish);
   return (
-    <Panel label="">
+    <Panel label="" className="track-map-panel">
       <div className="track-map-frame">
         <svg
-          viewBox="0 0 100 80"
+          viewBox="0 0 100 85"
           className="track-map-svg"
           role="img"
           aria-label={`${track.circuit_name} circuit map with selectable driver markers`}

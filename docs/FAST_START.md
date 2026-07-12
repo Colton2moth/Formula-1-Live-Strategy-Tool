@@ -28,4 +28,17 @@ Open the URL printed by Vite, usually `http://127.0.0.1:5173/`.
 
 - If the website loads without data, check `http://127.0.0.1:8000/api/race-state`.
 - If `fastapi` is not recognized, reactivate `.venv` in the backend terminal.
+- If a launcher still references an old project path after the repo was moved or
+  renamed, recreate `.venv` from the repo root because Windows virtual-environment
+  launchers store absolute paths:
+
+  ```powershell
+  Remove-Item -Recurse -Force .venv
+  python -m venv .venv
+  .\.venv\Scripts\Activate.ps1
+  python -m pip install --upgrade pip
+  pip install -r requirements.txt
+  pip install -e .
+  ```
+
 - If frontend packages changed, run `npm install` inside `frontend` before starting Vite.
