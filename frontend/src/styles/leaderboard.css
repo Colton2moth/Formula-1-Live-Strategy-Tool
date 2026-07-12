@@ -143,6 +143,7 @@
 
 .leaderboard-team-dot {
   @apply inline-block h-2 w-2 rounded-full;
+  background-color: var(--team-accent-color);
 }
 
 .leaderboard-team-name {

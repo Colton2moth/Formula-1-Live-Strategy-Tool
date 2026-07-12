@@ -1,21 +1,98 @@
 .race-header {
-  @apply grid gap-3 border-l-4 border-app-red bg-app-panel px-4 py-4 md:grid-cols-[1fr_auto] md:items-center;
+  @apply grid gap-4 border border-app-line bg-app-panel p-3 lg:grid-cols-[minmax(200px,0.7fr)_minmax(0,2fr)] lg:items-stretch;
   border-radius: var(--radius-surface);
   box-shadow: var(--shadow-surface);
 }
 
 .race-header-copy {
-  @apply grid gap-1;
+  @apply flex min-h-16 flex-col items-center justify-center border-b border-app-line px-2 pb-3 text-center lg:border-b-0 lg:border-r lg:pb-0 lg:pr-4;
+}
+
+.race-header-kicker {
+  @apply text-[10px] font-semibold uppercase leading-none tracking-[0.16em] text-app-muted;
 }
 
 .race-header-title {
-  @apply text-2xl font-black uppercase leading-none tracking-normal text-white md:text-3xl;
-}
-
-.race-header-subtitle {
-  @apply text-sm font-medium text-app-muted;
+  @apply mt-2 text-xl font-black uppercase leading-none tracking-tight text-white;
 }
 
 .race-header-statuses {
-  @apply flex flex-wrap gap-2 md:justify-end;
+  @apply grid grid-cols-2 gap-2 sm:grid-cols-[0.75fr_0.75fr_0.85fr_1.8fr];
+}
+
+.race-header-stat {
+  @apply flex min-h-16 flex-col items-center justify-center border border-app-line bg-app-bg px-3 py-2 text-center;
+  border-radius: var(--radius-surface);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+}
+
+.race-header-stat-label {
+  @apply text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-app-muted;
+}
+
+.race-header-stat-value {
+  @apply mt-1.5 text-lg font-black uppercase leading-none text-white;
+}
+.race-header-stat-reading {
+  @apply mt-1.5 flex items-center justify-center gap-2;
+}
+
+.race-header-stat-reading .race-header-stat-value {
+  @apply mt-0;
+}
+
+.race-header-stat-icon {
+  @apply text-[22px] leading-none text-app-muted;
+}
+
+.race-header-stat-value--numeric {
+  @apply tabular-nums;
+}
+
+.race-header-stat-value--green {
+  @apply text-emerald-400;
+}
+
+.race-header-stat-value--red {
+  @apply text-app-red;
+}
+
+.race-header-stat-value--yellow {
+  @apply text-amber-300;
+}
+
+.race-header-stat-value--blue {
+  @apply text-sky-400;
+}
+
+.race-header-stat-value--neutral {
+  @apply text-app-muted;
+}
+
+.race-header-weather {
+  @apply px-0;
+}
+
+.race-header-weather-sections {
+  @apply mt-1.5 grid w-full grid-cols-3;
+}
+
+.race-header-weather-item {
+  @apply flex min-w-0 flex-col items-center justify-center px-2;
+}
+
+.race-header-weather-item + .race-header-weather-item {
+  @apply border-l border-app-line;
+}
+
+.race-header-weather-reading {
+  @apply mt-1.5 flex items-center justify-center gap-1.5;
+}
+
+.race-header-weather-reading .race-header-stat-value {
+  @apply mt-0;
+}
+
+.race-header-weather-icon {
+  @apply text-[22px] leading-none text-app-muted;
 }

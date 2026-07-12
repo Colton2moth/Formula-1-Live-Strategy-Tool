@@ -1,10 +1,10 @@
 .track-map-frame {
-  @apply relative aspect-square overflow-hidden bg-app-panelAlt p-4;
+  @apply relative aspect-[4/3] overflow-hidden bg-app-panelAlt p-4;
   border-radius: var(--radius-surface);
 }
 
 .track-map-current-label {
-  @apply absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap border border-app-line bg-app-bg px-3 py-2 text-xs font-semibold tracking-wide text-white;
+  @apply mt-2 flex items-center justify-center gap-2 whitespace-nowrap border border-app-line bg-app-bg px-3 py-2 text-base font-semibold tracking-wide text-white;
   border-radius: var(--radius-control);
   box-shadow: var(--shadow-surface);
 }
@@ -27,22 +27,64 @@
   stroke-linejoin: round;
 }
 
+.track-map-extrusion-filter {
+  color-interpolation-filters: sRGB;
+}
+
+.track-map-extrusion-colour {
+  flood-color: var(--color-track-depth);
+}
+
+.track-map-start-finish-line {
+  stroke: var(--color-f1-red);
+  stroke-width: 0.75px;
+  stroke-linecap: square;
+}
+
 .track-map-start-finish-square {
   shape-rendering: crispEdges;
 }
 
+.track-map-start-finish-square--light {
+  fill: white;
+}
+
+.track-map-start-finish-square--dark {
+  fill: var(--color-bg);
+}
+
 .track-map-marker {
+  --driver-colour: var(--color-f1-red);
   @apply cursor-pointer outline-none;
 }
 
-.track-map-marker circle,
-.track-map-marker text {
+.track-map-marker-dot {
+  r: 2px;
+  fill: var(--driver-colour);
+  stroke: var(--color-bg);
+  stroke-width: 0.6px;
+}
+
+.track-map-marker--selected .track-map-marker-dot {
+  r: 2.2px;
+  stroke: white;
+  stroke-width: 0.7px;
+}
+
+.track-map-marker-label {
+  fill: white;
+  font-size: 3px;
+  font-weight: 600;
+}
+
+.track-map-marker-dot,
+.track-map-marker-label {
   transform-box: fill-box;
   transform-origin: center;
   transition: opacity var(--motion-duration-fast) var(--motion-easing-standard), r var(--motion-duration-fast) var(--motion-easing-standard), stroke var(--motion-duration-fast) var(--motion-easing-standard), transform var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
-.track-map-marker:hover circle,
-.track-map-marker:focus-visible circle {
+.track-map-marker:hover .track-map-marker-dot,
+.track-map-marker:focus-visible .track-map-marker-dot {
   transform: scale(1.08);
 }

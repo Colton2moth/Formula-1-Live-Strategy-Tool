@@ -1,10 +1,10 @@
 .strategy-panel-body {
-  @apply grid gap-5 p-5;
+  @apply p-4;
 }
 
 .strategy-driver-summary {
-  @apply grid gap-1 border border-l-4 border-app-line border-l-app-red bg-app-panelAlt p-4;
-  border-radius: var(--radius-surface);
+  @apply grid content-start gap-1 p-4;
+  box-shadow: inset 4px 0 var(--strategy-team-colour);
 }
 
 .strategy-eyebrow {
@@ -20,7 +20,7 @@
 }
 
 .strategy-driver-last-name {
-  @apply text-4xl font-black uppercase leading-none tracking-wide text-white;
+  @apply text-2xl font-black uppercase leading-none tracking-wide text-white;
 }
 
 .strategy-driver-empty {
@@ -31,14 +31,33 @@
   @apply text-sm font-semibold text-app-muted;
 }
 
-.strategy-card-grid {
+.strategy-category-grid {
+  @apply grid grid-cols-2 overflow-hidden border border-app-line bg-app-panelAlt xl:grid-cols-[1.15fr_1.65fr_0.9fr_1.15fr];
+  border-radius: var(--radius-surface);
+}
+
+.strategy-category {
+  @apply grid content-start gap-3 p-4;
+}
+
+.strategy-category:nth-child(even) {
+  border-left: 1px solid var(--color-line);
+}
+
+.strategy-category:nth-child(n + 3) {
+  border-top: 1px solid var(--color-line);
+}
+
+.strategy-category-title {
+  @apply text-[11px] font-semibold uppercase leading-tight tracking-wide text-app-muted;
+}
+
+.strategy-pit-stats {
   @apply grid grid-cols-2 gap-3;
 }
 
-.strategy-card {
-  @apply border border-app-line bg-app-panelAlt p-3;
-  border-radius: var(--radius-surface);
-  box-shadow: var(--shadow-surface);
+.strategy-pit-stat {
+  @apply min-w-0;
 }
 
 .strategy-card-label {
@@ -53,25 +72,34 @@
   @apply mt-1 text-xs font-medium text-app-muted;
 }
 
-.strategy-next-tyre-row {
-  @apply flex items-center justify-between gap-3 border-t border-app-line pt-4;
-}
-
-.strategy-next-tyre-label {
-  @apply text-sm font-black uppercase text-white;
-}
-
 .strategy-tyre-chip {
-  @apply border px-2 py-1 text-xs font-black uppercase text-white;
+  @apply w-fit border px-2 py-1 text-xs font-black uppercase text-white;
+  border-color: var(--strategy-tyre-colour);
   border-radius: var(--radius-control);
 }
 
-.strategy-status-row {
-  @apply flex flex-wrap gap-2;
+.strategy-freshness-row {
+  @apply flex items-center gap-1.5 whitespace-nowrap;
+}
+
+.strategy-freshness-label {
+  @apply text-[11px] font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.strategy-freshness-value {
+  @apply text-[11px] font-semibold tabular-nums text-app-text;
+}
+
+.strategy-category-unavailable {
+  @apply text-sm font-semibold text-white;
+}
+
+.strategy-category-help {
+  @apply text-xs font-medium leading-5 text-app-muted;
 }
 
 .strategy-empty-state {
-  @apply grid gap-2 border border-app-line bg-app-panelAlt p-4;
+  @apply grid gap-2 border border-app-line bg-app-panelAlt p-4 xl:col-span-3;
   border-radius: var(--radius-surface);
   box-shadow: var(--shadow-surface);
 }
@@ -82,4 +110,14 @@
 
 .strategy-empty-copy {
   @apply text-sm font-medium leading-6 text-app-muted;
+}
+
+@media (min-width: 1280px) {
+  .strategy-category:nth-child(n + 2) {
+    border-left: 1px solid var(--color-line);
+  }
+
+  .strategy-category:nth-child(n + 3) {
+    border-top: 0;
+  }
 }

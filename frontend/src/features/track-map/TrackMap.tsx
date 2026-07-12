@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
 import type { ApiDriver, TrackPoint, TrackState } from "../../types/race";
 
@@ -25,12 +26,6 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
   return (
     <Panel label="">
       <div className="track-map-frame">
-        <div role="heading" aria-level={3} className="track-map-current-label">
-          <span className="material-symbols-rounded track-map-current-icon" aria-hidden="true">
-            map
-          </span>
-          Current Map: {track.circuit_name}
-        </div>
         <svg
           viewBox="0 0 100 80"
           className="track-map-svg"
@@ -38,10 +33,10 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
           aria-label={`${track.circuit_name} circuit map with selectable driver markers`}
         >
           <defs>
-            <filter id="track-extrusion" x="-20%" y="-20%" width="140%" height="160%" colorInterpolationFilters="sRGB">
+            <filter id="track-extrusion" className="track-map-extrusion-filter" x="-20%" y="-20%" width="140%" height="160%">
               <feMorphology in="SourceAlpha" operator="dilate" radius="0 1.5" result="stretched" />
               <feOffset in="stretched" dy="1.5" result="extrudedAlpha" />
-              <feFlood floodColor="var(--color-track-depth)" result="extrusionColour" />
+              <feFlood className="track-map-extrusion-colour" result="extrusionColour" />
               <feComposite in="extrusionColour" in2="extrudedAlpha" operator="in" result="extrusion" />
               <feMerge>
                 <feMergeNode in="extrusion" />
@@ -55,56 +50,52 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
             transform={`rotate(${startFinishRotation}, ${startFinish.x}, ${startFinish.y})`}
           >
             <line
+              className="track-map-start-finish-line"
               x1={startFinish.x}
               x2={startFinish.x}
               y1={startFinish.y - START_FINISH_SQUARE_SIZE * 1.5}
               y2={startFinish.y + START_FINISH_SQUARE_SIZE * 1.5}
-              stroke="var(--color-f1-red)"
-              strokeWidth=".75"
-              strokeLinecap="square"
             />
             {startFinishSquares.map((square) => (
               <rect
                 key={`${square.row}-${square.column}`}
-                className="track-map-start-finish-square"
+                className={`track-map-start-finish-square track-map-start-finish-square--${square.isLight ? "light" : "dark"}`}
                 x={square.x}
                 y={square.y}
                 width={START_FINISH_SQUARE_SIZE}
                 height={START_FINISH_SQUARE_SIZE}
-                fill={square.isLight ? "white" : "var(--color-bg)"}
               />
             ))}
           </g>
           {drivers.map((driver) => {
             const marker = pointAtTrackProgress(displayPoints, driver.track_progress);
             const isSelected = driver.driver_number === selectedDriver?.driver_number;
+            const markerStyle = { "--driver-colour": `#${driver.team_colour}` } as CSSProperties;
+
             return (
               <g
                 key={driver.driver_number}
                 role="button"
                 tabIndex={0}
-                className="track-map-marker"
+                className={`track-map-marker ${isSelected ? "track-map-marker--selected" : ""}`}
                 aria-label={`${isSelected ? "Unselect" : "Select"} ${driver.acronym} marker`}
+                style={markerStyle}
                 onClick={() => onSelectDriver(driver.driver_number)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") onSelectDriver(driver.driver_number);
                 }}
               >
-                <circle
-                  cx={marker.x}
-                  cy={marker.y}
-                  r={isSelected ? 2.2 : 2}
-                  fill={`#${driver.team_colour}`}
-                  stroke={isSelected ? "white" : "var(--color-bg)"}
-                  strokeWidth={isSelected ? ".7" : ".6"}
-                />
-                <text x={marker.x + 3} y={marker.y + 1} fill="white" fontSize="3" fontWeight="600">
+                <circle className="track-map-marker-dot" cx={marker.x} cy={marker.y} />
+                <text className="track-map-marker-label" x={marker.x + 3} y={marker.y + 1}>
                   {driver.acronym}
                 </text>
               </g>
             );
           })}
         </svg>
+      </div>
+      <div role="heading" aria-level={3} className="track-map-current-label">
+        {track.circuit_name}
       </div>
     </Panel>
   );

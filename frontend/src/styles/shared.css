@@ -11,7 +11,7 @@
 }
 
 .dashboard-stack {
-  @apply grid gap-4;
+  @apply grid content-start gap-4;
 }
 
 .dashboard-state-card {
@@ -48,7 +48,7 @@
 }
 
 .panel-header {
-  @apply border-b border-app-line px-4 py-3;
+  @apply flex items-center justify-between gap-3 border-b border-app-line px-4 py-3;
 }
 
 .panel-header--prominent {
@@ -100,6 +100,8 @@
 
 .probability-bar-fill {
   @apply h-full;
+  width: var(--probability-value);
+  background-color: var(--probability-colour);
   border-radius: var(--radius-control);
   transition: width var(--motion-duration-standard) var(--motion-easing-standard), background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }

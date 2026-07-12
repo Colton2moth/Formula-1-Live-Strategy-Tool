@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
 import type { ApiDriver } from "../../types/race";
 import { formatGap, formatLapTime, tyreColors } from "../../utils/raceDisplay";
@@ -54,6 +55,9 @@ export function Leaderboard({ drivers, selectedDriver, onSelectDriver }: Leaderb
               const tyreTextColor = compound === "HARD" || compound === "MEDIUM" ? "#111318" : "#ffffff";
               const tyreAgeLabel = Number.isFinite(driver.tyre_age) ? String(driver.tyre_age) : "--";
               const tyreAgeDescription = tyreAgeLabel === "--" ? "tyre age unavailable" : `${tyreAgeLabel} laps old`;
+              const rowStyle = { "--team-accent-color": `#${driver.team_colour}` } as CSSProperties;
+              const tyreStyle = { "--tyre-color": tyreColor, "--tyre-text-color": tyreTextColor } as CSSProperties;
+
               return (
                 <tr
                   key={driver.driver_number}
@@ -64,11 +68,11 @@ export function Leaderboard({ drivers, selectedDriver, onSelectDriver }: Leaderb
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") onSelectDriver(driver.driver_number);
                   }}
-                  style={{ "--team-accent-color": `#${driver.team_colour}` } as React.CSSProperties}
+                  style={rowStyle}
                 >
                   <td className="leaderboard-cell"><span className="leaderboard-position">{driver.position}</span></td>
                   <td className="leaderboard-cell"><span className="leaderboard-driver-name">{firstName ? <span className="leaderboard-driver-first-name">{firstName}</span> : null}<span className="leaderboard-driver-last-name">{lastName.toUpperCase()}</span></span></td>
-                  <td className="leaderboard-cell"><span className="leaderboard-team-dot" style={{ backgroundColor: `#${driver.team_colour}` }} /><span className="leaderboard-team-name">{driver.team_name}</span></td>
+                  <td className="leaderboard-cell"><span className="leaderboard-team-dot" /><span className="leaderboard-team-name">{driver.team_name}</span></td>
                   <td className="leaderboard-cell"><span className="leaderboard-value">{formatLapTime(driver.last_lap_time)}</span></td>
                   <td className="leaderboard-cell leaderboard-timing-cell">
                     <span className="leaderboard-timing">
@@ -78,7 +82,7 @@ export function Leaderboard({ drivers, selectedDriver, onSelectDriver }: Leaderb
                   </td>
                   <td className="leaderboard-cell">
                     <span className="leaderboard-tyre-chip" aria-label={`${compound} tyre, ${tyreAgeDescription}`}>
-                      <span className="leaderboard-tyre-dot" style={{ "--tyre-color": tyreColor, "--tyre-text-color": tyreTextColor } as React.CSSProperties}>{tyreLetter}</span>
+                      <span className="leaderboard-tyre-dot" style={tyreStyle}>{tyreLetter}</span>
                       <span className={`leaderboard-tyre-age ${tyreAgeLabel === "--" ? "leaderboard-tyre-age--missing" : ""}`}>{tyreAgeLabel}</span>
                     </span>
                   </td>

@@ -20,5 +20,9 @@ export function formatGap(value: number | null) {
 }
 
 export function formatUpdatedAt(value: string) {
-  return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  const updatedAt = new Date(value);
+  const hours = String(updatedAt.getHours()).padStart(2, "0");
+  const minutes = String(updatedAt.getMinutes()).padStart(2, "0");
+  const seconds = String(updatedAt.getSeconds()).padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
 }

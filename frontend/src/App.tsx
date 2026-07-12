@@ -64,11 +64,11 @@ function App() {
       <div className="dashboard-container">
         <RaceHeader session={raceState.session} />
         <div className="dashboard-layout">
+          <TrackMap track={track} drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={toggleSelectedDriver} />
           <div className="dashboard-stack">
-            <TrackMap track={track} drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={toggleSelectedDriver} />
+            <Leaderboard drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={toggleSelectedDriver} />
             <StrategyPanel selectedDriver={selectedDriver} prediction={selectedPrediction} />
           </div>
-          <Leaderboard drivers={sortedDrivers} selectedDriver={selectedDriver} onSelectDriver={toggleSelectedDriver} />
         </div>
       </div>
     </main>
