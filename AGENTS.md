@@ -94,6 +94,20 @@ The main goal is to help the developer understand the system.
 - Add routing only when the app gains multiple pages.
 - Whenever a user interaction feature is added, such as hover states, click states, selected states, toggles, expandable panels, tooltips, focus states, or any other visual change triggered by user input, include a subtle accompanying animation or transition. Prefer short, consistent transitions for opacity, transform, colour, shadow, border, background, scale, or position changes so the UI feels cohesive without becoming distracting.
 
+## Responsive design
+
+- Design and maintain CSS for only two responsive layout states: desktop and phone.
+- Always design desktop-first.
+- Use a 16:9 viewport as the desktop target.
+- Use a portrait phone target around 2532 physical pixels tall by 1170 physical pixels wide, approximately 844 by 390 CSS pixels at 3x device scaling.
+- Do not add separate tablet, ultrawide, or intermediate responsive layouts unless the developer explicitly asks for one.
+- Keep desktop styling as the base state and use one shared `@media (max-width: 480px)` override for phone-specific layout changes.
+- Do not use Tailwind `sm`, `md`, `lg`, `xl`, or `2xl` responsive variants or introduce any other structural breakpoint. Accessibility and capability queries such as `prefers-reduced-motion` do not count as additional layout states.
+- Within each target state, prefer fluid values such as `clamp()`, flexible Grid or Flexbox layouts, `minmax()`, and appropriate min/max constraints so nearby viewport sizes remain usable without creating another layout mode.
+- On phones, stack primary dashboard regions cleanly, keep text readable, keep controls easy to tap, and prevent page-level horizontal overflow. Contained horizontal scrolling is acceptable only for inherently wide data surfaces such as the leaderboard.
+- Keep circuit maps, charts, icons, and other visual data inside their containers with intentional aspect ratios and scaling; do not allow them to force the page wider than the viewport.
+- Verify responsive changes at a representative 16:9 desktop viewport such as 1440 by 810 CSS pixels and at 390 by 844 CSS pixels for the phone state.
+- At both targets, check that navigation and controls remain usable, cards and panels align or stack cleanly, important data is not hidden behind hover, and the layout does not create unintended clipping or excessive empty space.
 
 ## Text and typography rules
 
@@ -143,7 +157,7 @@ The main goal is to help the developer understand the system.
 
 - Before finishing frontend work, run only the relevant scripts that exist in `package.json`.
 - Do not invent missing commands. If a check does not exist, mention that it was unavailable.
-- For frontend changes, verify relevant loading, empty, API error, reconnecting, missing selected driver, missing prediction, timing-mode, flag-status, wet-tyre, race-not-live, and narrow-desktop states.
+- For frontend changes, verify relevant loading, empty, API error, reconnecting, missing selected driver, missing prediction, timing-mode, flag-status, wet-tyre, and race-not-live states at both the 16:9 desktop and phone target viewports.
 
 ## Before coding
 

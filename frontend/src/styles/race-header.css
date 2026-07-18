@@ -106,3 +106,26 @@
 .race-header-weather-icon {
   @apply text-[22px] leading-none text-app-muted;
 }
+
+@media (max-width: 480px) {
+  .race-header {
+    @apply p-2;
+  }
+
+  .race-header-section-title {
+    @apply pb-2;
+  }
+
+  .race-header-copy,
+  .race-header-stat {
+    @apply min-h-14 px-2;
+  }
+
+  .race-header-title {
+    @apply text-lg;
+  }
+
+  .race-header-stat-value {
+    @apply text-base;
+  }
+}

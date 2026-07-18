@@ -1,9 +1,11 @@
 .dashboard-shell {
-  @apply min-h-screen bg-app-bg px-4 py-4 font-sans text-app-text md:px-6;
+  @apply min-h-screen bg-app-bg px-6 py-4 font-sans text-app-text;
 }
 
 .dashboard-container {
   @apply mx-auto grid max-w-[1440px] gap-4;
+  min-width: 0;
+  width: 100%;
 }
 
 .dashboard-brand {
@@ -17,11 +19,13 @@
 }
 
 .dashboard-layout {
-  @apply grid gap-4 xl:grid-cols-[0.95fr_1.55fr];
+  @apply grid grid-cols-[0.95fr_1.55fr] gap-4;
+  min-width: 0;
 }
 
 .dashboard-stack {
   @apply grid content-start gap-4;
+  min-width: 0;
 }
 
 .dashboard-state-card {
@@ -48,6 +52,7 @@
 
 .panel {
   @apply border border-app-line bg-app-panel;
+  min-width: 0;
   border-radius: var(--radius-surface);
   box-shadow: var(--shadow-surface);
   transition: border-color var(--motion-duration-standard) var(--motion-easing-standard), box-shadow var(--motion-duration-standard) var(--motion-easing-standard), transform var(--motion-duration-standard) var(--motion-easing-standard);
@@ -114,4 +119,36 @@
   background-color: var(--probability-colour);
   border-radius: var(--radius-control);
   transition: width var(--motion-duration-standard) var(--motion-easing-standard), background-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+@media (max-width: 480px) {
+  .dashboard-shell {
+    @apply px-3 py-3;
+  }
+
+  .dashboard-container,
+  .dashboard-layout,
+  .dashboard-stack {
+    @apply gap-3;
+  }
+
+  .dashboard-brand {
+    @apply w-full px-3 text-center;
+  }
+
+  .dashboard-brand-title {
+    @apply text-xl tracking-[0.08em];
+  }
+
+  .dashboard-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-state-card {
+    @apply p-4;
+  }
+
+  .panel-header {
+    @apply px-3;
+  }
 }

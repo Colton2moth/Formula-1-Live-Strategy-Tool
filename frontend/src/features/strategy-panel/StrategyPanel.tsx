@@ -14,8 +14,10 @@ export function StrategyPanel({ selectedDriver, prediction }: StrategyPanelProps
   const pitProbability = prediction ? Math.round(prediction.pit_within_5_laps * 100) : null;
   const selectedDriverName = selectedDriver ? splitDriverName(selectedDriver.name) : null;
   const summaryStyle = { "--strategy-team-colour": selectedTeamColor } as CSSProperties;
-  const nextTyreColor = prediction ? tyreColors[prediction.predicted_next_compound] ?? "var(--color-line)" : "var(--color-line)";
-  const nextTyreStyle = { "--strategy-tyre-colour": nextTyreColor } as CSSProperties;
+  const nextTyreCompound = prediction?.predicted_next_compound.trim().toUpperCase() ?? "";
+  const nextTyreColor = tyreColors[nextTyreCompound] ?? "var(--color-line)";
+  const nextTyreTextColor = nextTyreCompound === "HARD" || nextTyreCompound === "MEDIUM" ? "#111318" : "#ffffff";
+  const nextTyreStyle = { "--strategy-tyre-colour": nextTyreColor, "--strategy-tyre-text-colour": nextTyreTextColor } as CSSProperties;
 
   return (
     <Panel
@@ -73,7 +75,9 @@ export function StrategyPanel({ selectedDriver, prediction }: StrategyPanelProps
               <div className="strategy-category">
                 <div className="strategy-category-title">Likely next tyre</div>
                 <div className="stat-category-body">
-                  <span className="strategy-tyre-chip" style={nextTyreStyle}>{prediction.predicted_next_compound}</span>
+                  <span className="strategy-tyre-chip" style={nextTyreStyle} aria-label={`${nextTyreCompound} tyre`}>
+                    {nextTyreCompound.charAt(0) || "?"}
+                  </span>
                 </div>
               </div>
             </>

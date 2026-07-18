@@ -32,7 +32,7 @@
 }
 
 .strategy-category-grid {
-  @apply grid grid-cols-2 overflow-hidden border border-app-line bg-app-panelAlt xl:grid-cols-[1.15fr_1.65fr_0.9fr_1.15fr];
+  @apply grid grid-cols-[1.15fr_1.65fr_0.9fr_1.15fr] overflow-hidden border border-app-line bg-app-panelAlt;
   border-radius: var(--radius-surface);
   height: 7.5rem;
 }
@@ -41,12 +41,12 @@
   @apply grid content-start p-4 justify-items-center items-center;
 }
 
-.strategy-category:nth-child(even) {
+.strategy-category:nth-child(n + 2) {
   border-left: 1px solid var(--color-line);
 }
 
 .strategy-category:nth-child(n + 3) {
-  border-top: 1px solid var(--color-line);
+  border-top: 0;
 }
 
 .strategy-category-title {
@@ -78,9 +78,9 @@
 }
 
 .strategy-tyre-chip {
-  @apply w-fit border px-2 py-1 text-xs font-black uppercase text-white;
-  border-color: var(--strategy-tyre-colour);
-  border-radius: var(--radius-control);
+  @apply grid h-[50px] w-[50px] shrink-0 place-items-center rounded-full text-[30px] font-black leading-none;
+  background: var(--strategy-tyre-colour);
+  color: var(--strategy-tyre-text-colour);
 }
 
 .strategy-freshness-row {
@@ -104,7 +104,7 @@
 }
 
 .strategy-empty-state {
-  @apply grid gap-2 border border-app-line bg-app-panelAlt p-4 xl:col-span-3;
+  @apply col-span-3 grid gap-2 border border-app-line bg-app-panelAlt p-4;
   border-radius: var(--radius-surface);
   box-shadow: var(--shadow-surface);
 }
@@ -117,16 +117,26 @@
   @apply text-sm font-medium leading-6 text-app-muted;
 }
 
-@media (min-width: 1280px) {
+@media (max-width: 480px) {
   .strategy-category-grid {
-    min-height: 7rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    height: auto;
   }
 
-  .strategy-category:nth-child(n + 2) {
-    border-left: 1px solid var(--color-line);
+  .strategy-driver-summary,
+  .strategy-category {
+    @apply min-h-28 p-3;
   }
 
   .strategy-category:nth-child(n + 3) {
-    border-top: 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .strategy-category:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .strategy-empty-state {
+    grid-column: span 1;
   }
 }

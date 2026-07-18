@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { Panel } from "../../components/Panel";
 import type { ApiDriver, TrackPoint, TrackState } from "../../types/race";
 
 type TrackMapProps = {
@@ -24,7 +23,10 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
   const startFinishSquares = startFinishMarkerSquares(startFinish);
   const startFinishRotation = startFinishMarkerRotation(displayPoints, startFinish);
   return (
-    <Panel label="" className="track-map-panel">
+    <section className="panel track-map-panel">
+      <div role="heading" aria-level={2} className="track-map-title">
+        {track.circuit_name}
+      </div>
       <div className="track-map-frame">
         <svg
           viewBox="0 0 100 85"
@@ -94,10 +96,7 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
           })}
         </svg>
       </div>
-      <div role="heading" aria-level={3} className="track-map-current-label">
-        {track.circuit_name}
-      </div>
-    </Panel>
+    </section>
   );
 }
 

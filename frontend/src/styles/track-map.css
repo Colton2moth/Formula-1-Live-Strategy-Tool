@@ -2,21 +2,20 @@
   height: fit-content;
 }
 
+.track-map-title {
+  padding: clamp(1rem, 2vw, 1.5rem);
+  color: var(--color-text);
+  font-family: var(--font-app);
+  font-size: clamp(1.5rem, 3vw, 2.5rem);
+  font-weight: 900;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
 .track-map-frame {
   @apply relative aspect-[4/3] overflow-hidden bg-app-panelAlt p-4;
   border-radius: var(--radius-surface);
-}
-
-.track-map-current-label {
-  @apply mt-2 flex items-center justify-center gap-2 whitespace-nowrap border border-app-line bg-app-bg px-3 py-2 text-base font-semibold tracking-wide text-white;
-  border-radius: var(--radius-control);
-  box-shadow: var(--shadow-surface);
-}
-
-.track-map-current-icon {
-  font-size: 1rem;
-  font-variation-settings: "FILL" 0, "wght" 700, "GRAD" 0, "opsz" 20;
-  line-height: 1;
 }
 
 .track-map-svg {
@@ -91,4 +90,10 @@
 .track-map-marker:hover .track-map-marker-dot,
 .track-map-marker:focus-visible .track-map-marker-dot {
   transform: scale(1.08);
+}
+
+@media (max-width: 480px) {
+  .track-map-frame {
+    @apply p-2;
+  }
 }
