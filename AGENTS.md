@@ -177,4 +177,14 @@ State briefly:
 3. How to verify it.
 4. What the next small step would be.
 
+## TODO reconciliation
+
+After finishing any coding work:
+
+- Cross-reference `docs/TODO.md` before reporting the work complete.
+- Mark a task complete only when its implementation and all related subtasks are fully finished. Leave partially completed tasks unchecked.
+- Check for follow-up work or newly discovered subtasks and add them to `docs/TODO.md` before finishing.
+- Organize the checklist by functional area, nesting smaller subtasks under their larger parent task when appropriate.
+- Keep task wording specific enough that the remaining scope and completion state are clear.
+
 Do not write the next step unless explicitly asked.

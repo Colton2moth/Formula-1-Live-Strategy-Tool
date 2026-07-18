@@ -45,11 +45,7 @@ env/
 *~
 
 # Documentation (local working notes)
-docs/*
-!docs/
-!docs/FIRST_TIME_SETUP.md
-!docs/FAST_START.md
-!docs/FEATURE_IDEAS.md
+/docs/TODO.md
 
 # Testing / coverage
 .pytest_cache/
