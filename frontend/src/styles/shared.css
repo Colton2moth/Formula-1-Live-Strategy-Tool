@@ -19,7 +19,7 @@
 }
 
 .dashboard-layout {
-  @apply grid grid-cols-[0.95fr_1.55fr] gap-4;
+  @apply grid grid-cols-[1.6fr_1.55fr] gap-4;
   min-width: 0;
 }
 
@@ -58,16 +58,8 @@
   transition: border-color var(--motion-duration-standard) var(--motion-easing-standard), box-shadow var(--motion-duration-standard) var(--motion-easing-standard), transform var(--motion-duration-standard) var(--motion-easing-standard);
 }
 
-.panel--prominent {
-  @apply border-app-red;
-}
-
 .panel-header {
   @apply flex items-center justify-between gap-3 border-b border-app-line px-4 py-3;
-}
-
-.panel-header--prominent {
-  @apply border-app-red;
 }
 
 .panel-title {

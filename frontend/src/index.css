@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --font-app: "Work Sans", sans-serif;
+  --font-app: "Manrope", sans-serif;
   --color-bg: #070707;
   --color-panel: #121212;
   --color-panel-alt: #1b1b1b;

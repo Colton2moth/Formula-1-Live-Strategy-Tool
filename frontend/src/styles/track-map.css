@@ -6,11 +6,11 @@
   padding: clamp(1rem, 2vw, 1.5rem);
   color: var(--color-text);
   font-family: var(--font-app);
-  font-size: clamp(1.5rem, 3vw, 2.5rem);
+  font-size: clamp(1.5rem, 2vw, 2.5rem);
   font-weight: 900;
   line-height: 1.05;
   overflow-wrap: anywhere;
-  text-align: left;
+  text-align: center;
 }
 
 .track-map-frame {

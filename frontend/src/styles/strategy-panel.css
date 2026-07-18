@@ -1,14 +1,15 @@
 .strategy-panel-body {
-  @apply p-4;
+  @apply p-0;
 }
 
 .strategy-driver-summary {
   @apply grid  gap-1 p-4 justify-items-center;
-  box-shadow: inset 4px 0 var(--strategy-team-colour);
+  box-shadow: inset 0 4px var(--strategy-team-colour);
 }
 
 .strategy-eyebrow {
-  @apply text-xs font-semibold uppercase tracking-wide text-app-muted justify-self-center;
+  @apply text-xs font-semibold uppercase tracking-wide justify-self-center;
+  color: var(--strategy-team-colour);
 }
 
 .strategy-driver-name {
@@ -33,12 +34,13 @@
 
 .strategy-category-grid {
   @apply grid grid-cols-[1.15fr_1.65fr_0.9fr_1.15fr] overflow-hidden border border-app-line bg-app-panelAlt;
-  border-radius: var(--radius-surface);
-  height: 7.5rem;
+  border-radius: 0 0 var(--radius-surface) var(--radius-surface);
+  height: 9.25rem;
 }
 
 .strategy-category {
-  @apply grid content-start p-4 justify-items-center items-center;
+  @apply grid p-4 justify-items-center items-center;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .strategy-category:nth-child(n + 2) {
@@ -50,7 +52,7 @@
 }
 
 .strategy-category-title {
-  @apply text-[11px] font-semibold uppercase leading-tight tracking-wide text-app-muted justify-self-center pb-3;
+  @apply text-[11px] font-semibold uppercase leading-tight tracking-wide text-app-muted justify-self-center pb-3 text-center;
 }
 
 .stat-category-body {
@@ -63,6 +65,39 @@
 
 .strategy-pit-stat {
   @apply min-w-0;
+}
+
+.strategy-pit-probability {
+  @apply relative grid h-[88px] w-[88px] place-items-center;
+}
+
+.strategy-pit-ring {
+  @apply absolute inset-0 h-full w-full -rotate-90 overflow-visible;
+  fill: none;
+  stroke-width: 4;
+}
+
+.strategy-pit-ring-track {
+  stroke: var(--color-line);
+  stroke-dasharray: 1;
+  stroke-linecap: round;
+}
+
+.strategy-pit-ring-progress {
+  @apply stroke-amber-300;
+  stroke-dasharray: 100;
+  stroke-dashoffset: var(--strategy-pit-progress);
+  stroke-linecap: round;
+  transition: stroke-dashoffset var(--motion-duration-standard) var(--motion-easing-standard);
+}
+
+.strategy-pit-probability .strategy-card-value {
+  @apply text-xl;
+}
+
+.strategy-pit-probability .strategy-card-help {
+  @apply mt-0 text-[11px] leading-tight tracking-wide;
+  width: min-content;
 }
 
 .strategy-card-label {
@@ -78,7 +113,7 @@
 }
 
 .strategy-tyre-chip {
-  @apply grid h-[50px] w-[50px] shrink-0 place-items-center rounded-full text-[30px] font-black leading-none;
+  @apply grid h-[60px] w-[60px] shrink-0 place-items-center rounded-full text-[37px] font-black leading-none;
   background: var(--strategy-tyre-colour);
   color: var(--strategy-tyre-text-colour);
 }
