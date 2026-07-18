@@ -5,12 +5,14 @@
 .dashboard-container {
   @apply mx-auto grid max-w-[1440px] gap-4;
   min-width: 0;
+  padding-top: 3.75rem;
   width: 100%;
 }
 
 .dashboard-brand {
-  @apply w-fit justify-self-center border border-app-red bg-app-panel px-4 py-2;
-  border-radius: 20px;
+  @apply fixed inset-x-0 top-0 z-50 w-full bg-app-panel px-4 py-2 text-center;
+  border: 0;
+  border-radius: 0;
   box-shadow: var(--shadow-surface);
 }
 
@@ -49,7 +51,7 @@
 .dashboard-state-help {
   @apply text-sm font-semibold text-app-text;
 }
-
+undo 
 .panel {
   @apply border border-app-line bg-app-panel;
   min-width: 0;
@@ -124,8 +126,12 @@
     @apply gap-3;
   }
 
+  .dashboard-container {
+    padding-top: 3.25rem;
+  }
+
   .dashboard-brand {
-    @apply w-full px-3 text-center;
+    @apply px-3;
   }
 
   .dashboard-brand-title {

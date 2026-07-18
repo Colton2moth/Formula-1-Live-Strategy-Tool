@@ -1,6 +1,6 @@
 # Feature Ideas
 
-## Leaderboard pit probability column
+## Leaderboard pit probability (PIT SOON) column
 
 Add a compact pit-probability column to the live driver table so each row can show the model estimate for that driver.
 
@@ -20,3 +20,11 @@ Practical approach:
 Live-data requirement:
 
 - The live snapshot or WebSocket payload should include prediction updates for all visible drivers, not only the selected driver.
+
+## First-visit tooltip walkthrough
+
+Add a short tooltip walkthrough on a user's first visit to introduce the dashboard's main controls and data areas.
+
+- Highlight the race header, track map, live driver table, and AI strategy panel in sequence.
+- Let users skip or dismiss the walkthrough at any time.
+- Remember completion locally so the walkthrough does not appear on every visit.
