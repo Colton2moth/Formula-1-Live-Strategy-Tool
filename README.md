@@ -4,7 +4,12 @@ A learning-first backend project that uses historical OpenF1 data to train Formu
 
 ## Initial goal
 
-Build a baseline model that predicts whether a driver will pit within the next five laps.
+Build **two** XGBoost models from the same driver-lap dataset:
+
+1. **Pit-window** — will the driver pit within the next **3** laps?
+2. **Next-compound** — which tyre will they take at the next stop? (`SOFT` / `MEDIUM` / `HARD` / `INTERMEDIATE` / `WET`)
+
+Full plan: [docs/TWO_MODEL_ARCHITECTURE.md](docs/TWO_MODEL_ARCHITECTURE.md).
 
 ## System flow
 
@@ -14,8 +19,7 @@ Historical:
 OpenF1 REST API
 → raw JSON
 → processed driver-lap rows
-→ training dataset
-→ trained model
+→ pit-window XGBoost + next-compound XGBoost
 ```
 
 Live:
@@ -23,8 +27,8 @@ Live:
 ```text
 OpenF1 live feed
 → current race state
-→ feature generation
-→ model inference
+→ shared feature generation
+→ pit probability → (if above threshold) compound prediction
 → FastAPI REST/WebSocket API
 → frontend
 ```
@@ -35,9 +39,9 @@ OpenF1 live feed
 2. Inspect one race manually.
 3. Define one processed row: one driver at one completed lap.
 4. Build the processing pipeline for one race.
-5. Create labels for pit-within-five-laps.
-6. Train a simple baseline model.
-7. Add a minimal FastAPI prediction endpoint.
+5. Create labels: `pit_within_3_laps` and `next_compound`.
+6. Train two baseline XGBoost models.
+7. Combine inference and expose FastAPI prediction endpoints.
 8. Add live ingestion only after the historical pipeline works.
 
 ## Current scope
@@ -101,6 +105,9 @@ Copy `.env.example` to `.env` if you need local configuration.
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Two-model architecture](docs/TWO_MODEL_ARCHITECTURE.md)
+- [Driver-lap schema](docs/DRIVER_LAP_SCHEMA.md)
+- [API contract](docs/API_CONTRACT.md)
 - [Data acquisition](docs/DATA_ACQUISITION.md)
 - [Development workflow](docs/DEVELOPMENT_WORKFLOW.md)
 - [Roadmap](docs/ROADMAP.md)

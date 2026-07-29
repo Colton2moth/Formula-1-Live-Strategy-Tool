@@ -46,14 +46,31 @@ class DriverState(BaseModel):
     pit_stops: int
 
 
+class CompoundProbabilities(BaseModel):
+    """Multiclass probabilities from the next-compound XGBoost model."""
+
+    SOFT: float = Field(ge=0.0, le=1.0)
+    MEDIUM: float = Field(ge=0.0, le=1.0)
+    HARD: float = Field(ge=0.0, le=1.0)
+    INTERMEDIATE: float = Field(ge=0.0, le=1.0)
+    WET: float = Field(ge=0.0, le=1.0)
+
+
 class PredictionState(BaseModel):
-    """Model output for one driver (pit-within-5-laps baseline + window)."""
+    """
+    Combined two-model output for one driver.
+
+    pit_probability comes from the pit-window classifier (N = pit_window_laps).
+    Compound fields may be null when probability is below the display threshold;
+    mocks may still include them for frontend experimentation.
+    """
 
     driver_number: int
-    pit_within_5_laps: float = Field(ge=0.0, le=1.0)
-    predicted_pit_window_start: int
-    predicted_pit_window_end: int
-    predicted_next_compound: str
+    lap_number: int
+    pit_window_laps: int = 3
+    pit_probability: float = Field(ge=0.0, le=1.0)
+    predicted_next_compound: str | None
+    compound_probabilities: CompoundProbabilities | None
     updated_at: str  # ISO-8601 UTC, e.g. "2026-06-14T18:34:10Z"
 
 

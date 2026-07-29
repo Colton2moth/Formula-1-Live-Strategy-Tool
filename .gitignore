@@ -44,8 +44,9 @@ env/
 *.swo
 *~
 
-# Documentation (local working notes)
+# Documentation / agent notes (local working notes)
 docs/
+AGENTS.md
 
 # Testing / coverage
 .pytest_cache/
@@ -80,6 +81,7 @@ logs/
 # Local data
 data/raw/
 data/processed/
+data/models/
 download_errors.jsonl
 *.csv
 *.parquet

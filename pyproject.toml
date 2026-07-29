@@ -12,6 +12,8 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "requests>=2.30.0",
     "fastapi[standard]>=0.115.0",
+    "xgboost>=2.0.0",
+    "scikit-learn>=1.3.0",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +28,8 @@ dev = [
 [project.scripts]
 f1-strategy = "formula1_strategy_tool.cli:main"
 f1-download-openf1 = "formula1_strategy_tool.acquisition.cli:main"
+f1-process-races = "formula1_strategy_tool.processing:main"
+f1-train-pit = "formula1_strategy_tool.training:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]

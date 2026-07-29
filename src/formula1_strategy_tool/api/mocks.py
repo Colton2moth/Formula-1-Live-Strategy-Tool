@@ -10,6 +10,7 @@ Scenario: lap 25 of 70 at the Canadian Grand Prix, three drivers on screen.
 from __future__ import annotations
 
 from formula1_strategy_tool.api.schemas import (
+    CompoundProbabilities,
     DriverState,
     PredictionState,
     RaceStateSnapshot,
@@ -107,38 +108,69 @@ MOCK_DRIVERS_BY_NUMBER: dict[int, DriverState] = {
 }
 
 # --- Predictions (GET /api/predictions, GET /api/drivers/{n}/prediction) ---
+# Shape matches two-model API: pit probability (N=3) + optional compound output.
+# Driver 1 is below a typical display threshold but still includes compound
+# probabilities for frontend debugging (allowed by the contract).
 
 MOCK_PREDICTIONS: list[PredictionState] = [
     PredictionState(
         driver_number=1,
-        pit_within_5_laps=0.15,
-        predicted_pit_window_start=42,
-        predicted_pit_window_end=48,
-        predicted_next_compound="MEDIUM",
+        lap_number=25,
+        pit_window_laps=3,
+        pit_probability=0.15,
+        predicted_next_compound=None,
+        compound_probabilities=CompoundProbabilities(
+            SOFT=0.05,
+            MEDIUM=0.55,
+            HARD=0.38,
+            INTERMEDIATE=0.01,
+            WET=0.01,
+        ),
         updated_at="2026-06-14T18:34:10Z",
     ),
     PredictionState(
         driver_number=4,
-        pit_within_5_laps=0.72,
-        predicted_pit_window_start=28,
-        predicted_pit_window_end=31,
+        lap_number=25,
+        pit_window_laps=3,
+        pit_probability=0.72,
         predicted_next_compound="HARD",
+        compound_probabilities=CompoundProbabilities(
+            SOFT=0.04,
+            MEDIUM=0.21,
+            HARD=0.75,
+            INTERMEDIATE=0.00,
+            WET=0.00,
+        ),
         updated_at="2026-06-14T18:34:10Z",
     ),
     PredictionState(
         driver_number=16,
-        pit_within_5_laps=0.58,
-        predicted_pit_window_start=30,
-        predicted_pit_window_end=34,
+        lap_number=25,
+        pit_window_laps=3,
+        pit_probability=0.58,
         predicted_next_compound="HARD",
+        compound_probabilities=CompoundProbabilities(
+            SOFT=0.06,
+            MEDIUM=0.30,
+            HARD=0.62,
+            INTERMEDIATE=0.01,
+            WET=0.01,
+        ),
         updated_at="2026-06-14T18:34:10Z",
     ),
     PredictionState(
         driver_number=44,
-        pit_within_5_laps=0.91,
-        predicted_pit_window_start=26,
-        predicted_pit_window_end=28,
+        lap_number=25,
+        pit_window_laps=3,
+        pit_probability=0.91,
         predicted_next_compound="MEDIUM",
+        compound_probabilities=CompoundProbabilities(
+            SOFT=0.10,
+            MEDIUM=0.70,
+            HARD=0.18,
+            INTERMEDIATE=0.01,
+            WET=0.01,
+        ),
         updated_at="2026-06-14T18:34:10Z",
     ),
 ]
