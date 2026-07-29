@@ -4,7 +4,7 @@ Use this after you have completed [FIRST_TIME_SETUP.md](FIRST_TIME_SETUP.md) at 
 
 ## Start the backend
 
-Open a terminal at the repo root:
+Open a terminal at the repo root and run:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -15,7 +15,7 @@ The backend should be available at `http://127.0.0.1:8000`.
 
 ## Start the frontend
 
-Open a second terminal at the repo root:
+Wait for fastapi to complete its set up the, open a second terminal at the repo root and run:
 
 ```powershell
 cd frontend
