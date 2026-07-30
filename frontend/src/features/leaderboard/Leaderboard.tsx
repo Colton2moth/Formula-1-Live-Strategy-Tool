@@ -11,6 +11,18 @@ const tyreCompoundLetters: Record<string, string> = {
   WET: "W",
 };
 
+const leaderboardColumnLabels = ["Pos", "Driver", "Team", "Last lap", "Gap / Interval", "Tyre", "Stops"] as const;
+
+const leaderboardColumnSlug: Record<string, string> = {
+  Pos: "pos",
+  Driver: "driver",
+  Team: "team",
+  "Last lap": "last-lap",
+  "Gap / Interval": "gap-interval",
+  Tyre: "tyre",
+  Stops: "stops",
+};
+
 type LeaderboardProps = {
   drivers: ApiDriver[];
   selectedDriver: ApiDriver | null;
@@ -34,8 +46,8 @@ export function Leaderboard({ drivers, selectedDriver, onSelectDriver }: Leaderb
         <table className="leaderboard-table">
           <thead>
             <tr className="leaderboard-header-row">
-              {["Pos", "Driver", "Team", "Last lap", "Gap / Interval", "Tyre", "Stops"].map((label) => (
-                <th key={label} className={`leaderboard-header-cell ${label === "Gap / Interval" ? "leaderboard-timing-header" : ""}`}><span className="leaderboard-header-text">{label}</span></th>
+              {leaderboardColumnLabels.map((label) => (
+                <th key={label} className={`leaderboard-header-cell leaderboard-col--${leaderboardColumnSlug[label]} ${label === "Gap / Interval" ? "leaderboard-timing-header" : ""}`}><span className="leaderboard-header-text">{label}</span></th>
               ))}
             </tr>
           </thead>
@@ -67,23 +79,23 @@ export function Leaderboard({ drivers, selectedDriver, onSelectDriver }: Leaderb
                   }}
                   style={rowStyle}
                 >
-                  <td className="leaderboard-cell"><span className="leaderboard-position">{driver.position}</span></td>
-                  <td className="leaderboard-cell"><span className="leaderboard-driver-name">{firstName ? <span className="leaderboard-driver-first-name">{firstName}</span> : null}<span className="leaderboard-driver-last-name">{lastName.toUpperCase()}</span></span></td>
-                  <td className="leaderboard-cell"><span className="leaderboard-team-dot" /><span className="leaderboard-team-name">{driver.team_name}</span></td>
-                  <td className="leaderboard-cell"><span className="leaderboard-value">{formatLapTime(driver.last_lap_time)}</span></td>
-                  <td className="leaderboard-cell leaderboard-timing-cell">
+                  <td className="leaderboard-cell leaderboard-col--pos"><span className="leaderboard-position">{driver.position}</span></td>
+                  <td className="leaderboard-cell leaderboard-col--driver"><span className="leaderboard-driver-name">{firstName ? <span className="leaderboard-driver-first-name">{firstName}</span> : null}<span className="leaderboard-driver-last-name">{lastName.toUpperCase()}</span></span></td>
+                  <td className="leaderboard-cell leaderboard-col--team"><span className="leaderboard-team-dot" /><span className="leaderboard-team-name">{driver.team_name}</span></td>
+                  <td className="leaderboard-cell leaderboard-col--last-lap"><span className="leaderboard-value">{formatLapTime(driver.last_lap_time)}</span></td>
+                  <td className="leaderboard-cell leaderboard-col--gap-interval leaderboard-timing-cell">
                     <span className="leaderboard-timing">
                       <span className="leaderboard-timing-gap">{gapToLeader}</span>
                       <span className="leaderboard-timing-interval">{interval}</span>
                     </span>
                   </td>
-                  <td className="leaderboard-cell">
+                  <td className="leaderboard-cell leaderboard-col--tyre">
                     <span className="leaderboard-tyre-chip" aria-label={`${compound} tyre, ${tyreAgeDescription}`}>
                       <span className="leaderboard-tyre-dot" style={tyreStyle}>{tyreLetter}</span>
                       <span className={`leaderboard-tyre-age ${tyreAgeLabel === "--" ? "leaderboard-tyre-age--missing" : ""}`}>{tyreAgeLabel}</span>
                     </span>
                   </td>
-                  <td className="leaderboard-cell"><span className="leaderboard-muted-value">{driver.pit_stops}</span></td>
+                  <td className="leaderboard-cell leaderboard-col--stops"><span className="leaderboard-muted-value">{driver.pit_stops}</span></td>
                 </tr>
               );
             })}

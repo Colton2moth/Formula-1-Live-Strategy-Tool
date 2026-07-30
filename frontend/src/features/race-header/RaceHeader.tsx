@@ -30,7 +30,7 @@ export function RaceHeader({ session }: RaceHeaderProps) {
   const weatherIcon = session.rainfall ? "rainy" : "clear_day";
 
   return (
-    <Panel label="Race info">
+    <Panel label="Race conditions">
       <div className="p-3">
       <div className="race-header-statuses">
         <div className="race-header-stat">
@@ -56,7 +56,7 @@ export function RaceHeader({ session }: RaceHeaderProps) {
           </span>
         </div>
         <div className="race-header-stat">
-          <span className="race-header-stat-label">Conditions</span>
+          <span className="race-header-stat-label">Track status</span>
           <span className="race-header-stat-reading">
             <span className="material-symbols-rounded race-header-stat-icon" aria-hidden="true">
               {weatherIcon}

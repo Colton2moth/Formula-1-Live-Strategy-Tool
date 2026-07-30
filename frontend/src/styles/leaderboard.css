@@ -3,9 +3,17 @@
 }
 
 .leaderboard-table {
-  @apply w-full min-w-[760px];
+  @apply w-full;
   border-spacing: 0 0.5rem;
 }
+
+.leaderboard-col--pos { width: 2rem; }
+.leaderboard-col--driver { width: 6rem; }
+.leaderboard-col--team { width: 8rem; }
+.leaderboard-col--last-lap { width: 5rem; }
+.leaderboard-col--gap-interval { width: 6rem; }
+.leaderboard-col--tyre { width: 5rem; }
+.leaderboard-col--stops { width: 2rem; }
 
 .leaderboard-header-row {
   @apply text-left;
@@ -81,7 +89,7 @@
 }
 
 .leaderboard-driver-name {
-  @apply grid gap-0.5 text-left leading-none;
+  @apply grid gap-0.5 leading-none;
 }
 
 .leaderboard-driver-first-name {
