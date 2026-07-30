@@ -66,14 +66,24 @@ export function RaceHeader({ session }: RaceHeaderProps) {
         </div>
         <div className="race-header-stat">
           <span className="race-header-stat-label">Air Temp</span>
-          <span className="race-header-stat-value race-header-stat-value--numeric">
-            {session.air_temperature.toFixed(1)}&deg;C
+          <span className="race-header-stat-reading">
+            <span className="material-symbols-rounded race-header-stat-icon" aria-hidden="true">
+              device_thermostat
+            </span>
+            <span className="race-header-stat-value race-header-stat-value--numeric">
+              {session.air_temperature.toFixed(1)}&deg;C
+            </span>
           </span>
         </div>
         <div className="race-header-stat">
           <span className="race-header-stat-label">Track Temp</span>
-          <span className="race-header-stat-value race-header-stat-value--numeric">
-            {session.track_temperature.toFixed(1)}&deg;C
+          <span className="race-header-stat-reading">
+            <span className="material-symbols-rounded race-header-stat-icon" aria-hidden="true">
+              device_thermostat
+            </span>
+            <span className="race-header-stat-value race-header-stat-value--numeric">
+              {session.track_temperature.toFixed(1)}&deg;C
+            </span>
           </span>
         </div>
       </div>

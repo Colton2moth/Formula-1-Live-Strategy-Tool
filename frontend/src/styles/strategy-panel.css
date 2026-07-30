@@ -160,7 +160,7 @@
 
   .strategy-driver-summary,
   .strategy-category {
-    @apply min-h-28 p-3;
+    @apply min-h-28 p-1;
   }
 
   .strategy-category:nth-child(n + 3) {

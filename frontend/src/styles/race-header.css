@@ -3,17 +3,19 @@
 }
 
 .race-header-stat {
-  @apply flex min-h-16 flex-1 flex-col items-center justify-center border border-app-line bg-app-bg px-3 py-2 text-center;
+  @apply flex flex-1 flex-col items-center justify-center border border-app-line bg-app-bg text-center;
   border-radius: 0.5rem;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+  height: 4rem;
 }
 
 .race-header-stat-label {
-  @apply text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-app-muted;
+  @apply text-[10px] font-semibold uppercase leading-none text-app-muted;
 }
 
 .race-header-stat-value {
-  @apply mt-1.5 text-lg font-black uppercase leading-none text-white;
+  @apply mt-1.5 font-black uppercase leading-none text-white;
+  font-size: 1rem;
 }
 .race-header-stat-reading {
   @apply mt-1.5 flex items-center justify-center gap-2;
