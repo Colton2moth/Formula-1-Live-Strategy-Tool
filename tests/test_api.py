@@ -53,24 +53,26 @@ def test_get_race_state_snapshot():
     assert len(data["drivers"]) == len(data["predictions"])
 
 
-def test_get_predictions_match_two_model_contract():
+def test_get_predictions_include_all_model_outputs():
     response = client.get("/api/predictions")
     assert response.status_code == 200
     preds = response.json()
     assert len(preds) >= 1
     row = next(p for p in preds if p["driver_number"] == 4)
-    assert row["pit_window_laps"] == 3
-    assert row["pit_probability"] == 0.72
+    # Three pit-window models + compound multiclass.
+    assert row["pit_within_3_laps"] == 0.55
+    assert row["pit_within_5_laps"] == 0.72
+    assert row["pit_within_7_laps"] == 0.84
     assert row["predicted_next_compound"] == "HARD"
     assert row["compound_probabilities"]["HARD"] == 0.75
-    assert "pit_within_5_laps" not in row
+    assert "pit_probability" not in row
 
 
 def test_get_driver_prediction_below_threshold_allows_null_compound():
     response = client.get("/api/drivers/1/prediction")
     assert response.status_code == 200
     data = response.json()
-    assert data["pit_probability"] == 0.15
+    assert data["pit_within_5_laps"] == 0.15
     assert data["predicted_next_compound"] is None
     assert data["compound_probabilities"] is not None
 

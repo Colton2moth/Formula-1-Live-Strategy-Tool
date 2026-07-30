@@ -58,17 +58,19 @@ class CompoundProbabilities(BaseModel):
 
 class PredictionState(BaseModel):
     """
-    Combined two-model output for one driver.
+    Combined model output for one driver.
 
-    pit_probability comes from the pit-window classifier (N = pit_window_laps).
-    Compound fields may be null when probability is below the display threshold;
-    mocks may still include them for frontend experimentation.
+    Three binary pit-window probabilities (same features, different horizons)
+    plus next-compound multiclass output. Compound fields may be null when
+    pit risk is low; mocks may still include them for frontend experimentation.
     """
 
     driver_number: int
     lap_number: int
-    pit_window_laps: int = 3
-    pit_probability: float = Field(ge=0.0, le=1.0)
+    # Probabilities from pit_within_{3,5,7}_laps models (typically non-decreasing).
+    pit_within_3_laps: float = Field(ge=0.0, le=1.0)
+    pit_within_5_laps: float = Field(ge=0.0, le=1.0)
+    pit_within_7_laps: float = Field(ge=0.0, le=1.0)
     predicted_next_compound: str | None
     compound_probabilities: CompoundProbabilities | None
     updated_at: str  # ISO-8601 UTC, e.g. "2026-06-14T18:34:10Z"

@@ -108,16 +108,17 @@ MOCK_DRIVERS_BY_NUMBER: dict[int, DriverState] = {
 }
 
 # --- Predictions (GET /api/predictions, GET /api/drivers/{n}/prediction) ---
-# Shape matches two-model API: pit probability (N=3) + optional compound output.
-# Driver 1 is below a typical display threshold but still includes compound
-# probabilities for frontend debugging (allowed by the contract).
+# One row per driver: three pit-window probs + compound multiclass output.
+# Longer windows >= shorter ones (realistic). Driver 1 is "low pit risk"
+# (compound may be null); others include a top compound pick.
 
 MOCK_PREDICTIONS: list[PredictionState] = [
     PredictionState(
         driver_number=1,
         lap_number=25,
-        pit_window_laps=3,
-        pit_probability=0.15,
+        pit_within_3_laps=0.08,
+        pit_within_5_laps=0.15,
+        pit_within_7_laps=0.22,
         predicted_next_compound=None,
         compound_probabilities=CompoundProbabilities(
             SOFT=0.05,
@@ -131,8 +132,9 @@ MOCK_PREDICTIONS: list[PredictionState] = [
     PredictionState(
         driver_number=4,
         lap_number=25,
-        pit_window_laps=3,
-        pit_probability=0.72,
+        pit_within_3_laps=0.55,
+        pit_within_5_laps=0.72,
+        pit_within_7_laps=0.84,
         predicted_next_compound="HARD",
         compound_probabilities=CompoundProbabilities(
             SOFT=0.04,
@@ -146,8 +148,9 @@ MOCK_PREDICTIONS: list[PredictionState] = [
     PredictionState(
         driver_number=16,
         lap_number=25,
-        pit_window_laps=3,
-        pit_probability=0.58,
+        pit_within_3_laps=0.41,
+        pit_within_5_laps=0.58,
+        pit_within_7_laps=0.71,
         predicted_next_compound="HARD",
         compound_probabilities=CompoundProbabilities(
             SOFT=0.06,
@@ -161,8 +164,9 @@ MOCK_PREDICTIONS: list[PredictionState] = [
     PredictionState(
         driver_number=44,
         lap_number=25,
-        pit_window_laps=3,
-        pit_probability=0.91,
+        pit_within_3_laps=0.78,
+        pit_within_5_laps=0.91,
+        pit_within_7_laps=0.96,
         predicted_next_compound="MEDIUM",
         compound_probabilities=CompoundProbabilities(
             SOFT=0.10,
