@@ -34,7 +34,7 @@
 
 .strategy-category-grid {
   @apply grid grid-cols-[1.15fr_1.65fr_0.9fr_1.15fr] overflow-hidden border border-app-line bg-app-panelAlt;
-  border-radius: 0 0 var(--radius-surface) var(--radius-surface);
+  border-radius: 0 0 0.5rem 0.5rem;
   height: 9.25rem;
 }
 
@@ -140,7 +140,7 @@
 
 .strategy-empty-state {
   @apply col-span-3 grid gap-2 border border-app-line bg-app-panelAlt p-4;
-  border-radius: var(--radius-surface);
+  border-radius: 0.5rem;
   box-shadow: var(--shadow-surface);
 }
 

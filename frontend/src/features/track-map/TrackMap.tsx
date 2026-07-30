@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { Panel } from "../../components/Panel";
 import type { ApiDriver, TrackPoint, TrackState } from "../../types/race";
 
 type TrackMapProps = {
@@ -23,10 +24,7 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
   const startFinishSquares = startFinishMarkerSquares(startFinish);
   const startFinishRotation = startFinishMarkerRotation(displayPoints, startFinish);
   return (
-    <section className="panel track-map-panel">
-      <div role="heading" aria-level={2} className="track-map-title">
-        {track.circuit_name}
-      </div>
+    <Panel label={track.circuit_name} className="track-map-panel">
       <div className="track-map-frame">
         <svg
           viewBox="0 0 100 85"
@@ -34,19 +32,10 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
           role="img"
           aria-label={`${track.circuit_name} circuit map with selectable driver markers`}
         >
-          <defs>
-            <filter id="track-extrusion" className="track-map-extrusion-filter" x="-20%" y="-20%" width="140%" height="160%">
-              <feMorphology in="SourceAlpha" operator="dilate" radius="0 1.5" result="stretched" />
-              <feOffset in="stretched" dy="1.5" result="extrudedAlpha" />
-              <feFlood className="track-map-extrusion-colour" result="extrusionColour" />
-              <feComposite in="extrusionColour" in2="extrudedAlpha" operator="in" result="extrusion" />
-              <feMerge>
-                <feMergeNode in="extrusion" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          <path d={mapPath} className="track-map-road" filter="url(#track-extrusion)" />
+          <g transform="translate(0, 1.5)">
+            <path d={mapPath} className="track-map-road-shadow" />
+          </g>
+          <path d={mapPath} className="track-map-road" />
           <g
             aria-label="Start finish line"
             transform={`rotate(${startFinishRotation}, ${startFinish.x}, ${startFinish.y})`}
@@ -96,7 +85,7 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
           })}
         </svg>
       </div>
-    </section>
+    </Panel>
   );
 }
 

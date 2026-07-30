@@ -1,21 +1,9 @@
-.leaderboard-panel {
-  @apply border-0 bg-transparent;
-}
-
-.leaderboard-panel .panel-header {
-  @apply border-b-0 px-0 pt-0;
-}
-
-.leaderboard-title {
-  @apply text-sm font-semibold text-white;
-}
-
 .leaderboard-scroll {
   @apply overflow-x-auto;
 }
 
 .leaderboard-table {
-  @apply w-full min-w-[760px] border-separate;
+  @apply w-full min-w-[760px];
   border-spacing: 0 0.5rem;
 }
 
@@ -68,17 +56,6 @@
     ),
     color-mix(in srgb, var(--team-accent-color) 10%, transparent);
   box-shadow: var(--shadow-surface);
-  cursor: pointer;
-  transition:
-    border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    box-shadow var(--motion-duration-standard) var(--motion-easing-standard),
-    transform var(--motion-duration-standard) var(--motion-easing-standard);
-}
-
-.leaderboard-row:hover {
-  --leaderboard-row-base: color-mix(in srgb, var(--color-panel-alt) 82%, white 18%);
-  box-shadow: var(--shadow-surface-hover);
-  transform: translateY(-1px);
 }
 
 .leaderboard-row:focus-visible {
@@ -89,34 +66,14 @@
 .leaderboard-row .leaderboard-cell {
   background: transparent;
   border-block: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
-  transition:
-    border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    border-width var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
 .leaderboard-row .leaderboard-cell:first-child {
-  border-radius: var(--radius-surface) 0 0 var(--radius-surface);
   border-left: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
 }
 
 .leaderboard-row .leaderboard-cell:last-child {
-  border-radius: 0 var(--radius-surface) var(--radius-surface) 0;
   border-right: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
-}
-
-.leaderboard-row--selected .leaderboard-cell {
-  border-block-width: 3px;
-  border-block-color: var(--color-selection-blue);
-}
-
-.leaderboard-row--selected .leaderboard-cell:first-child {
-  border-left-width: 3px;
-  border-left-color: var(--color-selection-blue);
-}
-
-.leaderboard-row--selected .leaderboard-cell:last-child {
-  border-right-width: 3px;
-  border-right-color: var(--color-selection-blue);
 }
 
 .leaderboard-position {
@@ -180,12 +137,7 @@
   color: var(--tyre-text-color);
   transition:
     background-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard),
-    transform var(--motion-duration-fast) var(--motion-easing-standard);
-}
-
-.leaderboard-row:hover .leaderboard-tyre-dot {
-  transform: scale(1.04);
+    color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
 .leaderboard-tyre-age {
@@ -199,7 +151,6 @@
 @media (max-width: 480px) {
   .leaderboard-table {
     min-width: 680px;
-    row-gap: 0.375rem;
   }
 
   .leaderboard-header-cell,

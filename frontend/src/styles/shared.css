@@ -32,7 +32,7 @@
 
 .dashboard-state-card {
   @apply mx-auto grid max-w-[760px] gap-3 border border-app-line bg-app-panel p-5;
-  border-radius: var(--radius-surface);
+  border-radius: 0.5rem;
   box-shadow: var(--shadow-surface);
 }
 
@@ -51,13 +51,15 @@
 .dashboard-state-help {
   @apply text-sm font-semibold text-app-text;
 }
-undo 
 .panel {
   @apply border border-app-line bg-app-panel;
   min-width: 0;
-  border-radius: var(--radius-surface);
+  border-radius: 1rem;
   box-shadow: var(--shadow-surface);
-  transition: border-color var(--motion-duration-standard) var(--motion-easing-standard), box-shadow var(--motion-duration-standard) var(--motion-easing-standard), transform var(--motion-duration-standard) var(--motion-easing-standard);
+  transition:
+    border-color var(--motion-duration-standard) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-standard) var(--motion-easing-standard),
+    transform var(--motion-duration-standard) var(--motion-easing-standard);
 }
 
 .panel-header {
@@ -71,7 +73,10 @@ undo
 .status-chip {
   @apply inline-flex items-center border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide;
   border-radius: var(--radius-control);
-  transition: border-color var(--motion-duration-fast) var(--motion-easing-standard), color var(--motion-duration-fast) var(--motion-easing-standard), background-color var(--motion-duration-fast) var(--motion-easing-standard);
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
 .status-chip--neutral {
@@ -112,7 +117,9 @@ undo
   width: var(--probability-value);
   background-color: var(--probability-colour);
   border-radius: var(--radius-control);
-  transition: width var(--motion-duration-standard) var(--motion-easing-standard), background-color var(--motion-duration-fast) var(--motion-easing-standard);
+  transition:
+    width var(--motion-duration-standard) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
 @media (max-width: 480px) {

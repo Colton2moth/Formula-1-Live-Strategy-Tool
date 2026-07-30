@@ -1,4 +1,5 @@
 import type { ApiSession } from "../../types/race";
+import { Panel } from "../../components/Panel";
 
 type RaceHeaderProps = {
   session: ApiSession;
@@ -29,10 +30,8 @@ export function RaceHeader({ session }: RaceHeaderProps) {
   const weatherIcon = session.rainfall ? "rainy" : "clear_day";
 
   return (
-    <header className="race-header">
-      <div role="heading" aria-level={2} className="race-header-section-title">
-        Race info
-      </div>
+    <Panel label="Race info">
+      <div className="p-3">
       <div className="race-header-copy">
         <div className="race-header-kicker">Current Event</div>
         <div role="heading" aria-level={3} className="race-header-title">
@@ -92,7 +91,8 @@ export function RaceHeader({ session }: RaceHeaderProps) {
           </div>
         </div>
       </div>
-    </header>
+      </div>
+    </Panel>
   );
 }
 function getRaceControlState(status: string) {

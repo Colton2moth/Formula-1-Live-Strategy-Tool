@@ -2,24 +2,21 @@
   height: fit-content;
 }
 
-.track-map-title {
-  padding: clamp(1rem, 2vw, 1.5rem);
-  color: var(--color-text);
-  font-family: var(--font-app);
-  font-size: clamp(1.5rem, 2vw, 2.5rem);
-  font-weight: 900;
-  line-height: 1.05;
-  overflow-wrap: anywhere;
-  text-align: center;
-}
-
 .track-map-frame {
   @apply relative aspect-[4/3] overflow-hidden bg-app-panelAlt p-4;
-  border-radius: var(--radius-surface);
+  border-radius: 0.5rem;
 }
 
 .track-map-svg {
   @apply h-full w-full;
+}
+
+.track-map-road-shadow {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-track-surface) 38%, transparent);
+  stroke-width: 4px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .track-map-road {
@@ -28,14 +25,6 @@
   stroke-width: 1.25px;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.track-map-extrusion-filter {
-  color-interpolation-filters: sRGB;
-}
-
-.track-map-extrusion-colour {
-  flood-color: var(--color-track-depth);
 }
 
 .track-map-start-finish-line {
@@ -84,7 +73,11 @@
 .track-map-marker-label {
   transform-box: fill-box;
   transform-origin: center;
-  transition: opacity var(--motion-duration-fast) var(--motion-easing-standard), r var(--motion-duration-fast) var(--motion-easing-standard), stroke var(--motion-duration-fast) var(--motion-easing-standard), transform var(--motion-duration-fast) var(--motion-easing-standard);
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-easing-standard),
+    r var(--motion-duration-fast) var(--motion-easing-standard),
+    stroke var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
 .track-map-marker:hover .track-map-marker-dot,
