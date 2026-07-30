@@ -33,14 +33,6 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
           role="img"
           aria-label={`${track.circuit_name} circuit map with selectable driver markers`}
         >
-          <defs>
-            <filter id="road-blur">
-              <feGaussianBlur stdDeviation="0.8" />
-            </filter>
-          </defs>
-          <g transform="translate(0, 4)">
-            <path d={mapPath} className="track-map-road-shadow" filter="url(#road-blur)" />
-          </g>
           <path d={mapPath} className="track-map-road" />
           <g
             aria-label="Start finish line"

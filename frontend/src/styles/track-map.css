@@ -11,14 +11,6 @@
   @apply h-full w-full;
 }
 
-.track-map-road-shadow {
-  fill: none;
-  stroke: color-mix(in srgb, var(--color-track-surface) 38%, transparent);
-  stroke-width: .08rem;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 .track-map-road {
   fill: none;
   stroke: var(--color-track-surface);
