@@ -32,17 +32,7 @@ export function RaceHeader({ session }: RaceHeaderProps) {
   return (
     <Panel label="Race info">
       <div className="p-3">
-      <div className="race-header-copy">
-        <div className="race-header-kicker">Current Event</div>
-        <div role="heading" aria-level={3} className="race-header-title">
-          {session.meeting_name}
-        </div>
-      </div>
       <div className="race-header-statuses">
-        <div className="race-header-stat">
-          <span className="race-header-stat-label">Session</span>
-          <span className="race-header-stat-value">{session.session_name}</span>
-        </div>
         <div className="race-header-stat">
           <span className="race-header-stat-label">Flag</span>
           <span className="race-header-stat-reading">
@@ -65,30 +55,26 @@ export function RaceHeader({ session }: RaceHeaderProps) {
             </span>
           </span>
         </div>
-        <div className="race-header-stat race-header-weather">
-          <div className="race-header-weather-sections">
-            <span className="race-header-weather-item">
-              <span className="race-header-stat-label">Conditions</span>
-              <span className="race-header-weather-reading">
-                <span className="material-symbols-rounded race-header-weather-icon" aria-hidden="true">
-                  {weatherIcon}
-                </span>
-                <span className="race-header-stat-value">{session.rainfall ? "Wet" : "Dry"}</span>
-              </span>
+        <div className="race-header-stat">
+          <span className="race-header-stat-label">Conditions</span>
+          <span className="race-header-stat-reading">
+            <span className="material-symbols-rounded race-header-stat-icon" aria-hidden="true">
+              {weatherIcon}
             </span>
-            <span className="race-header-weather-item">
-              <span className="race-header-stat-label">Air Temp</span>
-              <span className="race-header-stat-value race-header-stat-value--numeric">
-                {session.air_temperature.toFixed(1)}&deg;C
-              </span>
-            </span>
-            <span className="race-header-weather-item">
-              <span className="race-header-stat-label">Track Temp</span>
-              <span className="race-header-stat-value race-header-stat-value--numeric">
-                {session.track_temperature.toFixed(1)}&deg;C
-              </span>
-            </span>
-          </div>
+            <span className="race-header-stat-value">{session.rainfall ? "Wet" : "Dry"}</span>
+          </span>
+        </div>
+        <div className="race-header-stat">
+          <span className="race-header-stat-label">Air Temp</span>
+          <span className="race-header-stat-value race-header-stat-value--numeric">
+            {session.air_temperature.toFixed(1)}&deg;C
+          </span>
+        </div>
+        <div className="race-header-stat">
+          <span className="race-header-stat-label">Track Temp</span>
+          <span className="race-header-stat-value race-header-stat-value--numeric">
+            {session.track_temperature.toFixed(1)}&deg;C
+          </span>
         </div>
       </div>
       </div>

@@ -1,9 +1,10 @@
 import type { CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
-import type { ApiDriver, TrackPoint, TrackState } from "../../types/race";
+import type { ApiDriver, ApiSession, TrackPoint, TrackState } from "../../types/race";
 
 type TrackMapProps = {
   track: TrackState;
+  session: ApiSession;
   drivers: ApiDriver[];
   selectedDriver: ApiDriver | null;
   onSelectDriver: (driverNumber: number) => void;
@@ -16,7 +17,7 @@ const START_FINISH_SQUARE_SIZE = 1.2;
 const START_FINISH_COLUMN_COUNT = 3;
 const START_FINISH_OUTSIDE_OFFSET = 6;
 
-export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
+export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
   const centeredTrack = centerTrackPoints(track.path);
   const displayPoints = smoothTrackPoints(centeredTrack.points);
   const mapPath = trackPath(displayPoints);
@@ -24,7 +25,7 @@ export function TrackMap({ track, drivers, selectedDriver, onSelectDriver }: Tra
   const startFinishSquares = startFinishMarkerSquares(startFinish);
   const startFinishRotation = startFinishMarkerRotation(displayPoints, startFinish);
   return (
-    <Panel label={track.circuit_name} className="track-map-panel">
+    <Panel label={`${session.meeting_name.toUpperCase()} | ${track.circuit_name.toUpperCase()} | ${session.session_name.toUpperCase()}`} className="track-map-panel">
       <div className="track-map-frame">
         <svg
           viewBox="0 0 100 85"

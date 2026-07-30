@@ -75,15 +75,16 @@ function App() {
             F1 Live Strategy Tool
           </div>
         </div>
+        <RaceHeader session={raceState.session} />
         <div className="dashboard-layout">
           <div className="dashboard-stack">
             <TrackMap
               track={track}
+              session={raceState.session}
               drivers={sortedDrivers}
               selectedDriver={selectedDriver}
               onSelectDriver={toggleSelectedDriver}
             />
-            <RaceHeader session={raceState.session} />
           </div>
           <div className="dashboard-stack">
             <StrategyPanel selectedDriver={selectedDriver} prediction={selectedPrediction} />

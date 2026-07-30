@@ -1,29 +1,11 @@
-.race-header-copy {
-  @apply flex min-h-16 flex-col items-center justify-center border border-app-line bg-app-bg px-3 py-2 text-center;
-  border-radius: 0.5rem;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
-}
-
-.race-header-kicker {
-  @apply text-[10px] font-semibold uppercase leading-none tracking-[0.16em] text-app-muted;
-}
-
-.race-header-title {
-  @apply mt-2 text-xl font-black uppercase leading-none tracking-tight text-white;
-}
-
 .race-header-statuses {
-  @apply grid grid-cols-2 gap-2;
+  @apply flex flex-wrap gap-2;
 }
 
 .race-header-stat {
-  @apply flex min-h-16 flex-col items-center justify-center border border-app-line bg-app-bg px-3 py-2 text-center;
+  @apply flex min-h-16 flex-1 flex-col items-center justify-center border border-app-line bg-app-bg px-3 py-2 text-center;
   border-radius: 0.5rem;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
-}
-
-.race-header-stat:first-child {
-  @apply col-span-2;
 }
 
 .race-header-stat-label {
@@ -69,50 +51,9 @@
   @apply text-app-muted;
 }
 
-.race-header-weather {
-  @apply col-span-2 px-0;
-}
-
-.race-header-weather-sections {
-  @apply mt-1.5 grid w-full grid-cols-3;
-}
-
-.race-header-weather-item {
-  @apply flex min-w-0 flex-col items-center justify-center px-2;
-}
-
-.race-header-weather-item + .race-header-weather-item {
-  @apply border-l border-app-line;
-}
-
-.race-header-weather-reading {
-  @apply mt-1.5 flex items-center justify-center gap-1.5;
-}
-
-.race-header-weather-reading .race-header-stat-value {
-  @apply mt-0;
-}
-
-.race-header-weather-icon {
-  @apply text-[22px] leading-none text-app-muted;
-}
-
 @media (max-width: 480px) {
-  .race-header {
-    @apply p-2;
-  }
-
-  .race-header-section-title {
-    @apply pb-2;
-  }
-
-  .race-header-copy,
   .race-header-stat {
     @apply min-h-14 px-2;
-  }
-
-  .race-header-title {
-    @apply text-lg;
   }
 
   .race-header-stat-value {
