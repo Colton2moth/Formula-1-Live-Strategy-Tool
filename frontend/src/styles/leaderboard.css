@@ -48,7 +48,7 @@
   --stripe-5-start: calc(var(--stripe-4-end) + var(--stripe-gap));
   --stripe-5-end: calc(var(--stripe-5-start) + var(--stripe-5-width));
 
-  background:
+  background-image:
     linear-gradient(
       30deg,
       color-mix(in srgb, var(--team-accent-color) 50%, transparent) var(--stripe-1-start) var(--stripe-1-end),
@@ -61,9 +61,30 @@
       transparent var(--stripe-4-end) var(--stripe-5-start),
       color-mix(in srgb, var(--team-accent-color) 5%, transparent) var(--stripe-5-start) var(--stripe-5-end),
       transparent var(--stripe-5-end)
-    ),
-    color-mix(in srgb, var(--team-accent-color) 10%, transparent);
+    );
+  background-color: color-mix(in srgb, var(--team-accent-color) 10%, transparent);
   box-shadow: var(--shadow-surface);
+  border-left: .2rem solid transparent;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    border-left-color var(--motion-duration-fast) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.leaderboard-row:hover {
+  background-color: color-mix(in srgb, var(--team-accent-color) 25%, transparent);
+  box-shadow: var(--shadow-surface-hover);
+}
+
+.leaderboard-row--selected {
+  background-color: color-mix(in srgb, var(--team-accent-color) 30%, transparent);
+  border-left-color: var(--color-selection-blue);
+  box-shadow: var(--shadow-surface-hover);
+}
+
+.leaderboard-row--selected:hover {
+  background-color: color-mix(in srgb, var(--team-accent-color) 40%, transparent);
 }
 
 .leaderboard-row:focus-visible {
