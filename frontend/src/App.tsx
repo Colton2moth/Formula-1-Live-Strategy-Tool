@@ -1,10 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchRaceState, fetchTrack } from "./api/raceState";
+import { ErrorScreen } from "./components/ErrorScreen";
+import type { ErrorVariant } from "./components/ErrorScreen";
+import { LoadingScreen } from "./components/LoadingScreen";
 import { Leaderboard } from "./features/leaderboard/Leaderboard";
 import { RaceHeader } from "./features/race-header/RaceHeader";
 import { StrategyPanel } from "./features/strategy-panel/StrategyPanel";
 import { TrackMap } from "./features/track-map/TrackMap";
 import type { RaceState, TrackState } from "./types/race";
+
+function classifyError(message: string): ErrorVariant {
+  if (message.includes("Failed to fetch") || message.includes("NetworkError")) {
+    return "unavailable";
+  }
+  if (message.startsWith("Request failed:")) {
+    return "server-error";
+  }
+  if (message.includes("did not match the expected shape")) {
+    return "invalid-data";
+  }
+  return "server-error";
+}
 
 function App() {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
@@ -41,30 +57,11 @@ function App() {
   };
 
   if (error) {
-    return (
-      <main className="dashboard-shell">
-        <div className="dashboard-state-card dashboard-state-card--error">
-          <div role="heading" aria-level={1} className="dashboard-state-title">
-            Race data unavailable
-          </div>
-          <div className="dashboard-state-message">{error}</div>
-          <div className="dashboard-state-help">Start FastAPI, then refresh the Vite app.</div>
-        </div>
-      </main>
-    );
+    return <ErrorScreen variant={classifyError(error)} message={error} />;
   }
 
   if (!raceState || !track) {
-    return (
-      <main className="dashboard-shell">
-        <div className="dashboard-state-card">
-          <div role="heading" aria-level={1} className="dashboard-state-title">
-            Loading race snapshot
-          </div>
-          <div className="dashboard-state-message">Waiting for the mock REST API.</div>
-        </div>
-      </main>
-    );
+    return <LoadingScreen variant="connecting" />;
   }
 
   return (
