@@ -25,19 +25,19 @@
 }
 
 .leaderboard-header-text {
-  @apply text-[11px] font-semibold uppercase tracking-wide text-app-muted;
+  @apply text-[0.6875rem] font-semibold uppercase tracking-wide text-app-muted;
 }
 
 .leaderboard-row {
   --team-accent-color: var(--color-f1-red);
-  --stripe-gap: 0px;
-  --stripe-1-width: 55px;
-  --stripe-2-width: 22px;
-  --stripe-3-width: 15px;
-  --stripe-4-width: 10px;
-  --stripe-5-width: 8px;
+  --stripe-gap: 0rem;
+  --stripe-1-width: 3.4375rem;
+  --stripe-2-width: 1.375rem;
+  --stripe-3-width: 0.9375rem;
+  --stripe-4-width: 0.625rem;
+  --stripe-5-width: 0.5rem;
 
-  --stripe-1-start: 0px;
+  --stripe-1-start: 0rem;
   --stripe-1-end: var(--stripe-1-width);
   --stripe-2-start: calc(var(--stripe-1-end) + var(--stripe-gap));
   --stripe-2-end: calc(var(--stripe-2-start) + var(--stripe-2-width));
@@ -88,25 +88,25 @@
 }
 
 .leaderboard-row:focus-visible {
-  outline: 2px solid var(--color-f1-red);
-  outline-offset: 2px;
+  outline: 0.125rem solid var(--color-f1-red);
+  outline-offset: 0.125rem;
 }
 
 .leaderboard-row .leaderboard-cell {
   background: transparent;
-  border-block: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
+  border-block: 0.0625rem solid color-mix(in srgb, var(--color-line) 58%, transparent);
 }
 
 .leaderboard-row .leaderboard-cell:first-child {
-  border-left: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
+  border-left: 0.0625rem solid color-mix(in srgb, var(--color-line) 58%, transparent);
 }
 
 .leaderboard-row .leaderboard-cell:last-child {
-  border-right: 1px solid color-mix(in srgb, var(--color-line) 58%, transparent);
+  border-right: 0.0625rem solid color-mix(in srgb, var(--color-line) 58%, transparent);
 }
 
 .leaderboard-position {
-  @apply text-[18px] font-black tabular-nums text-white;
+  @apply text-[1.125rem] font-black tabular-nums text-white;
 }
 
 .leaderboard-driver-name {
@@ -114,7 +114,7 @@
 }
 
 .leaderboard-driver-first-name {
-  @apply text-[11px] font-medium leading-none text-app-muted;
+  @apply text-[0.6875rem] font-medium leading-none text-app-muted;
 }
 
 .leaderboard-driver-last-name {
@@ -161,7 +161,7 @@
 }
 
 .leaderboard-tyre-dot {
-  @apply grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-black leading-none;
+  @apply grid h-5 w-5 shrink-0 place-items-center rounded-full text-[0.6875rem] font-black leading-none;
   background: var(--tyre-color);
   color: var(--tyre-text-color);
   transition:
@@ -179,7 +179,7 @@
 
 @media (max-width: 480px) {
   .leaderboard-table {
-    min-width: 680px;
+    min-width: 42.5rem;
   }
 
   .leaderboard-header-cell,

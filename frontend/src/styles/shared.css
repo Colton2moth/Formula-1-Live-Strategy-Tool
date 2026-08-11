@@ -3,7 +3,7 @@
 }
 
 .dashboard-container {
-  @apply mx-auto grid max-w-[1440px] gap-4;
+  @apply mx-auto grid max-w-[90rem] gap-4;
   min-width: 0;
   padding-top: 3.75rem;
   width: 100%;
@@ -31,7 +31,7 @@
 }
 
 .dashboard-state-card {
-  @apply mx-auto grid max-w-[760px] gap-3 border border-app-line bg-app-panel p-5;
+  @apply mx-auto grid max-w-[47.5rem] gap-3 border border-app-line bg-app-panel p-5;
   border-radius: 0.5rem;
   box-shadow: var(--shadow-surface);
 }
@@ -71,7 +71,7 @@
 }
 
 .status-chip {
-  @apply inline-flex items-center border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide;
+  @apply inline-flex items-center border px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide;
   border-radius: var(--radius-control);
   transition:
     border-color var(--motion-duration-fast) var(--motion-easing-standard),

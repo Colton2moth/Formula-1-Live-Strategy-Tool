@@ -5,12 +5,12 @@
 .race-header-stat {
   @apply flex flex-1 flex-col items-center justify-center border border-app-line bg-app-bg text-center;
   border-radius: 0.5rem;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+  box-shadow: inset 0 0.0625rem 0 rgb(255 255 255 / 0.03);
   height: 4rem;
 }
 
 .race-header-stat-label {
-  @apply text-[10px] font-semibold uppercase leading-none text-app-muted;
+  @apply text-[0.625rem] font-semibold uppercase leading-none text-app-muted;
 }
 
 .race-header-stat-value {
@@ -26,7 +26,7 @@
 }
 
 .race-header-stat-icon {
-  @apply text-[22px] leading-none text-app-muted;
+  @apply text-[1.375rem] leading-none text-app-muted;
 }
 
 .race-header-stat-value--numeric {

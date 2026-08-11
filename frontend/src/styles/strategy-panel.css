@@ -4,7 +4,7 @@
 
 .strategy-driver-summary {
   @apply grid  gap-1 p-4 justify-items-center;
-  box-shadow: inset 0 4px var(--strategy-team-colour);
+  box-shadow: inset 0 0.25rem var(--strategy-team-colour);
 }
 
 .strategy-eyebrow {
@@ -44,7 +44,7 @@
 }
 
 .strategy-category:nth-child(n + 2) {
-  border-left: 1px solid var(--color-line);
+  border-left: 0.0625rem solid var(--color-line);
 }
 
 .strategy-category:nth-child(n + 3) {
@@ -52,7 +52,7 @@
 }
 
 .strategy-category-title {
-  @apply text-[11px] font-semibold uppercase leading-tight tracking-wide text-app-muted justify-self-center pb-3 text-center;
+  @apply text-[0.6875rem] font-semibold uppercase leading-tight tracking-wide text-app-muted justify-self-center pb-3 text-center;
 }
 
 .stat-category-body {
@@ -68,7 +68,7 @@
 }
 
 .strategy-pit-probability {
-  @apply relative grid h-[88px] w-[88px] place-items-center;
+  @apply relative grid h-[5.5rem] w-[5.5rem] place-items-center;
 }
 
 .strategy-pit-ring {
@@ -96,12 +96,12 @@
 }
 
 .strategy-pit-probability .strategy-card-help {
-  @apply mt-0 text-[11px] leading-tight tracking-wide;
+  @apply mt-0 text-[0.6875rem] leading-tight tracking-wide;
   width: min-content;
 }
 
 .strategy-card-label {
-  @apply text-[11px] font-semibold uppercase tracking-wide text-app-muted;
+  @apply text-[0.6875rem] font-semibold uppercase tracking-wide text-app-muted;
 }
 
 .strategy-card-value {
@@ -113,7 +113,7 @@
 }
 
 .strategy-tyre-chip {
-  @apply grid h-[60px] w-[60px] shrink-0 place-items-center rounded-full text-[37px] font-black leading-none;
+  @apply grid h-[3.75rem] w-[3.75rem] shrink-0 place-items-center rounded-full text-[2.3125rem] font-black leading-none;
   background: var(--strategy-tyre-colour);
   color: var(--strategy-tyre-text-colour);
 }
@@ -123,11 +123,11 @@
 }
 
 .strategy-freshness-label {
-  @apply text-[11px] font-semibold uppercase tracking-wide text-app-muted;
+  @apply text-[0.6875rem] font-semibold uppercase tracking-wide text-app-muted;
 }
 
 .strategy-freshness-value {
-  @apply text-[11px] font-semibold tabular-nums text-app-text;
+  @apply text-[0.6875rem] font-semibold tabular-nums text-app-text;
 }
 
 .strategy-category-unavailable {
@@ -164,7 +164,7 @@
   }
 
   .strategy-category:nth-child(n + 3) {
-    border-top: 1px solid var(--color-line);
+    border-top: 0.0625rem solid var(--color-line);
   }
 
   .strategy-category:nth-child(odd) {
