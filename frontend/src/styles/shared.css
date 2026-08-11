@@ -122,7 +122,7 @@
     background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 48rem) {
   .dashboard-shell {
     @apply px-3 py-3;
   }

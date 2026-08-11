@@ -77,7 +77,7 @@
   transform: scale(1.08);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 48rem) {
   .track-map-frame {
     @apply p-2;
   }

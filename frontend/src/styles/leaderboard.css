@@ -177,7 +177,7 @@
   @apply text-app-muted;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 48rem) {
   .leaderboard-table {
     min-width: 42.5rem;
   }
