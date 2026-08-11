@@ -183,7 +183,9 @@ MOCK_DRIVERS_BY_NUMBER: dict[int, DriverState] = {
 MOCK_PREDICTIONS: list[PredictionState] = [
     PredictionState(
         driver_number=1,
+        pit_within_3_laps=0.05,
         pit_within_5_laps=0.15,
+        pit_within_7_laps=0.28,
         predicted_pit_window_start=42,
         predicted_pit_window_end=48,
         predicted_next_compound="MEDIUM",
@@ -191,7 +193,9 @@ MOCK_PREDICTIONS: list[PredictionState] = [
     ),
     PredictionState(
         driver_number=4,
+        pit_within_3_laps=0.38,
         pit_within_5_laps=0.72,
+        pit_within_7_laps=0.91,
         predicted_pit_window_start=28,
         predicted_pit_window_end=31,
         predicted_next_compound="HARD",
@@ -199,7 +203,9 @@ MOCK_PREDICTIONS: list[PredictionState] = [
     ),
     PredictionState(
         driver_number=16,
+        pit_within_3_laps=0.26,
         pit_within_5_laps=0.58,
+        pit_within_7_laps=0.82,
         predicted_pit_window_start=30,
         predicted_pit_window_end=34,
         predicted_next_compound="HARD",
@@ -207,7 +213,9 @@ MOCK_PREDICTIONS: list[PredictionState] = [
     ),
     PredictionState(
         driver_number=44,
+        pit_within_3_laps=0.64,
         pit_within_5_laps=0.91,
+        pit_within_7_laps=0.98,
         predicted_pit_window_start=26,
         predicted_pit_window_end=28,
         predicted_next_compound="MEDIUM",
@@ -215,7 +223,9 @@ MOCK_PREDICTIONS: list[PredictionState] = [
     ),
     PredictionState(
         driver_number=81,
+        pit_within_3_laps=0.18,
         pit_within_5_laps=0.46,
+        pit_within_7_laps=0.74,
         predicted_pit_window_start=31,
         predicted_pit_window_end=35,
         predicted_next_compound="HARD",
@@ -223,7 +233,9 @@ MOCK_PREDICTIONS: list[PredictionState] = [
     ),
     PredictionState(
         driver_number=63,
+        pit_within_3_laps=0.03,
         pit_within_5_laps=0.12,
+        pit_within_7_laps=0.25,
         predicted_pit_window_start=43,
         predicted_pit_window_end=49,
         predicted_next_compound="MEDIUM",
@@ -231,7 +243,9 @@ MOCK_PREDICTIONS: list[PredictionState] = [
     ),
     PredictionState(
         driver_number=14,
+        pit_within_3_laps=0.02,
         pit_within_5_laps=0.09,
+        pit_within_7_laps=0.19,
         predicted_pit_window_start=44,
         predicted_pit_window_end=50,
         predicted_next_compound="MEDIUM",
@@ -239,7 +253,9 @@ MOCK_PREDICTIONS: list[PredictionState] = [
     ),
     PredictionState(
         driver_number=10,
+        pit_within_3_laps=0.31,
         pit_within_5_laps=0.63,
+        pit_within_7_laps=0.86,
         predicted_pit_window_start=29,
         predicted_pit_window_end=33,
         predicted_next_compound="HARD",

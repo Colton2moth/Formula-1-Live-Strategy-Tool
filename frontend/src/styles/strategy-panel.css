@@ -67,37 +67,39 @@
   @apply min-w-0;
 }
 
-.strategy-pit-probability {
-  @apply relative grid h-[5.5rem] w-[5.5rem] place-items-center;
+.strategy-pit-bars {
+  @apply flex items-end gap-3;
+  height: 5.5rem;
 }
 
-.strategy-pit-ring {
-  @apply absolute inset-0 h-full w-full -rotate-90 overflow-visible;
-  fill: none;
-  stroke-width: 4;
+.strategy-pit-bar-col {
+  @apply flex flex-col items-center gap-2;
+  width: 2.25rem;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
 }
 
-.strategy-pit-ring-track {
-  stroke: var(--color-line);
-  stroke-dasharray: 1;
-  stroke-linecap: round;
+.strategy-pit-bar-value {
+  @apply text-xs font-bold tabular-nums text-white leading-none;
 }
 
-.strategy-pit-ring-progress {
-  @apply stroke-amber-300;
-  stroke-dasharray: 100;
-  stroke-dashoffset: var(--strategy-pit-progress);
-  stroke-linecap: round;
-  transition: stroke-dashoffset var(--motion-duration-standard) var(--motion-easing-standard);
+.strategy-pit-bar-track {
+  @apply relative w-4;
+  flex: 1;
+  border-radius: 999rem;
+  background: var(--color-line);
+  overflow: hidden;
 }
 
-.strategy-pit-probability .strategy-card-value {
-  @apply text-xl;
+.strategy-pit-bar-fill {
+  @apply absolute bottom-0 w-full bg-amber-400;
+  min-height: 0.125rem;
+  transition: height var(--motion-duration-standard) var(--motion-easing-standard);
 }
 
-.strategy-pit-probability .strategy-card-help {
-  @apply mt-0 text-[0.6875rem] leading-tight tracking-wide;
-  width: min-content;
+.strategy-pit-bar-label {
+  @apply text-[0.625rem] font-semibold uppercase tracking-wide text-app-muted leading-none;
 }
 
 .strategy-card-label {

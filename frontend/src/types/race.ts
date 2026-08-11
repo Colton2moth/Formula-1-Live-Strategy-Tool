@@ -28,7 +28,9 @@ export type ApiDriver = {
 
 export type ApiPrediction = {
   driver_number: number;
+  pit_within_3_laps: number;
   pit_within_5_laps: number;
+  pit_within_7_laps: number;
   predicted_pit_window_start: number;
   predicted_pit_window_end: number;
   predicted_next_compound: string;

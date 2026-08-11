@@ -9,15 +9,22 @@ type StrategyPanelProps = {
   prediction: ApiPrediction | null;
 };
 
+type BarDatum = { laps: number; pct: number };
+
 export function StrategyPanel({ selectedDriver, prediction }: StrategyPanelProps) {
   const selectedTeamColor = selectedDriver ? `#${selectedDriver.team_colour}` : "var(--color-line)";
-  const pitProbability = Math.round((prediction?.pit_within_5_laps ?? 0) * 100);
   const selectedDriverName = selectedDriver ? splitDriverName(selectedDriver.name) : null;
   const summaryStyle = { "--strategy-team-colour": selectedTeamColor } as CSSProperties;
   const nextTyreCompound = prediction?.predicted_next_compound.trim().toUpperCase() ?? "";
   const nextTyreColor = tyreColors[nextTyreCompound] ?? "var(--color-line)";
   const nextTyreTextColor = nextTyreCompound === "HARD" || nextTyreCompound === "MEDIUM" ? "#111318" : "#ffffff";
   const nextTyreStyle = { "--strategy-tyre-colour": nextTyreColor, "--strategy-tyre-text-colour": nextTyreTextColor } as CSSProperties;
+
+  const bars: BarDatum[] = [
+    { laps: 3, pct: Math.round((prediction?.pit_within_3_laps ?? 0) * 100) },
+    { laps: 5, pct: Math.round((prediction?.pit_within_5_laps ?? 0) * 100) },
+    { laps: 7, pct: Math.round((prediction?.pit_within_7_laps ?? 0) * 100) },
+  ];
 
   return (
     <Panel
@@ -54,24 +61,21 @@ export function StrategyPanel({ selectedDriver, prediction }: StrategyPanelProps
           {selectedDriver && prediction ? (
             <>
               <div className="strategy-category">
-                <div className="strategy-category-title">Pit within 5 laps</div>
+                <div className="strategy-category-title">Pit probability within</div>
                 <div className="stat-category-body">
-                  <div className="strategy-pit-probability" aria-label={`${pitProbability}% model estimate for pitting within 5 laps`}>
-                    <svg className="strategy-pit-ring" viewBox="0 0 100 100" aria-hidden="true">
-                      <circle className="strategy-pit-ring-track" cx="50" cy="50" r="50" pathLength="100" />
-                      <circle
-                        className="strategy-pit-ring-progress"
-                        cx="50"
-                        cy="50"
-                        r="50"
-                        pathLength="100"
-                        style={{ "--strategy-pit-progress": 100 - pitProbability } as CSSProperties}
-                      />
-                    </svg>
-                    <div className="strategy-pit-stat">
-                      <div className="strategy-card-value">{pitProbability}%</div>
-                      <div className="strategy-card-help">Model Estimate</div>
-                    </div>
+                  <div className="strategy-pit-bars" role="img" aria-label={`Model estimate: ${bars[0].pct}% within 3 laps, ${bars[1].pct}% within 5 laps, ${bars[2].pct}% within 7 laps`}>
+                    {bars.map((bar) => (
+                      <div key={bar.laps} className="strategy-pit-bar-col">
+                        <span className="strategy-pit-bar-label">{bar.laps} Laps</span>
+                        <div className="strategy-pit-bar-track">
+                          <div
+                            className="strategy-pit-bar-fill"
+                            style={{ height: `${bar.pct}%` }}
+                          />
+                        </div>
+                        <span className="strategy-pit-bar-value">{bar.pct}%</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

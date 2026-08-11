@@ -48,10 +48,12 @@ class DriverState(BaseModel):
 
 
 class PredictionState(BaseModel):
-    """Model output for one driver (pit-within-5-laps baseline + window)."""
+    """Model output for one driver (pit-within-N-laps probabilities + window)."""
 
     driver_number: int
+    pit_within_3_laps: float = Field(ge=0.0, le=1.0)
     pit_within_5_laps: float = Field(ge=0.0, le=1.0)
+    pit_within_7_laps: float = Field(ge=0.0, le=1.0)
     predicted_pit_window_start: int
     predicted_pit_window_end: int
     predicted_next_compound: str
