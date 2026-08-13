@@ -97,3 +97,21 @@ class TrackState(BaseModel):
     circuit_name: str
     circuit_key: int
     path: list[TrackPoint]
+
+
+class LiveTopicStats(BaseModel):
+    """Per-topic counters from the in-memory MQTT buffer."""
+
+    messages: int
+    unique_keys: int
+
+
+class LiveStatus(BaseModel):
+    """
+    Lightweight view of LIVE_STATE for GET /api/live-status.
+
+    Empty topics mean no push traffic yet (normal between sessions).
+    """
+
+    mqtt_enabled: bool
+    topics: dict[str, LiveTopicStats]

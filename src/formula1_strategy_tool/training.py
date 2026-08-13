@@ -50,6 +50,10 @@ _EXCLUDE = {
 # String columns encoded as integer codes for XGBoost.
 _CATEGORICAL = ("current_compound", "previous_compound")
 
+# Must match pandas' default sorted categories when all compounds appear in
+# training data — used for live rows so codes do not shift with small batches.
+_COMPOUND_CAT_ORDER = ("HARD", "INTERMEDIATE", "MEDIUM", "SOFT", "WET")
+
 # Compound classes in a stable display order (actual set may omit rare ones).
 _COMPOUND_ORDER = ("SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET")
 
@@ -66,7 +70,11 @@ def _prepare_features(df: pd.DataFrame) -> pd.DataFrame:
 
     for col in _CATEGORICAL:
         if col in X.columns:
-            X[col] = X[col].astype("category").cat.codes.replace(-1, pd.NA)
+            # Fixed category order keeps live inference aligned with training.
+            X[col] = pd.Categorical(
+                X[col], categories=list(_COMPOUND_CAT_ORDER)
+            ).codes
+            X[col] = X[col].replace(-1, pd.NA)
             X[col] = pd.to_numeric(X[col], errors="coerce")
 
     bool_cols = X.select_dtypes(include=["bool"]).columns
