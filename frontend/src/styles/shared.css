@@ -1,0 +1,159 @@
+.dashboard-shell {
+  @apply min-h-screen bg-app-bg px-6 py-4 font-sans text-app-text;
+}
+
+.dashboard-container {
+  @apply mx-auto grid max-w-[90rem] gap-4;
+  min-width: 0;
+  padding-top: 3.75rem;
+  width: 100%;
+}
+
+.dashboard-brand {
+  @apply fixed inset-x-0 top-0 z-50 w-full bg-app-panel px-4 py-2 text-center;
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--shadow-surface);
+}
+
+.dashboard-brand-title {
+  @apply text-3xl font-black uppercase tracking-[0.12em] text-white;
+}
+
+.dashboard-layout {
+  @apply grid grid-cols-[1.6fr_1.55fr] gap-4;
+  min-width: 0;
+}
+
+.dashboard-stack {
+  @apply grid content-start gap-4;
+  min-width: 0;
+}
+
+.dashboard-state-card {
+  @apply mx-auto grid max-w-[47.5rem] gap-3 border border-app-line bg-app-panel p-5;
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-surface);
+}
+
+.dashboard-state-card--error {
+  @apply border-app-red;
+}
+
+.dashboard-state-title {
+  @apply text-xl font-black uppercase text-white;
+}
+
+.dashboard-state-message {
+  @apply text-sm font-medium leading-6 text-app-muted;
+}
+
+.dashboard-state-help {
+  @apply text-sm font-semibold text-app-text;
+}
+.panel {
+  @apply border border-app-line bg-app-panel;
+  min-width: 0;
+  border-radius: 1rem;
+  box-shadow: var(--shadow-surface);
+  transition:
+    border-color var(--motion-duration-standard) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-standard) var(--motion-easing-standard),
+    transform var(--motion-duration-standard) var(--motion-easing-standard);
+}
+
+.panel-header {
+  @apply flex items-center justify-between gap-3 border-b border-app-line px-4 py-3;
+}
+
+.panel-title {
+  @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.status-chip {
+  @apply inline-flex items-center border px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide;
+  border-radius: var(--radius-control);
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.status-chip--neutral {
+  @apply border-app-line text-app-muted;
+}
+
+.status-chip--green {
+  @apply border-emerald-500 text-emerald-200;
+}
+
+.status-chip--red {
+  @apply border-app-red text-white;
+}
+
+.probability-bar {
+  @apply grid gap-1;
+}
+
+.probability-bar-header {
+  @apply flex items-center justify-between gap-3;
+}
+
+.probability-bar-label {
+  @apply text-xs font-semibold text-app-text;
+}
+
+.probability-bar-value {
+  @apply text-xs font-semibold tabular-nums text-app-muted;
+}
+
+.probability-bar-track {
+  @apply h-2 overflow-hidden bg-app-panelAlt;
+  border-radius: var(--radius-control);
+}
+
+.probability-bar-fill {
+  @apply h-full;
+  width: var(--probability-value);
+  background-color: var(--probability-colour);
+  border-radius: var(--radius-control);
+  transition:
+    width var(--motion-duration-standard) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+@media (max-width: 48rem) {
+  .dashboard-shell {
+    @apply px-3 py-3;
+  }
+
+  .dashboard-container,
+  .dashboard-layout,
+  .dashboard-stack {
+    @apply gap-3;
+  }
+
+  .dashboard-container {
+    padding-top: 3.25rem;
+  }
+
+  .dashboard-brand {
+    @apply px-3;
+  }
+
+  .dashboard-brand-title {
+    @apply text-xl tracking-[0.08em];
+  }
+
+  .dashboard-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-state-card {
+    @apply p-4;
+  }
+
+  .panel-header {
+    @apply px-3;
+  }
+}

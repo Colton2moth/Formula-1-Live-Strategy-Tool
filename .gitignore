@@ -44,9 +44,8 @@ env/
 *.swo
 *~
 
-# Documentation / agent notes (local working notes)
-docs/
-AGENTS.md
+# Documentation (local working notes)
+/docs/TODO.md
 
 # Testing / coverage
 .pytest_cache/
@@ -81,8 +80,13 @@ logs/
 # Local data
 data/raw/
 data/processed/
-data/models/
 download_errors.jsonl
 *.csv
 *.parquet
 !data/.gitkeep
+
+# Frontend generated files
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo

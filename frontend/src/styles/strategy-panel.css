@@ -1,0 +1,179 @@
+.strategy-panel-body {
+  @apply p-0;
+}
+
+.strategy-driver-summary {
+  @apply grid  gap-1 p-4 justify-items-center;
+  box-shadow: inset 0 0.25rem var(--strategy-team-colour);
+}
+
+.strategy-eyebrow {
+  @apply text-xs font-semibold uppercase tracking-wide justify-self-center;
+  color: var(--strategy-team-colour);
+}
+
+.strategy-driver-name {
+  @apply grid gap-0.5 leading-none justify-items-center;
+}
+
+.strategy-driver-first-name {
+  @apply text-lg font-medium leading-none text-app-muted;
+}
+
+.strategy-driver-last-name {
+  @apply text-lg font-black uppercase leading-none tracking-wide text-white;
+}
+
+.strategy-driver-empty {
+  @apply text-2xl font-black uppercase leading-none tracking-wide text-white;
+}
+
+.strategy-driver-meta {
+  @apply text-sm font-normal text-app-muted;
+}
+
+.strategy-category-grid {
+  @apply grid grid-cols-[1.15fr_1.65fr_0.9fr_1.15fr] overflow-hidden border border-app-line bg-app-panelAlt;
+  border-radius: 0 0 0.5rem 0.5rem;
+  height: 9.25rem;
+}
+
+.strategy-category {
+  @apply grid p-4 justify-items-center items-center;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.strategy-category:nth-child(n + 2) {
+  border-left: 0.0625rem solid var(--color-line);
+}
+
+.strategy-category:nth-child(n + 3) {
+  border-top: 0;
+}
+
+.strategy-category-title {
+  @apply text-[0.6875rem] font-semibold uppercase leading-tight tracking-wide text-app-muted justify-self-center pb-3 text-center;
+}
+
+.stat-category-body {
+  @apply grid justify-items-center gap-1 text-center;
+}
+
+.strategy-pit-stats {
+  @apply grid grid-cols-2;
+}
+
+.strategy-pit-stat {
+  @apply min-w-0;
+}
+
+.strategy-pit-bars {
+  @apply flex items-end gap-3;
+  height: 5.5rem;
+}
+
+.strategy-pit-bar-col {
+  @apply flex flex-col items-center gap-2;
+  width: 2.25rem;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+}
+
+.strategy-pit-bar-value {
+  @apply text-xs font-bold tabular-nums text-white leading-none;
+}
+
+.strategy-pit-bar-track {
+  @apply relative w-4;
+  flex: 1;
+  border-radius: 999rem;
+  background: var(--color-line);
+  overflow: hidden;
+}
+
+.strategy-pit-bar-fill {
+  @apply absolute bottom-0 w-full bg-amber-400;
+  min-height: 0.125rem;
+  transition: height var(--motion-duration-standard) var(--motion-easing-standard);
+}
+
+.strategy-pit-bar-label {
+  @apply text-[0.625rem] font-semibold uppercase tracking-wide text-app-muted leading-none;
+}
+
+.strategy-card-label {
+  @apply text-[0.6875rem] font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.strategy-card-value {
+  @apply text-2xl font-black tabular-nums text-white;
+}
+
+.strategy-card-help {
+  @apply mt-1 text-xs font-medium text-app-muted;
+}
+
+.strategy-tyre-chip {
+  @apply grid h-[3.75rem] w-[3.75rem] shrink-0 place-items-center rounded-full text-[2.3125rem] font-black leading-none;
+  background: var(--strategy-tyre-colour);
+  color: var(--strategy-tyre-text-colour);
+}
+
+.strategy-freshness-row {
+  @apply flex items-center gap-1.5 whitespace-nowrap;
+}
+
+.strategy-freshness-label {
+  @apply text-[0.6875rem] font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.strategy-freshness-value {
+  @apply text-[0.6875rem] font-semibold tabular-nums text-app-text;
+}
+
+.strategy-category-unavailable {
+  @apply text-sm font-semibold text-white justify-items-center;
+}
+
+.strategy-category-help {
+  @apply text-xs font-medium leading-5 text-app-muted;
+}
+
+.strategy-empty-state {
+  @apply col-span-3 grid gap-2 border border-app-line bg-app-panelAlt p-4;
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-surface);
+}
+
+.strategy-empty-title {
+  @apply text-sm font-semibold text-white justify-self-center;
+}
+
+.strategy-empty-copy {
+  @apply text-sm font-medium leading-6 text-app-muted;
+}
+
+@media (max-width: 48rem) {
+  .strategy-category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    height: auto;
+  }
+
+  .strategy-driver-summary,
+  .strategy-category {
+    @apply min-h-28 p-1;
+  }
+
+  .strategy-category:nth-child(n + 3) {
+    border-top: 0.0625rem solid var(--color-line);
+  }
+
+  .strategy-category:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .strategy-empty-state {
+    grid-column: span 1;
+  }
+}

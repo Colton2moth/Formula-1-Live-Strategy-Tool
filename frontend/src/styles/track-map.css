@@ -1,0 +1,84 @@
+.track-map-panel {
+  height: fit-content;
+}
+
+.track-map-frame {
+  @apply relative aspect-[4/3] overflow-hidden bg-app-panelAlt p-4;
+  border-radius: 0.5rem;
+}
+
+.track-map-svg {
+  @apply h-full w-full;
+}
+
+.track-map-road {
+  fill: none;
+  stroke: var(--color-track-surface);
+  stroke-width: .08rem;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.track-map-start-finish-line {
+  stroke: var(--color-f1-red);
+  stroke-width: 0.046875rem;
+  stroke-linecap: square;
+}
+
+.track-map-start-finish-square {
+  shape-rendering: crispEdges;
+}
+
+.track-map-start-finish-square--light {
+  fill: white;
+}
+
+.track-map-start-finish-square--dark {
+  fill: var(--color-bg);
+}
+
+.track-map-marker {
+  --driver-colour: var(--color-f1-red);
+  @apply cursor-pointer outline-none;
+}
+
+.track-map-marker-dot {
+  r: 0.125rem;
+  fill: var(--driver-colour);
+  stroke: var(--color-bg);
+  stroke-width: 0.0375rem;
+}
+
+.track-map-marker--selected .track-map-marker-dot {
+  r: 0.1375rem;
+  stroke: white;
+  stroke-width: 0.04375rem;
+}
+
+.track-map-marker-label {
+  fill: white;
+  font-size: 0.1875rem;
+  font-weight: 600;
+}
+
+.track-map-marker-dot,
+.track-map-marker-label {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-easing-standard),
+    r var(--motion-duration-fast) var(--motion-easing-standard),
+    stroke var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.track-map-marker:hover .track-map-marker-dot,
+.track-map-marker:focus-visible .track-map-marker-dot {
+  transform: scale(1.08);
+}
+
+@media (max-width: 48rem) {
+  .track-map-frame {
+    @apply p-2;
+  }
+}
