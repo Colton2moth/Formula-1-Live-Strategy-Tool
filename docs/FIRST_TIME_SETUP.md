@@ -28,19 +28,36 @@ npm install
 ## Download and process historical data
 
 When no race is live, `/api/race-state` serves predictions from a historical
-CSV snapshot. Generate it once by downloading raw OpenF1 data and building the
-driver-lap table:
+CSV snapshot. The commands differ depending on whether you only run the backend
+or also train the models.
+
+### Just run the backend (recommended for the dashboard)
+
+Download only the season that contains the configured `INFERENCE_SESSION_KEY`
+(default `9979`, the 2025 Monaco Grand Prix), then build the CSV:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+f1-download-openf1 --start-year 2025 --end-year 2025
+f1-process-races
+```
+
+### Train or retrain the models
+
+The full historical dataset is required for training. Download every season
+(2023 onward), process it, then train:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 f1-download-openf1
 f1-process-races
+f1-train-pit
 ```
 
-`f1-download-openf1` downloads every Race session from 2023 onward into
-`data/raw/` (a large download; safe to re-run, it skips files already on disk).
-`f1-process-races` builds `data/processed/driver_laps_all.csv`. Both folders are
-gitignored local data, so run this step on each new machine.
+`f1-download-openf1` downloads Race sessions into `data/raw/` (a large download;
+safe to re-run, it skips files already on disk). `f1-process-races` builds
+`data/processed/driver_laps_all.csv`. Both folders are gitignored local data, so
+run the download + process step on each new machine.
 
 ## Start the backend for the first time
 
