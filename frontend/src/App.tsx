@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchRaceState, fetchTrack, isApiRequestError } from "./api/raceState";
+import { fetchDriverPrediction, fetchRaceState, fetchTrack, isApiRequestError } from "./api/raceState";
 import { ErrorScreen } from "./components/ErrorScreen";
 import type { ErrorVariant } from "./components/ErrorScreen";
 import { LoadingScreen } from "./components/LoadingScreen";
@@ -8,7 +8,7 @@ import { RaceHeader } from "./features/race-header/RaceHeader";
 import { StrategyPanel } from "./features/strategy-panel/StrategyPanel";
 import { TrackMap } from "./features/track-map/TrackMap";
 import { Footer } from "./components/Footer";
-import type { RaceState, TrackState } from "./types/race";
+import type { ApiPrediction, RaceState, TrackState } from "./types/race";
 
 function classifyError(message: string): ErrorVariant {
   if (message.includes("Failed to fetch") || message.includes("NetworkError")) {
@@ -27,6 +27,7 @@ function App() {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [track, setTrack] = useState<TrackState | null>(null);
   const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
+  const [livePrediction, setLivePrediction] = useState<{ driverNumber: number; prediction: ApiPrediction } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,8 +69,33 @@ function App() {
   }, []);
 
   const selectedDriver = raceState?.drivers.find((driver) => driver.driver_number === selectedDriverNumber) ?? null;
-  const selectedPrediction =
+  const snapshotPrediction =
     raceState?.predictions.find((prediction) => prediction.driver_number === selectedDriver?.driver_number) ?? null;
+
+  useEffect(() => {
+    if (selectedDriverNumber === null) {
+      setLivePrediction(null);
+      return;
+    }
+
+    let active = true;
+    fetchDriverPrediction(selectedDriverNumber)
+      .then((prediction) => {
+        if (active) setLivePrediction({ driverNumber: selectedDriverNumber, prediction });
+      })
+      .catch(() => {
+        // Fall back to the snapshot prediction on error.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedDriverNumber]);
+
+  const selectedPrediction =
+    livePrediction?.driverNumber === selectedDriverNumber
+      ? livePrediction.prediction
+      : snapshotPrediction;
   const sortedDrivers = useMemo(
     () => [...(raceState?.drivers ?? [])].sort((a, b) => a.position - b.position),
     [raceState],

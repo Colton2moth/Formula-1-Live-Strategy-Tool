@@ -1,4 +1,4 @@
-import type { RaceState, TrackState } from "../types/race";
+import type { ApiPrediction, RaceState, TrackState } from "../types/race";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -28,6 +28,13 @@ function assertTrackState(value: unknown): TrackState {
   return value as TrackState;
 }
 
+function assertPrediction(value: unknown): ApiPrediction {
+  if (!isRecord(value) || typeof value.driver_number !== "number") {
+    throw new Error("Prediction response did not match the expected shape.");
+  }
+  return value as ApiPrediction;
+}
+
 async function fetchJson<T>(path: string, parse: (value: unknown) => T): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`);
   if (!response.ok) {
@@ -44,4 +51,8 @@ export function fetchRaceState() {
 
 export function fetchTrack() {
   return fetchJson("/api/track", assertTrackState);
+}
+
+export function fetchDriverPrediction(driverNumber: number) {
+  return fetchJson(`/api/drivers/${driverNumber}/prediction`, assertPrediction);
 }
