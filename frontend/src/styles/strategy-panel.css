@@ -33,9 +33,9 @@
 }
 
 .strategy-category-grid {
-  @apply grid grid-cols-[1.15fr_1.65fr_0.9fr_1.15fr] overflow-hidden border border-app-line bg-app-panelAlt;
+  @apply grid grid-cols-[1.1fr_1.5fr_1.4fr] overflow-hidden border border-app-line bg-app-panelAlt;
   border-radius: 0 0 0.5rem 0.5rem;
-  height: 9.25rem;
+  min-height: 9.25rem;
 }
 
 .strategy-category {
@@ -57,14 +57,6 @@
 
 .stat-category-body {
   @apply grid justify-items-center gap-1 text-center;
-}
-
-.strategy-pit-stats {
-  @apply grid grid-cols-2;
-}
-
-.strategy-pit-stat {
-  @apply min-w-0;
 }
 
 .strategy-pit-bars {
@@ -102,22 +94,14 @@
   @apply text-[0.625rem] font-semibold uppercase tracking-wide text-app-muted leading-none;
 }
 
-.strategy-card-label {
-  @apply text-[0.6875rem] font-semibold uppercase tracking-wide text-app-muted;
+.strategy-compound-breakdown {
+  @apply grid w-full gap-2 content-center;
 }
 
-.strategy-card-value {
-  @apply text-2xl font-black tabular-nums text-white;
-}
-
-.strategy-card-help {
-  @apply mt-1 text-xs font-medium text-app-muted;
-}
-
-.strategy-tyre-chip {
-  @apply grid h-[3.75rem] w-[3.75rem] shrink-0 place-items-center rounded-full text-[2.3125rem] font-black leading-none;
-  background: var(--strategy-tyre-colour);
-  color: var(--strategy-tyre-text-colour);
+.strategy-tyre-logo {
+  @apply grid h-5 w-5 shrink-0 place-items-center rounded-full text-[0.6875rem] font-black leading-none;
+  background: var(--strategy-tyre-logo-colour);
+  color: var(--strategy-tyre-logo-text);
 }
 
 .strategy-freshness-row {
@@ -141,7 +125,7 @@
 }
 
 .strategy-empty-state {
-  @apply col-span-3 grid gap-2 border border-app-line bg-app-panelAlt p-4;
+  @apply col-span-2 grid gap-2 border border-app-line bg-app-panelAlt p-4;
   border-radius: 0.5rem;
   box-shadow: var(--shadow-surface);
 }
@@ -171,6 +155,10 @@
 
   .strategy-category:nth-child(odd) {
     border-left: 0;
+  }
+
+  .strategy-category--tyres {
+    grid-column: span 2;
   }
 
   .strategy-empty-state {

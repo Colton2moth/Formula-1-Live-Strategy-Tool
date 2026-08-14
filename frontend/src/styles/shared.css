@@ -133,6 +133,21 @@
   @apply grid gap-1;
 }
 
+.probability-bar--with-icon {
+  @apply items-center;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.5rem;
+}
+
+.probability-bar-icon {
+  @apply flex items-center;
+}
+
+.probability-bar-body {
+  @apply grid gap-1;
+  min-width: 0;
+}
+
 .probability-bar-header {
   @apply flex items-center justify-between gap-3;
 }

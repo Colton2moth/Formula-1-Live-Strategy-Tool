@@ -26,14 +26,21 @@ export type ApiDriver = {
   pit_stops: number;
 };
 
+export type ApiCompoundProbabilities = {
+  SOFT: number;
+  MEDIUM: number;
+  HARD: number;
+  INTERMEDIATE: number;
+  WET: number;
+};
+
 export type ApiPrediction = {
   driver_number: number;
   pit_within_3_laps: number;
   pit_within_5_laps: number;
   pit_within_7_laps: number;
-  predicted_pit_window_start: number;
-  predicted_pit_window_end: number;
   predicted_next_compound: string;
+  compound_probabilities: ApiCompoundProbabilities | null;
   updated_at: string;
 };
 

@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
+import { ProbabilityBar } from "../../components/ProbabilityBar";
 
 import type { ApiDriver, ApiPrediction } from "../../types/race";
 import { formatUpdatedAt, tyreColors } from "../../utils/raceDisplay";
@@ -11,14 +12,13 @@ type StrategyPanelProps = {
 
 type BarDatum = { laps: number; pct: number };
 
+const COMPOUND_ORDER = ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"] as const;
+
 export function StrategyPanel({ selectedDriver, prediction }: StrategyPanelProps) {
   const selectedTeamColor = selectedDriver ? `#${selectedDriver.team_colour}` : "var(--color-line)";
   const selectedDriverName = selectedDriver ? splitDriverName(selectedDriver.name) : null;
   const summaryStyle = { "--strategy-team-colour": selectedTeamColor } as CSSProperties;
-  const nextTyreCompound = prediction?.predicted_next_compound.trim().toUpperCase() ?? "";
-  const nextTyreColor = tyreColors[nextTyreCompound] ?? "var(--color-line)";
-  const nextTyreTextColor = nextTyreCompound === "HARD" || nextTyreCompound === "MEDIUM" ? "#111318" : "#ffffff";
-  const nextTyreStyle = { "--strategy-tyre-colour": nextTyreColor, "--strategy-tyre-text-colour": nextTyreTextColor } as CSSProperties;
+  const compoundProbabilities = prediction?.compound_probabilities ?? null;
 
   const bars: BarDatum[] = [
     { laps: 3, pct: Math.round((prediction?.pit_within_3_laps ?? 0) * 100) },
@@ -79,21 +79,31 @@ export function StrategyPanel({ selectedDriver, prediction }: StrategyPanelProps
                   </div>
                 </div>
               </div>
-              <div className="strategy-category">
-                <div className="strategy-category-title">Predicted window</div>
-                <div className="stat-category-body">
-                  <div className="strategy-pit-stat">
-                    <div className="strategy-card-value">{prediction.predicted_pit_window_start}-{prediction.predicted_pit_window_end}</div>
-                    <div className="strategy-card-help">race laps</div>
-                  </div>
-                </div>
-              </div>
-              <div className="strategy-category">
+              <div className="strategy-category strategy-category--tyres">
                 <div className="strategy-category-title">Likely next tyre</div>
-                <div className="stat-category-body">
-                  <span className="strategy-tyre-chip" style={nextTyreStyle} aria-label={`${nextTyreCompound} tyre`}>
-                    {nextTyreCompound.charAt(0) || "?"}
-                  </span>
+                <div className="strategy-compound-breakdown">
+                  {compoundProbabilities ? (
+                    COMPOUND_ORDER.map((compound) => {
+                      const color = tyreColors[compound] ?? "var(--color-line)";
+                      const textColor = compound === "HARD" || compound === "MEDIUM" ? "#111318" : "#ffffff";
+                      const logoStyle = { "--strategy-tyre-logo-colour": color, "--strategy-tyre-logo-text": textColor } as CSSProperties;
+                      return (
+                        <ProbabilityBar
+                          key={compound}
+                          label={compound}
+                          value={Math.round(compoundProbabilities[compound] * 100)}
+                          color={color}
+                          icon={
+                            <span className="strategy-tyre-logo" style={logoStyle}>
+                              {compound.charAt(0)}
+                            </span>
+                          }
+                        />
+                      );
+                    })
+                  ) : (
+                    <span className="strategy-category-unavailable">Compound data unavailable</span>
+                  )}
                 </div>
               </div>
             </>
