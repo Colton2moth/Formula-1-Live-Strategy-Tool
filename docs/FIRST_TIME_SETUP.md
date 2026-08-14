@@ -25,6 +25,23 @@ cd frontend
 npm install
 ```
 
+## Download and process historical data
+
+When no race is live, `/api/race-state` serves predictions from a historical
+CSV snapshot. Generate it once by downloading raw OpenF1 data and building the
+driver-lap table:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+f1-download-openf1
+f1-process-races
+```
+
+`f1-download-openf1` downloads every Race session from 2023 onward into
+`data/raw/` (a large download; safe to re-run, it skips files already on disk).
+`f1-process-races` builds `data/processed/driver_laps_all.csv`. Both folders are
+gitignored local data, so run this step on each new machine.
+
 ## Start the backend for the first time
 
 Open one terminal at the repo root:

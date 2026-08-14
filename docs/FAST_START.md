@@ -27,6 +27,9 @@ Open the URL printed by Vite, usually `http://127.0.0.1:5173/`.
 ## Quick troubleshooting
 
 - If the website loads without data, check `http://127.0.0.1:8000/api/race-state`.
+- If `/api/race-state` errors with `FileNotFoundError: data/processed/driver_laps_all.csv`,
+  the historical data has not been generated yet. Run `f1-download-openf1` then
+  `f1-process-races` (see [FIRST_TIME_SETUP.md](FIRST_TIME_SETUP.md)).
 - If `fastapi` is not recognized, reactivate `.venv` in the backend terminal.
 - If a launcher still references an old project path after the repo was moved or
   renamed, recreate `.venv` from the repo root because Windows virtual-environment
