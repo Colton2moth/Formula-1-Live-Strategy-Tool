@@ -10,7 +10,7 @@ Current scope:
     - GET /api/live-status — MQTT in-memory buffer summary
     - Background OpenF1 MQTT listener (LIVE_MQTT=1, default on)
     - Predictions from trained models on a historical CSV snapshot
-    - Session / drivers / track still mocked
+    - Session / drivers from live OpenF1; track from a static circuit library
     - Optional CORS via FRONTEND_URL (needed when FE is on Render)
 
 Run locally (from repo root so relative data/ paths resolve):
@@ -59,14 +59,14 @@ def _run_bootstrap() -> None:
     try:
         session_key = bootstrap_live_state()
         print(f"OpenF1 REST bootstrap done (session_key={session_key})")
-    except Exception as exc:  # noqa: BLE001 — mocks remain if bootstrap fails
+    except Exception as exc:  # noqa: BLE001 — API stays up with empty live buffer
         print(f"OpenF1 REST bootstrap skipped: {exc}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Bootstrap REST snapshot, then start MQTT (both optional via env)."""
-    # LIVE_BOOTSTRAP default on — disable with LIVE_BOOTSTRAP=0 for mock-only.
+    # LIVE_BOOTSTRAP default on — disable with LIVE_BOOTSTRAP=0 for MQTT-only.
     boot_flag = os.getenv("LIVE_BOOTSTRAP", "1").strip().lower()
     if boot_flag not in {"0", "false", "no", "off"}:
         # Run in a thread so slow OpenF1 calls do not block startup forever
@@ -95,7 +95,7 @@ app = FastAPI(
     title="Formula 1 Live Strategy Tool",
     description=(
         "Strategy API with optional live OpenF1 MQTT ingest; "
-        "session/drivers still mocked; predictions from CSV snapshot."
+        "session/drivers from live data; predictions from CSV snapshot."
     ),
     version="0.1.0",
     lifespan=lifespan,

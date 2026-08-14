@@ -13,7 +13,7 @@ Tasks:
 - download completed races from 2023 onward;
 - document cancelled / empty races to skip in training.
 
-Status: largely done (see data audit). Mock REST API exists for frontend work.
+Status: largely done (see data audit). REST API serves live OpenF1 data and a static circuit library for frontend work.
 
 ## Phase 2: One-race processing
 

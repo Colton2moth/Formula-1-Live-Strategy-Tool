@@ -77,7 +77,7 @@ def session_from_live(state: LiveState) -> SessionState | None:
     """
     Map LIVE_STATE into SessionState.
 
-    Returns None when v1/sessions has not been seeded yet (routes use mocks).
+    Returns None when v1/sessions has not been seeded yet.
     """
     sessions = _docs(state, "v1/sessions")
     if not sessions:
@@ -106,7 +106,7 @@ def session_from_live(state: LiveState) -> SessionState | None:
         session_name=str(session.get("session_name") or session.get("session_type") or "Session"),
         session_status=_session_status(session),
         current_lap=current,
-        total_laps=current,  # unknown true distance; avoid fake 70 from mocks
+        total_laps=current,  # unknown true distance; avoid guessing a lap count
         track_temperature=track_temp,
         air_temperature=air_temp,
         rainfall=rainfall,

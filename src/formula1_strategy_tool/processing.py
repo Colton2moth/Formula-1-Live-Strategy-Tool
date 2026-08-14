@@ -153,12 +153,12 @@ def add_current_position(
     )
     # OpenF1 timestamps sometimes omit fractional seconds.
     out["date_start"] = pd.to_datetime(out["date_start"], utc=True, format="ISO8601")
-    # date_start parses to datetime64[us]; the timedelta is timedelta64[ns], so
-    # the sum would promote as_of to datetime64[ns] and break the later
-    # merge_asof joins (ns vs us). Normalize back to us to match the date cols.
-    out["as_of"] = (
-        out["date_start"] + pd.to_timedelta(out["lap_duration"].fillna(0), unit="s")
-    ).dt.as_unit("us")
+    # date_start + lap_duration must stay the same datetime precision as the
+    # position/interval/weather/race_control date columns so merge_asof can
+    # join them (all parse to the same pandas datetime64 unit).
+    out["as_of"] = out["date_start"] + pd.to_timedelta(
+        out["lap_duration"].fillna(0), unit="s"
+    )
     # Rare incomplete laps (null date_start) cannot be as-of joined — drop them.
     out = out.dropna(subset=["as_of"])
 

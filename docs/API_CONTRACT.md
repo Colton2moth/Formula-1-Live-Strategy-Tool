@@ -22,11 +22,12 @@ The API uses JSON.
 
 ### GET `/api/session`
 
-Returns the current session state.
+Returns the current session state from the live buffer. Returns `503` before
+any live session has been ingested.
 
 ```json
 {
-  "meeting_name": "Canadian Grand Prix",
+  "meeting_name": "Hungarian Grand Prix",
   "session_name": "Race",
   "session_status": "active",
   "current_lap": 25,
@@ -154,18 +155,25 @@ The fields use the same schemas as `/api/session`, `/api/drivers`, and `/api/pre
 
 ### GET `/api/track`
 
-Returns track metadata and the points used to draw the circuit.
+Returns track metadata and the points used to draw the circuit. The circuit is
+resolved from the live session's `circuit_key` against a static circuit
+library (see `src/formula1_strategy_tool/api/circuits.py`).
 
 ```json
 {
-  "circuit_name": "Circuit Gilles Villeneuve",
-  "circuit_key": 23,
+  "circuit_name": "Hungaroring",
+  "circuit_key": 4,
+  "start_finish": {"x": 0.4287, "y": 0.1147},
   "path": [
-    {"x": 0.12, "y": 0.73},
-    {"x": 0.15, "y": 0.69}
+    {"x": 0.4062, "y": 0.1315},
+    {"x": 0.3836, "y": 0.1483}
   ]
 }
 ```
+
+`path` is a closed loop of 0-1 normalized points (first point repeats last).
+Returns `503` before any live session is ingested and `404` when the session's
+`circuit_key` is not yet in the circuit library.
 
 ---
 

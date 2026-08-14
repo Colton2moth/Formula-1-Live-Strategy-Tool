@@ -4,8 +4,6 @@ Pydantic response models for the REST API.
 These shapes match docs/API_CONTRACT.md exactly. FastAPI uses them to:
     - Validate outgoing JSON field names and types
     - Generate OpenAPI docs at /docs for the frontend developer
-
-Replace the mock data sources later; keep these schemas stable.
 """
 
 from __future__ import annotations
@@ -64,7 +62,7 @@ class PredictionState(BaseModel):
 
     Three binary pit-window probabilities (same features, different horizons)
     plus next-compound multiclass output. Compound fields may be null when
-    pit risk is low; mocks may still include them for frontend experimentation.
+    pit risk is low.
     """
 
     driver_number: int

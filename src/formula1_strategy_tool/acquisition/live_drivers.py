@@ -4,7 +4,7 @@ Build API DriverState list from the in-memory MQTT LiveState buffer.
 Input:  LiveState (topics: drivers, position, laps, stints, intervals, pit)
 Output: list[DriverState] or None if there is not enough live data yet
 
-When None, routes keep serving mocks. During a live session, MQTT fills the
+When None, routes serve an empty list. During a live session, MQTT fills the
 buffer and /api/drivers switches over automatically.
 """
 

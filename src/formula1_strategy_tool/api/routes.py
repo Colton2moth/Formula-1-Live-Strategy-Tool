@@ -1,9 +1,10 @@
 """
 REST route handlers for the strategy API contract.
 
-Session, drivers, and track still use mock fixtures. Predictions are scored
-from the trained models against a historical CSV snapshot (see inference.py).
-Results are cached after the first request so /docs stays snappy.
+Session and drivers are served from the live OpenF1 buffer. The track map is
+resolved from a static circuit library keyed by the live session's
+circuit_key. Predictions are scored from the trained models against a
+historical CSV snapshot (see inference.py).
 """
 
 from __future__ import annotations
@@ -14,11 +15,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 
-from formula1_strategy_tool.api.mocks import (
-    MOCK_DRIVERS,
-    MOCK_SESSION,
-    MOCK_TRACK,
-)
 from formula1_strategy_tool.acquisition.live_drivers import drivers_from_live
 from formula1_strategy_tool.acquisition.live_features import (
     features_from_live,
@@ -26,6 +22,7 @@ from formula1_strategy_tool.acquisition.live_features import (
 )
 from formula1_strategy_tool.acquisition.live_session import session_from_live
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE
+from formula1_strategy_tool.api.circuits import track_for_circuit
 from formula1_strategy_tool.api.schemas import (
     DriverState,
     LiveStatus,
@@ -48,15 +45,26 @@ _prediction_cache: list[PredictionState] | None = None
 
 
 def _active_drivers() -> list[DriverState]:
-    """Prefer live MQTT-derived drivers; fall back to mocks when buffer empty."""
+    """Live MQTT-derived drivers; empty list when no live data yet."""
     live = drivers_from_live(LIVE_STATE)
-    return live if live is not None else MOCK_DRIVERS
+    return live if live is not None else []
 
 
 def _active_session() -> SessionState:
-    """Prefer live/bootstrap session; fall back to mock Canadian GP fixture."""
+    """Live/bootstrap session; 503 when no session has been ingested yet."""
     live = session_from_live(LIVE_STATE)
-    return live if live is not None else MOCK_SESSION
+    if live is None:
+        raise HTTPException(status_code=503, detail="No live session available")
+    return live
+
+
+def _live_circuit_key() -> int | None:
+    """circuit_key of the ingested session, or None before data arrives."""
+    sessions = list(LIVE_STATE.docs.get("v1/sessions", {}).values())
+    if not sessions:
+        return None
+    key = sessions[0].get("circuit_key")
+    return int(key) if key is not None else None
 
 
 def _drivers_by_number() -> dict[int, DriverState]:
@@ -75,7 +83,15 @@ def _csv_predictions() -> list[PredictionState]:
     session_key = int(os.getenv("INFERENCE_SESSION_KEY", "9979"))
     lap_number = int(os.getenv("INFERENCE_LAP", "20"))
 
-    raw = predict_snapshot(csv_path, model_dir, session_key, lap_number)
+    if not csv_path.exists():
+        return []
+
+    try:
+        raw = predict_snapshot(csv_path, model_dir, session_key, lap_number)
+    except Exception as exc:  # noqa: BLE001 — keep API up without a snapshot
+        print(f"CSV predictions unavailable: {exc}")
+        return []
+
     _prediction_cache = [PredictionState.model_validate(row) for row in raw]
     return _prediction_cache
 
@@ -109,7 +125,7 @@ def get_session() -> SessionState:
 
 @router.get("/drivers", response_model=list[DriverState])
 def get_drivers() -> list[DriverState]:
-    """All drivers' timing, tyre, and gap state (live buffer or mocks)."""
+    """All drivers' timing, tyre, and gap state from the live buffer."""
     return _active_drivers()
 
 
@@ -145,7 +161,7 @@ def get_race_state() -> RaceStateSnapshot:
     """
     Full bootstrap snapshot for initial page load.
 
-    Session/drivers stay mocked; predictions come from the models.
+    Session and drivers come from the live buffer; predictions from the models.
     """
     return RaceStateSnapshot(
         session=_active_session(),
@@ -156,8 +172,16 @@ def get_race_state() -> RaceStateSnapshot:
 
 @router.get("/track", response_model=TrackState)
 def get_track() -> TrackState:
-    """Circuit name and normalized path points for the track map."""
-    return MOCK_TRACK
+    """Static circuit path for the live session's circuit_key."""
+    circuit_key = _live_circuit_key()
+    if circuit_key is None:
+        raise HTTPException(status_code=503, detail="No live session available")
+    track = track_for_circuit(circuit_key)
+    if track is None:
+        raise HTTPException(
+            status_code=404, detail=f"No circuit map for circuit_key {circuit_key}"
+        )
+    return track
 
 
 @router.get("/live-status", response_model=LiveStatus)
