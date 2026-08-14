@@ -23,6 +23,8 @@ function classifyError(message: string): ErrorVariant {
   return "server-error";
 }
 
+const PREDICTION_POLL_MS = 5000;
+
 function App() {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [track, setTrack] = useState<TrackState | null>(null);
@@ -79,16 +81,22 @@ function App() {
     }
 
     let active = true;
-    fetchDriverPrediction(selectedDriverNumber)
-      .then((prediction) => {
+
+    const refresh = async () => {
+      try {
+        const prediction = await fetchDriverPrediction(selectedDriverNumber);
         if (active) setLivePrediction({ driverNumber: selectedDriverNumber, prediction });
-      })
-      .catch(() => {
+      } catch {
         // Fall back to the snapshot prediction on error.
-      });
+      }
+    };
+
+    refresh();
+    const interval = setInterval(refresh, PREDICTION_POLL_MS);
 
     return () => {
       active = false;
+      clearInterval(interval);
     };
   }, [selectedDriverNumber]);
 
