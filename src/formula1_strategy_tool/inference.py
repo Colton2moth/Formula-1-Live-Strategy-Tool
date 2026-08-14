@@ -110,15 +110,19 @@ def predict_snapshot(
         for j, name in enumerate(compound_classes):
             probs[name] = float(compound_proba[i, j])
         predicted = compound_classes[int(pred_idx[i])]
+        lap_number = int(row["lap_number"])
 
         results.append(
             {
                 "driver_number": int(row["driver_number"]),
-                "lap_number": int(row["lap_number"]),
+                "lap_number": lap_number,
                 "pit_within_3_laps": float(pit_proba["pit_within_3_laps"][i]),
                 "pit_within_5_laps": float(pit_proba["pit_within_5_laps"][i]),
                 "pit_within_7_laps": float(pit_proba["pit_within_7_laps"][i]),
                 "predicted_next_compound": predicted,
+                # Rough FE placeholder: "pit window" = next few laps from now.
+                "predicted_pit_window_start": lap_number + 1,
+                "predicted_pit_window_end": lap_number + 5,
                 "compound_probabilities": probs,
                 "updated_at": updated_at,
             }
@@ -173,6 +177,8 @@ def predict_feature_rows(
                 "pit_within_5_laps": float(pit_proba["pit_within_5_laps"][i]),
                 "pit_within_7_laps": float(pit_proba["pit_within_7_laps"][i]),
                 "predicted_next_compound": compound_classes[int(pred_idx[i])],
+                "predicted_pit_window_start": int(row["lap_number"]) + 1,
+                "predicted_pit_window_end": int(row["lap_number"]) + 5,
                 "compound_probabilities": probs,
                 "updated_at": updated_at,
             }

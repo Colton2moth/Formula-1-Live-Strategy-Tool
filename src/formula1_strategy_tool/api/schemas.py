@@ -36,6 +36,8 @@ class DriverState(BaseModel):
     team_name: str
     team_colour: str  # hex without '#', e.g. "FF8000"
     position: int
+    # Placeholder for map markers until live location is wired (FE requires it).
+    track_progress: float = Field(default=0.0, ge=0.0, le=1.0)
     current_lap: int
     compound: str
     tyre_age: int
@@ -71,8 +73,12 @@ class PredictionState(BaseModel):
     pit_within_3_laps: float = Field(ge=0.0, le=1.0)
     pit_within_5_laps: float = Field(ge=0.0, le=1.0)
     pit_within_7_laps: float = Field(ge=0.0, le=1.0)
-    predicted_next_compound: str | None
-    compound_probabilities: CompoundProbabilities | None
+    # FE currently requires a string (calls .trim()); never send null.
+    predicted_next_compound: str = "UNKNOWN"
+    compound_probabilities: CompoundProbabilities | None = None
+    # Placeholder window for FE strategy panel until a dedicated window model exists.
+    predicted_pit_window_start: int = 0
+    predicted_pit_window_end: int = 0
     updated_at: str  # ISO-8601 UTC, e.g. "2026-06-14T18:34:10Z"
 
 
@@ -96,6 +102,8 @@ class TrackState(BaseModel):
 
     circuit_name: str
     circuit_key: int
+    # FE map draws a start/finish marker; default to first path point if omitted.
+    start_finish: TrackPoint
     path: list[TrackPoint]
 
 

@@ -119,7 +119,7 @@ MOCK_PREDICTIONS: list[PredictionState] = [
         pit_within_3_laps=0.08,
         pit_within_5_laps=0.15,
         pit_within_7_laps=0.22,
-        predicted_next_compound=None,
+        predicted_next_compound="UNKNOWN",
         compound_probabilities=CompoundProbabilities(
             SOFT=0.05,
             MEDIUM=0.55,
@@ -197,6 +197,7 @@ MOCK_RACE_STATE = RaceStateSnapshot(
 MOCK_TRACK = TrackState(
     circuit_name="Circuit Gilles Villeneuve",
     circuit_key=23,
+    start_finish=TrackPoint(x=0.12, y=0.73),
     path=[
         TrackPoint(x=0.12, y=0.73),
         TrackPoint(x=0.18, y=0.68),

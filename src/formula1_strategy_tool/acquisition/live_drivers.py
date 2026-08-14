@@ -127,6 +127,12 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
         pit_stops = sum(1 for p in pits if int(p.get("driver_number", -1)) == num)
 
         colour = str(d.get("team_colour") or "FFFFFF").lstrip("#")
+        position = int(pos_row.get("position") or 0) if pos_row else 0
+        # Spread markers along the map by grid order (placeholder, not GPS).
+        track_progress = 0.0
+        if position > 0:
+            track_progress = min(0.95, max(0.0, (position - 1) / 20.0))
+
         results.append(
             DriverState(
                 driver_number=num,
@@ -134,7 +140,8 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
                 acronym=str(d.get("name_acronym") or f"{num:02d}"),
                 team_name=str(d.get("team_name") or "Unknown"),
                 team_colour=colour,
-                position=int(pos_row.get("position") or 0) if pos_row else 0,
+                position=position,
+                track_progress=track_progress,
                 current_lap=current_lap,
                 compound=compound,
                 tyre_age=tyre_age,
