@@ -7,6 +7,7 @@ import { Leaderboard } from "./features/leaderboard/Leaderboard";
 import { RaceHeader } from "./features/race-header/RaceHeader";
 import { StrategyPanel } from "./features/strategy-panel/StrategyPanel";
 import { TrackMap } from "./features/track-map/TrackMap";
+import { Footer } from "./components/Footer";
 import type { RaceState, TrackState } from "./types/race";
 
 function classifyError(message: string): ErrorVariant {
@@ -69,8 +70,9 @@ function App() {
       <div className="dashboard-container">
         <div className="dashboard-brand">
           <div role="heading" aria-level={1} className="dashboard-brand-title">
-            F1 Live Strategy Tool
+            PitPit
           </div>
+          <div className="dashboard-brand-subtitle">F1 Live Strategy Tool</div>
         </div>
         <RaceHeader session={raceState.session} />
         <div className="dashboard-layout">
@@ -93,6 +95,7 @@ function App() {
           </div>
         </div>
       </div>
+      <Footer />
     </main>
   );
 }

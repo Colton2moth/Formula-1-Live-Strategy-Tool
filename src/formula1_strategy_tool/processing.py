@@ -153,7 +153,12 @@ def add_current_position(
     )
     # OpenF1 timestamps sometimes omit fractional seconds.
     out["date_start"] = pd.to_datetime(out["date_start"], utc=True, format="ISO8601")
-    out["as_of"] = out["date_start"] + pd.to_timedelta(out["lap_duration"].fillna(0), unit="s")
+    # date_start parses to datetime64[us]; the timedelta is timedelta64[ns], so
+    # the sum would promote as_of to datetime64[ns] and break the later
+    # merge_asof joins (ns vs us). Normalize back to us to match the date cols.
+    out["as_of"] = (
+        out["date_start"] + pd.to_timedelta(out["lap_duration"].fillna(0), unit="s")
+    ).dt.as_unit("us")
     # Rare incomplete laps (null date_start) cannot be as-of joined — drop them.
     out = out.dropna(subset=["as_of"])
 
