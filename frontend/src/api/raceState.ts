@@ -2,6 +2,14 @@ import type { RaceState, TrackState } from "../types/race";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
 
+export interface ApiRequestError extends Error {
+  status: number;
+}
+
+export function isApiRequestError(error: unknown): error is ApiRequestError {
+  return error instanceof Error && typeof (error as ApiRequestError).status === "number";
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -23,7 +31,9 @@ function assertTrackState(value: unknown): TrackState {
 async function fetchJson<T>(path: string, parse: (value: unknown) => T): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`);
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    throw Object.assign(new Error(`Request failed: ${response.status}`), {
+      status: response.status,
+    });
   }
   return parse(await response.json());
 }

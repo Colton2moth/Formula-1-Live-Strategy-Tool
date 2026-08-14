@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchRaceState, fetchTrack } from "./api/raceState";
+import { fetchRaceState, fetchTrack, isApiRequestError } from "./api/raceState";
 import { ErrorScreen } from "./components/ErrorScreen";
 import type { ErrorVariant } from "./components/ErrorScreen";
 import { LoadingScreen } from "./components/LoadingScreen";
@@ -31,16 +31,37 @@ function App() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([fetchRaceState(), fetchTrack()])
-      .then(([raceStateResponse, trackResponse]) => {
-        if (!active) return;
-        setRaceState(raceStateResponse);
-        setTrack(trackResponse);
-      })
-      .catch((requestError: unknown) => {
-        if (!active) return;
-        setError(requestError instanceof Error ? requestError.message : "Unable to load race data.");
-      });
+
+    const retryDelay = (attempt: number) => Math.min(1000 * 2 ** attempt, 8000);
+
+    async function load() {
+      for (let attempt = 0; active; attempt += 1) {
+        try {
+          const [raceStateResponse, trackResponse] = await Promise.all([
+            fetchRaceState(),
+            fetchTrack(),
+          ]);
+          if (!active) return;
+          setRaceState(raceStateResponse);
+          setTrack(trackResponse);
+          return;
+        } catch (requestError: unknown) {
+          if (!active) return;
+          if (isApiRequestError(requestError) && requestError.status === 503) {
+            await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt)));
+            continue;
+          }
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Unable to load race data.",
+          );
+          return;
+        }
+      }
+    }
+
+    load();
     return () => {
       active = false;
     };

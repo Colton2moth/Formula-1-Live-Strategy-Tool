@@ -46,13 +46,19 @@ _prediction_cache: list[PredictionState] | None = None
 
 def _active_drivers() -> list[DriverState]:
     """Live MQTT-derived drivers; empty list when no live data yet."""
-    live = drivers_from_live(LIVE_STATE)
+    try:
+        live = drivers_from_live(LIVE_STATE)
+    except Exception:  # noqa: BLE001 — partial buffer must not 500 the API
+        live = None
     return live if live is not None else []
 
 
 def _active_session() -> SessionState:
     """Live/bootstrap session; 503 when no session has been ingested yet."""
-    live = session_from_live(LIVE_STATE)
+    try:
+        live = session_from_live(LIVE_STATE)
+    except Exception:  # noqa: BLE001 — treat partial buffer as "not ready"
+        live = None
     if live is None:
         raise HTTPException(status_code=503, detail="No live session available")
     return live
@@ -88,11 +94,11 @@ def _csv_predictions() -> list[PredictionState]:
 
     try:
         raw = predict_snapshot(csv_path, model_dir, session_key, lap_number)
+        _prediction_cache = [PredictionState.model_validate(row) for row in raw]
     except Exception as exc:  # noqa: BLE001 — keep API up without a snapshot
         print(f"CSV predictions unavailable: {exc}")
         return []
 
-    _prediction_cache = [PredictionState.model_validate(row) for row in raw]
     return _prediction_cache
 
 
