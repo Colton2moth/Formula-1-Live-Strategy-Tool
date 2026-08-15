@@ -1,3 +1,5 @@
+import { ReplayControls } from "./ReplayControls";
+
 function GitHubIcon() {
   return (
     <svg className="footer-link-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -14,10 +16,11 @@ function LinkedInIcon() {
   );
 }
 
-export function Footer() {
+export function Footer({ onReplayReload }: { onReplayReload: () => void }) {
   return (
     <footer className="footer">
       <div className="footer-brand">PitPit</div>
+      <ReplayControls onReload={onReplayReload} />
       <nav className="footer-links" aria-label="Footer links">
         <a
           className="footer-link"

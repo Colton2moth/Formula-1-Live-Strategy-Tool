@@ -137,3 +137,20 @@ class LiveStatus(BaseModel):
 
     mqtt_enabled: bool
     topics: dict[str, LiveTopicStats]
+
+
+class ReplayStartRequest(BaseModel):
+    """Body for POST /api/replay/start. session_key falls back to env when omitted."""
+
+    session_key: int | None = None
+    speed: float = 10.0
+
+
+class ReplayStatus(BaseModel):
+    """Runtime replay controller state returned by the /api/replay endpoints."""
+
+    status: str  # idle | downloading | running | finished | error
+    running: bool
+    session_key: int | None = None
+    speed: float | None = None
+    error: str | None = None

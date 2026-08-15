@@ -1,5 +1,9 @@
 """Tests for the replay harness timeline builder and location thinning."""
 
+import threading
+import time
+
+from formula1_strategy_tool.acquisition import replay as replay_mod
 from formula1_strategy_tool.acquisition.replay import (
     _thin_location,
     build_timeline,
@@ -105,3 +109,34 @@ def test_thin_location_keeps_one_per_driver_per_second():
         "2026-07-26T13:00:01+00:00",
         "2026-07-26T13:00:00+00:00",
     ]
+
+
+def test_replay_controller_start_stop(monkeypatch):
+    started = threading.Event()
+
+    def fake_replay(
+        session_key, speed=10.0, state=None, *, stop_event=None, on_seeded=None
+    ):
+        if on_seeded is not None:
+            on_seeded()
+        started.set()
+        if stop_event is not None:
+            stop_event.wait(timeout=2.0)
+
+    controller = replay_mod.ReplayController()
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+
+    controller.start(9979, speed=20)
+    assert started.wait(timeout=1.0)
+    snapshot = controller.snapshot()
+    assert snapshot["status"] == "running"
+    assert snapshot["running"] is True
+    assert snapshot["session_key"] == 9979
+    assert snapshot["speed"] == 20
+
+    controller.stop()
+    deadline = time.time() + 2.0
+    while controller.snapshot()["running"] and time.time() < deadline:
+        time.sleep(0.01)
+    assert controller.snapshot()["status"] == "idle"
+    assert controller.snapshot()["running"] is False

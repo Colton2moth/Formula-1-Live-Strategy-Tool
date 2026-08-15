@@ -19,7 +19,9 @@ No-future-leakage rule:
 
 from __future__ import annotations
 
+import threading
 import time
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -97,7 +99,14 @@ def _download_location(
     laps: list[dict[str, Any]],
     cache: Path,
 ) -> list[dict[str, Any]]:
-    """Pull the full-session location stream in cached, paginated windows."""
+    """
+    Pull the full-session location stream in cached, paginated windows.
+
+    OpenF1 rejects whole-session location requests (422) and the inclusive
+    ``date>=`` bound errors (500), so each window uses ``date>`` / ``date<``.
+    Chunks are thinned per window to keep peak memory bounded; the caller's
+    timeline step thins again to close gaps at window boundaries.
+    """
     start = parse_openf1_datetime(session.get("date_start"))
     end = parse_openf1_datetime(session.get("date_end")) or _last_lap_end(laps)
     if start is None or end is None or end <= start:
@@ -116,12 +125,12 @@ def _download_location(
             "location",
             {
                 "session_key": session_key,
-                "date>=": window.isoformat(),
+                "date>": window.isoformat(),
                 "date<": window_end.isoformat(),
             },
             location_dir / f"{index:04d}.json",
         )
-        rows.extend(chunk)
+        rows.extend(_thin_location(chunk))
         index += 1
         window = window_end
     return rows
@@ -226,12 +235,20 @@ def build_timeline(data: dict[str, Any]) -> list[tuple[float, str, dict[str, Any
 
 
 def replay_session(
-    session_key: int, speed: float = 10.0, state: LiveState | None = None
+    session_key: int,
+    speed: float = 10.0,
+    state: LiveState | None = None,
+    *,
+    stop_event: threading.Event | None = None,
+    on_seeded: Callable[[], None] | None = None,
 ) -> None:
     """
     Download/cache one session, clear the buffer, then feed it chronologically.
 
     Blocks until the replay reaches race end; the final state is left visible.
+    When ``stop_event`` is set, replay exits early (without clearing state if it
+    has not started yet). ``on_seeded`` fires right after identity + the first
+    data are written, so the API can mark the replay as actively running.
     """
     if speed <= 0:
         raise ValueError("speed must be positive")
@@ -239,6 +256,8 @@ def replay_session(
 
     client = OpenF1Client()
     data = download_replay_data(client, session_key)
+    if stop_event is not None and stop_event.is_set():
+        return
     events = build_timeline(data)
 
     # Clear stale live/test data, then seed non-time-varying identity first.
@@ -249,12 +268,18 @@ def replay_session(
     for driver in data["drivers"]:
         buffer.update("v1/drivers", driver)
 
+    if on_seeded is not None:
+        on_seeded()
+
     print(f"replay: session_key={session_key} events={len(events)} speed={speed}x")
 
     start = time.monotonic()
     cursor = 0
     total = len(events)
     while cursor < total:
+        if stop_event is not None and stop_event.is_set():
+            print("replay: stopped early")
+            return
         elapsed = (time.monotonic() - start) * speed
         while cursor < total and events[cursor][0] <= elapsed:
             _, topic, payload = events[cursor]
@@ -266,6 +291,88 @@ def replay_session(
         time.sleep(max(0.0, min(wait, 0.1)))
 
     print("replay: reached race end; leaving final state visible")
+
+
+class ReplayController:
+    """
+    Runtime start/stop wrapper around the blocking replay producer.
+
+    One controller is shared by the FastAPI replay endpoints and the startup
+    path. ``on_before_start`` is an optional hook (wired by main.py) used to
+    stop the live MQTT listener so its pushes cannot mix with replay data.
+    """
+
+    def __init__(self) -> None:
+        self._thread: threading.Thread | None = None
+        self._stop = threading.Event()
+        self._lock = threading.Lock()
+        self.status = "idle"
+        self.session_key: int | None = None
+        self.speed: float | None = None
+        self.error: str | None = None
+        self.on_before_start: Callable[[], None] | None = None
+
+    def start(self, session_key: int, speed: float = 10.0) -> None:
+        """Stop any running replay, then start a new one in a daemon thread."""
+        with self._lock:
+            self._stop.set()
+            stop_event = threading.Event()
+            self._stop = stop_event
+            self.status = "downloading"
+            self.session_key = session_key
+            self.speed = speed
+            self.error = None
+            if self.on_before_start is not None:
+                self.on_before_start()
+            self._thread = threading.Thread(
+                target=self._run,
+                args=(session_key, speed, stop_event),
+                name="openf1-replay",
+                daemon=True,
+            )
+            self._thread.start()
+
+    def stop(self) -> None:
+        """Signal the running replay worker to exit at its next checkpoint."""
+        self._stop.set()
+        self.status = "idle"
+
+    def _run(
+        self, session_key: int, speed: float, stop_event: threading.Event
+    ) -> None:
+        try:
+            replay_session(
+                session_key,
+                speed=speed,
+                stop_event=stop_event,
+                on_seeded=self._on_seeded,
+            )
+        except Exception as exc:  # noqa: BLE001 — keep API up if replay dies
+            self.error = str(exc)
+            self.status = "error"
+            print(f"Replay worker exited: {exc}")
+            return
+        if not stop_event.is_set():
+            self.status = "finished"
+
+    def _on_seeded(self) -> None:
+        """Mark the replay as actively running once data is in LIVE_STATE."""
+        with self._lock:
+            self.status = "running"
+
+    def snapshot(self) -> dict[str, Any]:
+        """Current controller state for the /api/replay/status endpoint."""
+        with self._lock:
+            return {
+                "status": self.status,
+                "running": self._thread is not None and self._thread.is_alive(),
+                "session_key": self.session_key,
+                "speed": self.speed,
+                "error": self.error,
+            }
+
+
+replay_controller = ReplayController()
 
 
 def main() -> None:

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchRaceState, fetchTrack, isApiRequestError } from "./api/raceState";
 import { ErrorScreen } from "./components/ErrorScreen";
 import type { ErrorVariant } from "./components/ErrorScreen";
@@ -29,6 +29,9 @@ function App() {
   const [track, setTrack] = useState<TrackState | null>(null);
   const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
+
+  const reload = useCallback(() => setReloadCount((count) => count + 1), []);
 
   useEffect(() => {
     let active = true;
@@ -66,7 +69,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadCount]);
 
   const live = useLiveState(raceState);
 
@@ -130,7 +133,7 @@ function App() {
           </div>
         </div>
       </div>
-      <Footer />
+      <Footer onReplayReload={reload} />
     </main>
   );
 }

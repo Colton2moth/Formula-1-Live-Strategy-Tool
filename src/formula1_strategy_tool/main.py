@@ -29,6 +29,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from formula1_strategy_tool.acquisition.replay import replay_controller
 from formula1_strategy_tool.api.routes import router as api_router
 from formula1_strategy_tool.api.websocket import (
     broadcaster,
@@ -40,6 +41,9 @@ from formula1_strategy_tool.api.websocket import (
 
 # Read .env before FRONTEND_URL / LIVE_MQTT checks.
 load_dotenv()
+
+# Set when a runtime replay starts, to stop the MQTT listener thread.
+_mqtt_stop = threading.Event()
 
 
 def _mqtt_enabled() -> bool:
@@ -55,7 +59,7 @@ def _mqtt_worker() -> None:
 
     try:
         # verbose=False keeps uvicorn logs readable during a race.
-        run_listener(seconds=None, verbose=False)
+        run_listener(seconds=None, verbose=False, stop_event=_mqtt_stop)
     except Exception as exc:  # noqa: BLE001 — keep API up if MQTT dies
         print(f"MQTT listener exited: {exc}")
 
@@ -71,31 +75,18 @@ def _run_bootstrap() -> None:
         print(f"OpenF1 REST bootstrap skipped: {exc}")
 
 
-def _replay_worker(session_key: int, speed: float) -> None:
-    """Background thread target: replay a completed session into LIVE_STATE."""
-    from formula1_strategy_tool.acquisition.replay import replay_session
-
-    try:
-        replay_session(session_key, speed=speed)
-    except Exception as exc:  # noqa: BLE001 — keep API up if replay dies
-        print(f"Replay worker exited: {exc}")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start replay, or bootstrap + MQTT (replay mode disables both)."""
+    # A runtime replay (via the API) stops the MQTT listener first.
+    replay_controller.on_before_start = _mqtt_stop.set
+
     replay_key = os.getenv("REPLAY_SESSION_KEY", "").strip()
 
     if replay_key:
         # Replay mode: a developer-controlled historical race drives LIVE_STATE.
         speed = float(os.getenv("REPLAY_SPEED", "10").strip())
-        thread = threading.Thread(
-            target=_replay_worker,
-            args=(int(replay_key), speed),
-            name="openf1-replay",
-            daemon=True,
-        )
-        thread.start()
+        replay_controller.start(int(replay_key), speed)
         print(
             f"Replay mode: session_key={replay_key} speed={speed}x "
             "(bootstrap + MQTT disabled)"

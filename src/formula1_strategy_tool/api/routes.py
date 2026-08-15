@@ -22,6 +22,7 @@ from formula1_strategy_tool.acquisition.live_features import (
 )
 from formula1_strategy_tool.acquisition.live_session import session_from_live
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE
+from formula1_strategy_tool.acquisition.replay import replay_controller
 from formula1_strategy_tool.api.circuits import track_for_circuit
 from formula1_strategy_tool.api.schemas import (
     DriverState,
@@ -30,6 +31,8 @@ from formula1_strategy_tool.api.schemas import (
     LocationState,
     PredictionState,
     RaceStateSnapshot,
+    ReplayStartRequest,
+    ReplayStatus,
     SessionState,
     TrackState,
 )
@@ -224,3 +227,44 @@ def get_live_status() -> LiveStatus:
         for name, stats in raw.items()
     }
     return LiveStatus(mqtt_enabled=mqtt_enabled, topics=topics)
+
+
+def _replay_status() -> ReplayStatus:
+    """Map the replay controller snapshot into the response model."""
+    return ReplayStatus(**replay_controller.snapshot())
+
+
+@router.get("/replay/status", response_model=ReplayStatus)
+def get_replay_status() -> ReplayStatus:
+    """Current replay controller state (idle/running/finished/error)."""
+    return _replay_status()
+
+
+@router.post("/replay/start", response_model=ReplayStatus)
+def start_replay(request: ReplayStartRequest) -> ReplayStatus:
+    """
+    Start replaying a completed session through LIVE_STATE.
+
+    ``session_key`` defaults to REPLAY_SESSION_KEY, then INFERENCE_SESSION_KEY.
+    Starting a replay stops the live MQTT listener so live pushes cannot mix.
+    """
+    session_key = request.session_key
+    if session_key is None:
+        env_key = os.getenv("REPLAY_SESSION_KEY") or os.getenv(
+            "INFERENCE_SESSION_KEY"
+        )
+        if env_key:
+            session_key = int(env_key)
+        else:
+            raise HTTPException(
+                status_code=400, detail="session_key is required"
+            )
+    replay_controller.start(session_key, request.speed)
+    return _replay_status()
+
+
+@router.post("/replay/stop", response_model=ReplayStatus)
+def stop_replay() -> ReplayStatus:
+    """Stop the running replay at its next checkpoint."""
+    replay_controller.stop()
+    return _replay_status()

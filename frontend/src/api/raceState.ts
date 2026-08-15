@@ -45,6 +45,20 @@ async function fetchJson<T>(path: string, parse: (value: unknown) => T): Promise
   return parse(await response.json());
 }
 
+async function postJson<T>(path: string, body: unknown, parse: (value: unknown) => T): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw Object.assign(new Error(`Request failed: ${response.status}`), {
+      status: response.status,
+    });
+  }
+  return parse(await response.json());
+}
+
 export function fetchRaceState() {
   return fetchJson("/api/race-state", assertRaceState);
 }
@@ -55,4 +69,31 @@ export function fetchTrack() {
 
 export function fetchDriverPrediction(driverNumber: number) {
   return fetchJson(`/api/drivers/${driverNumber}/prediction`, assertPrediction);
+}
+
+export type ReplayStatus = {
+  status: string;
+  running: boolean;
+  session_key: number | null;
+  speed: number | null;
+  error: string | null;
+};
+
+function assertReplayStatus(value: unknown): ReplayStatus {
+  if (!isRecord(value) || typeof value.status !== "string" || typeof value.running !== "boolean") {
+    throw new Error("Replay status response did not match the expected shape.");
+  }
+  return value as ReplayStatus;
+}
+
+export function startReplay(sessionKey: number, speed: number) {
+  return postJson("/api/replay/start", { session_key: sessionKey, speed }, assertReplayStatus);
+}
+
+export function stopReplay() {
+  return postJson("/api/replay/stop", {}, assertReplayStatus);
+}
+
+export function fetchReplayStatus() {
+  return fetchJson("/api/replay/status", assertReplayStatus);
 }
