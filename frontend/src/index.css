@@ -62,3 +62,14 @@ svg [tabindex="0"]:focus-visible {
   outline-offset: 0.125rem;
   transition: outline-color var(--motion-duration-fast) var(--motion-easing-standard), outline-offset var(--motion-duration-fast) var(--motion-easing-standard);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
