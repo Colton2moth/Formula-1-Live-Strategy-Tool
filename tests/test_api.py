@@ -11,8 +11,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def reset_live_state():
-    LIVE_STATE.docs.clear()
-    LIVE_STATE.counts.clear()
+    LIVE_STATE.clear()
     yield
 
 

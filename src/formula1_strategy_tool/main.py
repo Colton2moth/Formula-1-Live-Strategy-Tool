@@ -20,6 +20,7 @@ Avoid --reload while using MQTT (reload can start duplicate listeners).
 
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 from contextlib import asynccontextmanager
@@ -29,6 +30,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from formula1_strategy_tool.api.routes import router as api_router
+from formula1_strategy_tool.api.websocket import (
+    broadcaster,
+    broadcaster_loop,
+)
+from formula1_strategy_tool.api.websocket import (
+    router as ws_router,
+)
 
 # Read .env before FRONTEND_URL / LIVE_MQTT checks.
 load_dotenv()
@@ -86,7 +94,12 @@ async def lifespan(app: FastAPI):
         print("OpenF1 MQTT listener thread started (LIVE_MQTT=1)")
     else:
         print("OpenF1 MQTT listener disabled (LIVE_MQTT=0)")
+
+    # WebSocket broadcaster: flushes changed live values to /ws/live clients.
+    broadcast_task = asyncio.create_task(broadcaster_loop(broadcaster))
+    print("WebSocket broadcaster started (/ws/live)")
     yield
+    broadcast_task.cancel()
     # Daemon threads are abandoned on shutdown; good enough for v1.
 
 
@@ -113,6 +126,7 @@ if _frontend_url:
     )
 
 app.include_router(api_router)
+app.include_router(ws_router)
 
 
 @app.get("/")

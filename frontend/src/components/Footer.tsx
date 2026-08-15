@@ -35,7 +35,7 @@ export function Footer() {
           rel="noreferrer"
         >
           <LinkedInIcon />
-          <span className="footer-link-label">Gwantanaki Boigo</span>
+          <span className="footer-link-label">Gwantana Kiboigo</span>
         </a>
         <a
           className="footer-link"

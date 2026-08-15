@@ -52,7 +52,9 @@ class LiveState:
         self.docs: dict[str, dict[str, dict[str, Any]]] = {}
         # topic -> how many messages received (including replacements)
         self.counts: dict[str, int] = {}
-        # Guards docs/counts: MQTT writes in a thread, FastAPI reads in others.
+        # Topics changed since the last drain (drives the WS broadcaster).
+        self._dirty: set[str] = set()
+        # Guards docs/counts/_dirty: MQTT writes in a thread, API reads in others.
         self._lock = threading.RLock()
 
     @staticmethod
@@ -95,6 +97,21 @@ class LiveState:
             bucket = self.docs.setdefault(topic, {})
             bucket[key] = payload
             self.counts[topic] = self.counts.get(topic, 0) + 1
+            self._dirty.add(topic)
+
+    def drain_dirty(self) -> set[str]:
+        """Return and clear the set of topics changed since the last drain."""
+        with self._lock:
+            dirty = self._dirty
+            self._dirty = set()
+            return dirty
+
+    def clear(self) -> None:
+        """Reset all stored documents, counts, and dirty flags."""
+        with self._lock:
+            self.docs.clear()
+            self.counts.clear()
+            self._dirty.clear()
 
     def docs_for(self, topic: str) -> list[dict[str, Any]]:
         """Return a snapshot list of stored payloads for one topic."""
