@@ -97,3 +97,23 @@ export function stopReplay() {
 export function fetchReplayStatus() {
   return fetchJson("/api/replay/status", assertReplayStatus);
 }
+
+export type ReplaySessionOption = {
+  session_key: number;
+  year: number;
+  country_name: string | null;
+  location: string | null;
+  circuit_short_name: string | null;
+  date_start: string | null;
+};
+
+function assertReplaySessions(value: unknown): ReplaySessionOption[] {
+  if (!Array.isArray(value)) {
+    throw new Error("Replay sessions response did not match the expected shape.");
+  }
+  return value as ReplaySessionOption[];
+}
+
+export function fetchReplaySessions() {
+  return fetchJson("/api/replay/sessions", assertReplaySessions);
+}

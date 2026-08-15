@@ -154,3 +154,14 @@ class ReplayStatus(BaseModel):
     session_key: int | None = None
     speed: float | None = None
     error: str | None = None
+
+
+class ReplaySessionOption(BaseModel):
+    """One completed Race session, for the year → country replay picker."""
+
+    session_key: int
+    year: int
+    country_name: str | None = None
+    location: str | None = None
+    circuit_short_name: str | None = None
+    date_start: str | None = None

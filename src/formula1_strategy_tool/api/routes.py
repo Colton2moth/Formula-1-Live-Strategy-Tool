@@ -31,6 +31,7 @@ from formula1_strategy_tool.api.schemas import (
     LocationState,
     PredictionState,
     RaceStateSnapshot,
+    ReplaySessionOption,
     ReplayStartRequest,
     ReplayStatus,
     SessionState,
@@ -238,6 +239,20 @@ def _replay_status() -> ReplayStatus:
 def get_replay_status() -> ReplayStatus:
     """Current replay controller state (idle/running/finished/error)."""
     return _replay_status()
+
+
+@router.get("/replay/sessions", response_model=list[ReplaySessionOption])
+def get_replay_sessions() -> list[ReplaySessionOption]:
+    """Completed Race sessions, for the year → country replay picker."""
+    from formula1_strategy_tool.acquisition.replay import list_replay_sessions
+
+    try:
+        sessions = list_replay_sessions()
+    except Exception as exc:  # noqa: BLE001 — surface OpenF1 failures cleanly
+        raise HTTPException(
+            status_code=503, detail=f"Could not list sessions: {exc}"
+        ) from exc
+    return [ReplaySessionOption(**row) for row in sessions]
 
 
 @router.post("/replay/start", response_model=ReplayStatus)

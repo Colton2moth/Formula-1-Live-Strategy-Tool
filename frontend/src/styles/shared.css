@@ -83,6 +83,32 @@
   @apply w-16;
 }
 
+.replay-controls-select {
+  @apply border border-app-line bg-app-panelAlt px-2 py-1 text-xs font-semibold text-app-text;
+  border-radius: var(--radius-compact);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.replay-controls-select:focus-visible {
+  outline: 0.125rem solid var(--color-f1-red);
+  outline-offset: 0.125rem;
+}
+
+.replay-controls-select:disabled {
+  @apply opacity-50;
+}
+
+.replay-controls-select--year {
+  @apply w-20;
+}
+
+.replay-controls-select--country {
+  @apply w-44;
+}
+
 .replay-controls-button {
   @apply border border-app-line bg-app-panelAlt px-3 py-1 text-xs font-semibold uppercase tracking-wide text-app-text;
   border-radius: var(--radius-compact);

@@ -54,6 +54,47 @@ def replay_dir(session_key: int) -> Path:
     return Path("data/replay") / str(session_key)
 
 
+_SESSION_LIST_START_YEAR = 2023
+
+
+def fetch_replay_sessions(client: OpenF1Client) -> list[dict[str, Any]]:
+    """
+    Download completed Race sessions from OpenF1 (2023 → current year).
+
+    Returns one dict per finished race with the fields the frontend needs to
+    build a year → country picker.
+    """
+    now = datetime.now(timezone.utc)
+    out: list[dict[str, Any]] = []
+    for year in range(_SESSION_LIST_START_YEAR, now.year + 1):
+        for row in client.get("sessions", {"year": year, "session_name": "Race"}):
+            end = parse_openf1_datetime(row.get("date_end"))
+            if end is None or end > now:
+                continue
+            out.append(
+                {
+                    "session_key": row.get("session_key"),
+                    "year": year,
+                    "country_name": row.get("country_name"),
+                    "location": row.get("location"),
+                    "circuit_short_name": row.get("circuit_short_name"),
+                    "date_start": row.get("date_start"),
+                }
+            )
+    return out
+
+
+_sessions_cache: list[dict[str, Any]] | None = None
+
+
+def list_replay_sessions() -> list[dict[str, Any]]:
+    """Return completed Race sessions, fetching (and caching) on first call."""
+    global _sessions_cache
+    if _sessions_cache is None:
+        _sessions_cache = fetch_replay_sessions(OpenF1Client())
+    return _sessions_cache
+
+
 def download_replay_data(
     client: OpenF1Client, session_key: int, cache: Path | None = None
 ) -> dict[str, Any]:

@@ -183,3 +183,36 @@ def test_replay_controller_start_stop(monkeypatch):
         time.sleep(0.01)
     assert controller.snapshot()["status"] == "idle"
     assert controller.snapshot()["running"] is False
+
+
+def test_fetch_replay_sessions_filters_completed():
+    class FakeClient:
+        def get(self, endpoint, params):
+            assert endpoint == "sessions"
+            return {
+                2025: [
+                    {
+                        "session_key": 100,
+                        "country_name": "Monaco",
+                        "location": "Monte Carlo",
+                        "circuit_short_name": "Monaco",
+                        "date_end": "2025-05-25T15:00:00+00:00",
+                    },
+                    {
+                        "session_key": 101,
+                        "country_name": "Japan",
+                        "location": "Suzuka",
+                        "circuit_short_name": "Suzuka",
+                        "date_end": "2999-01-01T00:00:00+00:00",
+                    },
+                ]
+            }.get(params["year"], [])
+
+    sessions = replay_mod.fetch_replay_sessions(FakeClient())
+    keys = [session["session_key"] for session in sessions]
+    assert 100 in keys
+    assert 101 not in keys
+    monaco = next(s for s in sessions if s["session_key"] == 100)
+    assert monaco["year"] == 2025
+    assert monaco["country_name"] == "Monaco"
+    assert monaco["circuit_short_name"] == "Monaco"

@@ -127,16 +127,21 @@ listener and REST bootstrap are disabled and replay starts automatically:
 ### Option B — start from the website (footer button)
 
 Start the backend without `REPLAY_SESSION_KEY`, then run the frontend. A
-**Replay** control sits in the footer: type a session key (and speed), press
-**Start**. Pressing **Start** stops the live MQTT listener so live pushes
-cannot mix with the replay. **Stop** halts the replay at its next checkpoint.
+**Replay** control sits in the footer: pick a **year**, then a **race** (by
+country) from the dropdowns, set the speed, and press **Start**. The dropdowns
+are backed by `GET /api/replay/sessions`, which lists completed Race sessions
+from 2023 onward. Pressing **Start** stops the live MQTT listener so live
+pushes cannot mix with the replay. **Stop** halts the replay at its next
+checkpoint.
 
-Optionally prefill the inputs with `frontend/.env`:
+Optionally prefill only the speed input with `frontend/.env`:
 
 ```
-VITE_REPLAY_SESSION_KEY=9979
 VITE_REPLAY_SPEED=10
 ```
+
+(Year and race are chosen in the UI now; `VITE_REPLAY_SESSION_KEY` is no
+longer used by the picker.)
 
 ### Option C — standalone CLI
 
@@ -150,7 +155,8 @@ Replay without the API server (useful for checking the producer):
 
 | Method | Path                  | Purpose                                   |
 | ------ | --------------------- | ----------------------------------------- |
-| GET    | `/api/replay/status`  | `idle` / `running` / `finished` / `error` |
+| GET    | `/api/replay/status`  | `idle` / `downloading` / `running` / `finished` / `error` |
+| GET    | `/api/replay/sessions`| completed Race sessions (year + country)  |
 | POST   | `/api/replay/start`   | start a replay (`{session_key, speed}`)   |
 | POST   | `/api/replay/stop`    | stop the running replay                   |
 
@@ -174,14 +180,14 @@ Replay without the API server (useful for checking the producer):
 | ----------------------- | -------- | ------- | ------------------------------------ |
 | `REPLAY_SESSION_KEY`    | backend  | unset   | session to replay at startup         |
 | `REPLAY_SPEED`          | backend  | `10`    | replay speed multiplier (1x = real)  |
-| `VITE_REPLAY_SESSION_KEY` | frontend | unset | prefill the footer session-key input |
 | `VITE_REPLAY_SPEED`     | frontend | `10`    | prefill the footer speed input       |
 
 ## Current limitations
 
 - Location is thinned to ~1 sample/driver/second to bound memory.
 - There is no pause/resume or seek yet — only start and stop.
-- Selecting a session requires typing its key; there is no race-picker UI.
+- The race picker is a flat year → country list; there is no search or
+  meeting-name grouping.
 - Stopping a replay leaves MQTT off; restart the backend to return to live
   mode.
 - Predictions require `data/models` to exist; otherwise they fall back to the
