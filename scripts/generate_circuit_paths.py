@@ -1,14 +1,24 @@
 """
-Generate normalized circuit path data for the static track library.
+Generate circuit path data for the static track library.
 
 Uses FastF1's official circuit corner / marshal-sector coordinates as anchor
-points, orders them around the circuit, and smooths them into a closed loop.
-Output is the 0-1 normalized ``TrackPoint`` data committed to
-``src/formula1_strategy_tool/api/circuits.py``.
+points, orders them around the circuit, smooths them into a closed loop, and
+emits the result in the **raw FastF1 coordinate system**.
+
+The raw coordinate system is shared with OpenF1 ``v1/location`` ``x``/``y``
+(proven in the Phase 0 spike), so the frontend can place live car markers with
+a single shared transform. No per-axis normalization is applied here — that
+would distort the aspect ratio and break the link to live locations.
 
 FastF1 is a build-time dependency only (not listed in requirements.txt). Run:
 
+    python scripts/generate_circuit_paths.py --write-circuits --year 2025
+
+to regenerate ``src/formula1_strategy_tool/api/circuits.py``, or:
+
     python scripts/generate_circuit_paths.py --year 2025 --circuit-key 4
+
+to print one circuit's raw path for inspection.
 
 OpenF1 and FastF1 share the same ``circuit_key`` numbering.
 """
@@ -18,6 +28,7 @@ from __future__ import annotations
 import argparse
 import math
 from collections.abc import Iterable
+from pathlib import Path
 
 try:
     import fastf1.mvapi as mvapi
@@ -26,6 +37,34 @@ except ImportError as exc:  # pragma: no cover - build-time tool
 
 RESAMPLE = 140
 SAMPLES_PER_SEGMENT = 12
+
+# circuit_key -> circuit name. Matches the 2026 calendar circuits that FastF1
+# has geometry for (Madring 153 and Sepang 12 are still missing a real source).
+CIRCUITS: list[tuple[int, str]] = [
+    (2, "Silverstone Circuit"),
+    (4, "Hungaroring"),
+    (7, "Circuit de Spa-Francorchamps"),
+    (9, "Circuit of the Americas"),
+    (10, "Albert Park Circuit"),
+    (14, "Autodromo Jose Carlos Pace"),
+    (15, "Circuit de Barcelona-Catalunya"),
+    (19, "Red Bull Ring"),
+    (22, "Circuit de Monaco"),
+    (23, "Circuit Gilles Villeneuve"),
+    (39, "Autodromo Nazionale Monza"),
+    (46, "Suzuka International Racing Course"),
+    (49, "Shanghai International Circuit"),
+    (55, "Circuit Zandvoort"),
+    (61, "Marina Bay Street Circuit"),
+    (63, "Bahrain International Circuit"),
+    (65, "Autodromo Hermanos Rodriguez"),
+    (70, "Yas Marina Circuit"),
+    (144, "Baku City Circuit"),
+    (149, "Jeddah Corniche Circuit"),
+    (150, "Lusail International Circuit"),
+    (151, "Miami International Autodrome"),
+    (152, "Las Vegas Strip Circuit"),
+]
 
 
 def _dist(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -136,30 +175,10 @@ def _resample(
     return out
 
 
-def _normalize(
-    points: list[tuple[float, float]],
-) -> list[tuple[float, float]]:
-    xs = [p[0] for p in points]
-    ys = [p[1] for p in points]
-    minx, maxx = min(xs), max(xs)
-    miny, maxy = min(ys), max(ys)
-    w = maxx - minx
-    h = maxy - miny
-    return [((p[0] - minx) / w, (p[1] - miny) / h) for p in points]
-
-
-def _bounds(
-    points: list[tuple[float, float]],
-) -> tuple[float, float, float, float]:
-    xs = [p[0] for p in points]
-    ys = [p[1] for p in points]
-    return min(xs), max(xs), min(ys), max(ys)
-
-
-def build_path(
+def build_raw(
     year: int, circuit_key: int
 ) -> tuple[list[tuple[float, float]], tuple[float, float]]:
-    """Return (normalized path points, normalized start_finish point)."""
+    """Return (raw closed path points, raw start_finish point)."""
     info = mvapi.get_circuit_info(year=year, circuit_key=circuit_key)
     if info is None:
         raise ValueError(
@@ -176,34 +195,105 @@ def build_path(
 
     splined = _catmull_rom_closed(anchors, SAMPLES_PER_SEGMENT)
     resampled = _resample(splined, RESAMPLE)
-    minx, maxx, miny, maxy = _bounds(resampled)
-    w = maxx - minx
-    h = maxy - miny
-    normalized = [((p[0] - minx) / w, (p[1] - miny) / h) for p in resampled]
-    normalized.append(normalized[0])
-    start_finish_norm = (
-        (start_finish_raw[0] - minx) / w,
-        (start_finish_raw[1] - miny) / h,
-    )
-    return normalized, start_finish_norm
+    resampled.append(resampled[0])
+    return resampled, start_finish_raw
 
 
-def format_points(points: Iterable[tuple[float, float]]) -> str:
-    return "\n".join(
-        f'    TrackPoint(x={x:.4f}, y={y:.4f}),' for x, y in points
+def _format_point(x: float, y: float) -> str:
+    return f"TrackPoint(x={x:.4f}, y={y:.4f})"
+
+
+def write_circuits_module(year: int, destination: Path) -> None:
+    """Regenerate the circuits.py module with raw-coordinate geometry."""
+    lines: list[str] = [
+        '"""',
+        "Static circuit path library for the track map.",
+        "",
+        "Each entry maps an OpenF1 ``circuit_key`` to a :class:`TrackState` whose",
+        "path points are in the raw FastF1 coordinate system. This is the same",
+        "coordinate system as OpenF1 ``v1/location`` ``x``/``y``, so live car",
+        "markers and the circuit outline can share one display transform.",
+        "",
+        "Geometry is derived from official FastF1 circuit data via",
+        "``scripts/generate_circuit_paths.py``; see that script for the source and",
+        "regeneration instructions.",
+        "",
+        "OpenF1 and FastF1 share the same ``circuit_key`` numbering.",
+        "",
+        "Not yet available (return 404 until sourced): Madring (153), Sepang (12).",
+        '"""',
+        "",
+        "from __future__ import annotations",
+        "",
+        "from formula1_strategy_tool.api.schemas import TrackPoint, TrackState",
+        "",
+        "CIRCUITS: dict[int, TrackState] = {",
+    ]
+
+    for circuit_key, circuit_name in CIRCUITS:
+        path, start_finish = build_raw(year, circuit_key)
+        lines.append(f"    {circuit_key}: TrackState(")
+        lines.append(f'        circuit_name="{circuit_name}",')
+        lines.append(f"        circuit_key={circuit_key},")
+        lines.append(
+            f"        start_finish={_format_point(start_finish[0], start_finish[1])},"
+        )
+        lines.append("        path=[")
+        lines.extend(f"            {_format_point(x, y)}," for x, y in path)
+        lines.append("        ],")
+        lines.append("    ),")
+
+    lines.extend(
+        [
+            "}",
+            "",
+            "",
+            "def track_for_circuit(circuit_key: int) -> TrackState | None:",
+            '    """Return the TrackState for a circuit_key, or None if unknown."""',
+            "    return CIRCUITS.get(circuit_key)",
+            "",
+        ]
     )
+
+    destination.write_text("\n".join(lines), encoding="utf-8")
+    print(f"wrote {destination} ({len(CIRCUITS)} circuits)")
+
+
+def _format_path_lines(points: Iterable[tuple[float, float]]) -> str:
+    return "\n".join(f"    TrackPoint(x={x:.4f}, y={y:.4f})," for x, y in points)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--year", type=int, required=True)
-    parser.add_argument("--circuit-key", type=int, required=True)
+    parser.add_argument("--year", type=int, default=2025)
+    parser.add_argument("--circuit-key", type=int, default=None)
+    parser.add_argument(
+        "--write-circuits",
+        action="store_true",
+        help="regenerate src/formula1_strategy_tool/api/circuits.py",
+    )
     args = parser.parse_args()
 
-    path, start_finish = build_path(args.year, args.circuit_key)
-    print(f"start_finish=TrackPoint(x={start_finish[0]:.4f}, y={start_finish[1]:.4f})")
+    if args.write_circuits:
+        destination = (
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "formula1_strategy_tool"
+            / "api"
+            / "circuits.py"
+        )
+        write_circuits_module(args.year, destination)
+        return
+
+    if args.circuit_key is None:
+        parser.error("--circuit-key is required unless --write-circuits is set")
+
+    path, start_finish = build_raw(args.year, args.circuit_key)
+    print(
+        f"start_finish=TrackPoint(x={start_finish[0]:.4f}, y={start_finish[1]:.4f})"
+    )
     print("path=[")
-    print(format_points(path))
+    print(_format_path_lines(path))
     print("]")
 
 

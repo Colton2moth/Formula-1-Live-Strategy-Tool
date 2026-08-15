@@ -17,7 +17,8 @@ export type ApiDriver = {
   team_name: string;
   team_colour: string;
   position: number;
-  track_progress: number;
+  x: number | null;
+  y: number | null;
   compound: string;
   tyre_age: number;
   last_lap_time: number;

@@ -35,6 +35,7 @@ _TOPICS = (
     "v1/intervals",
     "v1/weather",
     "v1/race_control",
+    "v1/location",
 )
 
 

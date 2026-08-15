@@ -52,6 +52,8 @@ Returns the current state of every driver.
     "team_name": "McLaren",
     "team_colour": "FF8000",
     "position": 2,
+    "x": 1245,
+    "y": -438,
     "current_lap": 25,
     "compound": "MEDIUM",
     "tyre_age": 14,
@@ -76,6 +78,8 @@ Returns the current state of one driver.
   "team_name": "McLaren",
   "team_colour": "FF8000",
   "position": 2,
+  "x": 1245,
+  "y": -438,
   "current_lap": 25,
   "compound": "MEDIUM",
   "tyre_age": 14,
@@ -163,15 +167,17 @@ library (see `src/formula1_strategy_tool/api/circuits.py`).
 {
   "circuit_name": "Hungaroring",
   "circuit_key": 4,
-  "start_finish": {"x": 0.4287, "y": 0.1147},
+  "start_finish": {"x": -1470.9, "y": -123.3},
   "path": [
-    {"x": 0.4062, "y": 0.1315},
-    {"x": 0.3836, "y": 0.1483}
+    {"x": -1710.5, "y": 76.6},
+    {"x": -1950.7, "y": 275.8}
   ]
 }
 ```
 
-`path` is a closed loop of 0-1 normalized points (first point repeats last).
+`path` is a closed loop in the raw FastF1 coordinate system (first point repeats
+last). This is the same coordinate space as OpenF1 `v1/location` `x`/`y` on
+`/api/drivers`, so the frontend applies one shared display transform to both.
 Returns `503` before any live session is ingested and `404` when the session's
 `circuit_key` is not yet in the circuit library.
 

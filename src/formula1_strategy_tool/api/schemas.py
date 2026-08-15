@@ -34,8 +34,10 @@ class DriverState(BaseModel):
     team_name: str
     team_colour: str  # hex without '#', e.g. "FF8000"
     position: int
-    # Placeholder for map markers until live location is wired (FE requires it).
-    track_progress: float = Field(default=0.0, ge=0.0, le=1.0)
+    # Raw OpenF1/FastF1 track coordinate (same space as the circuit path).
+    # Null when the car has no live telemetry (garage / no position sample).
+    x: float | None = None
+    y: float | None = None
     current_lap: int
     compound: str
     tyre_age: int
