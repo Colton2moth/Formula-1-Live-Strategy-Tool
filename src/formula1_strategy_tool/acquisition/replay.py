@@ -306,6 +306,8 @@ def replay_session(
     state: LiveState | None = None,
     *,
     stop_event: threading.Event | None = None,
+    pause_event: threading.Event | None = None,
+    progress: dict[str, Any] | None = None,
     on_seeded: Callable[[], None] | None = None,
 ) -> None:
     """
@@ -313,8 +315,11 @@ def replay_session(
 
     Blocks until the replay reaches race end; the final state is left visible.
     When ``stop_event`` is set, replay exits early (without clearing state if it
-    has not started yet). ``on_seeded`` fires right after identity + the first
-    data are written, so the API can mark the replay as actively running.
+    has not started yet). ``pause_event`` suspends the replay clock while set.
+    ``progress`` (when provided) is updated in place with the authoritative
+    replay clock, total duration, and lap progress. ``on_seeded`` fires right
+    after identity + the first data are written, so the API can mark the replay
+    as actively running.
     """
     if speed <= 0:
         raise ValueError("speed must be positive")
@@ -325,6 +330,14 @@ def replay_session(
     if stop_event is not None and stop_event.is_set():
         return
     events = build_timeline(data)
+
+    total_duration = events[-1][0] if events else 0.0
+    total_laps = max(
+        (int(row.get("lap_number") or 0) for row in data["laps"]), default=0
+    )
+    if progress is not None:
+        progress["total_duration"] = total_duration
+        progress["total_laps"] = total_laps
 
     # Clear stale live/test data, then seed non-time-varying identity first.
     buffer.clear()
@@ -340,21 +353,42 @@ def replay_session(
     print(f"replay: session_key={session_key} events={len(events)} speed={speed}x")
 
     start = time.monotonic()
+    paused_since: float | None = None
+    paused_total = 0.0
     cursor = 0
     total = len(events)
+    current_lap = 0
     while cursor < total:
         if stop_event is not None and stop_event.is_set():
             print("replay: stopped early")
             return
-        elapsed = (time.monotonic() - start) * speed
+        if pause_event is not None:
+            if pause_event.is_set():
+                if paused_since is None:
+                    paused_since = time.monotonic()
+                pause_event.wait(timeout=0.1)
+                continue
+            if paused_since is not None:
+                paused_total += time.monotonic() - paused_since
+                paused_since = None
+        elapsed = (time.monotonic() - start - paused_total) * speed
+        if progress is not None:
+            progress["current_time"] = min(elapsed, total_duration)
+            progress["current_lap"] = current_lap
         while cursor < total and events[cursor][0] <= elapsed:
             _, topic, payload = events[cursor]
             buffer.update(topic, payload)
+            if topic == "v1/laps":
+                current_lap = max(current_lap, int(payload.get("lap_number") or 0))
             cursor += 1
         if cursor >= total:
             break
         wait = (events[cursor][0] - elapsed) / speed
         time.sleep(max(0.0, min(wait, 0.1)))
+
+    if progress is not None:
+        progress["current_time"] = total_duration
+        progress["current_lap"] = current_lap
 
     print("replay: reached race end; leaving final state visible")
 
@@ -365,18 +399,28 @@ class ReplayController:
 
     One controller is shared by the FastAPI replay endpoints and the startup
     path. ``on_before_start`` is an optional hook (wired by main.py) used to
-    stop the live MQTT listener so its pushes cannot mix with replay data.
+    stop the live MQTT listener so its pushes cannot mix with replay data;
+    ``on_after_stop`` is its counterpart, restoring live mode once the user
+    deliberately leaves replay.
     """
 
     def __init__(self) -> None:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        self._pause = threading.Event()
         self._lock = threading.Lock()
         self.status = "idle"
         self.session_key: int | None = None
         self.speed: float | None = None
         self.error: str | None = None
         self.on_before_start: Callable[[], None] | None = None
+        self.on_after_stop: Callable[[], None] | None = None
+        self.progress: dict[str, Any] = {
+            "current_time": 0.0,
+            "total_duration": None,
+            "current_lap": 0,
+            "total_laps": None,
+        }
 
     def start(self, session_key: int, speed: float = 10.0) -> None:
         """Stop any running replay, then start a new one in a daemon thread."""
@@ -384,33 +428,70 @@ class ReplayController:
             self._stop.set()
             stop_event = threading.Event()
             self._stop = stop_event
+            self._pause = threading.Event()
             self.status = "downloading"
             self.session_key = session_key
             self.speed = speed
             self.error = None
+            self.progress = {
+                "current_time": 0.0,
+                "total_duration": None,
+                "current_lap": 0,
+                "total_laps": None,
+            }
             if self.on_before_start is not None:
                 self.on_before_start()
             self._thread = threading.Thread(
                 target=self._run,
-                args=(session_key, speed, stop_event),
+                args=(session_key, speed, stop_event, self._pause, self.progress),
                 name="openf1-replay",
                 daemon=True,
             )
             self._thread.start()
 
+    def pause(self) -> None:
+        """Suspend the replay clock; playback resumes from the same position."""
+        with self._lock:
+            if self.status == "running":
+                self._pause.set()
+                self.status = "paused"
+
+    def resume(self) -> None:
+        """Continue a paused replay from where it left off."""
+        with self._lock:
+            if self.status == "paused":
+                self._pause.clear()
+                self.status = "running"
+
     def stop(self) -> None:
-        """Signal the running replay worker to exit at its next checkpoint."""
-        self._stop.set()
-        self.status = "idle"
+        """Stop the replay and restore live mode via the on_after_stop hook."""
+        with self._lock:
+            was_active = self.status in {
+                "downloading",
+                "running",
+                "paused",
+                "finished",
+            }
+            self._stop.set()
+            self.status = "idle"
+        if was_active and self.on_after_stop is not None:
+            self.on_after_stop()
 
     def _run(
-        self, session_key: int, speed: float, stop_event: threading.Event
+        self,
+        session_key: int,
+        speed: float,
+        stop_event: threading.Event,
+        pause_event: threading.Event,
+        progress: dict[str, Any],
     ) -> None:
         try:
             replay_session(
                 session_key,
                 speed=speed,
                 stop_event=stop_event,
+                pause_event=pause_event,
+                progress=progress,
                 on_seeded=self._on_seeded,
             )
         except Exception as exc:  # noqa: BLE001 — keep API up if replay dies
@@ -435,6 +516,10 @@ class ReplayController:
                 "session_key": self.session_key,
                 "speed": self.speed,
                 "error": self.error,
+                "current_time": self.progress["current_time"],
+                "total_duration": self.progress["total_duration"],
+                "current_lap": self.progress["current_lap"],
+                "total_laps": self.progress["total_laps"],
             }
 
 

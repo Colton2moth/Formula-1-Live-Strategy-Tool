@@ -149,11 +149,15 @@ class ReplayStartRequest(BaseModel):
 class ReplayStatus(BaseModel):
     """Runtime replay controller state returned by the /api/replay endpoints."""
 
-    status: str  # idle | downloading | running | finished | error
+    status: str  # idle | downloading | running | paused | finished | error
     running: bool
     session_key: int | None = None
     speed: float | None = None
     error: str | None = None
+    current_time: float | None = None
+    total_duration: float | None = None
+    current_lap: int | None = None
+    total_laps: int | None = None
 
 
 class ReplaySessionOption(BaseModel):

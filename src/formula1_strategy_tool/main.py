@@ -42,7 +42,8 @@ from formula1_strategy_tool.api.websocket import (
 # Read .env before FRONTEND_URL / LIVE_MQTT checks.
 load_dotenv()
 
-# Set when a runtime replay starts, to stop the MQTT listener thread.
+# Stop event for the current MQTT listener thread. Replaced with a fresh event
+# each time the listener is (re)started so it can resume after a replay stops.
 _mqtt_stop = threading.Event()
 
 
@@ -52,16 +53,39 @@ def _mqtt_enabled() -> bool:
     return flag not in {"0", "false", "no", "off"}
 
 
-def _mqtt_worker() -> None:
+def _mqtt_worker(stop_event: threading.Event) -> None:
     """Background thread target: fill LIVE_STATE until the process exits."""
     # Import inside the thread so app import stays light if MQTT is disabled.
     from formula1_strategy_tool.acquisition.live_mqtt import run_listener
 
     try:
         # verbose=False keeps uvicorn logs readable during a race.
-        run_listener(seconds=None, verbose=False, stop_event=_mqtt_stop)
+        run_listener(seconds=None, verbose=False, stop_event=stop_event)
     except Exception as exc:  # noqa: BLE001 — keep API up if MQTT dies
         print(f"MQTT listener exited: {exc}")
+
+
+def _stop_mqtt() -> None:
+    """Signal the current MQTT listener to exit (used before replay starts)."""
+    _mqtt_stop.set()
+
+
+def _start_mqtt() -> None:
+    """Start (or restart) the MQTT listener with a fresh stop event."""
+    global _mqtt_stop
+    if not _mqtt_enabled():
+        print("OpenF1 MQTT listener disabled (LIVE_MQTT=0)")
+        return
+    stop_event = threading.Event()
+    _mqtt_stop = stop_event
+    thread = threading.Thread(
+        target=_mqtt_worker,
+        args=(stop_event,),
+        name="openf1-mqtt",
+        daemon=True,
+    )
+    thread.start()
+    print("OpenF1 MQTT listener thread started (LIVE_MQTT=1)")
 
 
 def _run_bootstrap() -> None:
@@ -78,8 +102,10 @@ def _run_bootstrap() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start replay, or bootstrap + MQTT (replay mode disables both)."""
-    # A runtime replay (via the API) stops the MQTT listener first.
-    replay_controller.on_before_start = _mqtt_stop.set
+    # A runtime replay (via the API) stops the MQTT listener first and restarts
+    # it once the user deliberately stops/leaves replay mode.
+    replay_controller.on_before_start = _stop_mqtt
+    replay_controller.on_after_stop = _start_mqtt
 
     replay_key = os.getenv("REPLAY_SESSION_KEY", "").strip()
 
@@ -103,15 +129,7 @@ async def lifespan(app: FastAPI):
             boot.start()
             boot.join(timeout=120.0)
 
-        thread: threading.Thread | None = None
-        if _mqtt_enabled():
-            thread = threading.Thread(
-                target=_mqtt_worker, name="openf1-mqtt", daemon=True
-            )
-            thread.start()
-            print("OpenF1 MQTT listener thread started (LIVE_MQTT=1)")
-        else:
-            print("OpenF1 MQTT listener disabled (LIVE_MQTT=0)")
+        _start_mqtt()
 
     # WebSocket broadcaster: flushes changed live values to /ws/live clients.
     broadcast_task = asyncio.create_task(broadcaster_loop(broadcaster))

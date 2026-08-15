@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import App from "./App";
 import { ErrorScreen } from "./components/ErrorScreen";
 import { LoadingScreen } from "./components/LoadingScreen";
+import { ReplayPage } from "./features/replay/ReplayPage";
 import { TestIndex } from "./features/test-screens/TestIndex";
 import "./index.css";
 import "./styles/shared.css";
@@ -12,12 +13,14 @@ import "./styles/track-map.css";
 import "./styles/leaderboard.css";
 import "./styles/strategy-panel.css";
 import "./styles/state-screens.css";
+import "./features/replay/replay.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />} />
+        <Route path="/replay" element={<ReplayPage />} />
         <Route path="/test" element={<TestIndex />} />
         <Route path="/test/loading/connecting" element={<LoadingScreen variant="connecting" />} />
         <Route path="/test/loading/data" element={<LoadingScreen variant="loading" />} />

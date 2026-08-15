@@ -35,7 +35,7 @@ function assertPrediction(value: unknown): ApiPrediction {
   return value as ApiPrediction;
 }
 
-async function fetchJson<T>(path: string, parse: (value: unknown) => T): Promise<T> {
+export async function fetchJson<T>(path: string, parse: (value: unknown) => T): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`);
   if (!response.ok) {
     throw Object.assign(new Error(`Request failed: ${response.status}`), {
@@ -45,7 +45,7 @@ async function fetchJson<T>(path: string, parse: (value: unknown) => T): Promise
   return parse(await response.json());
 }
 
-async function postJson<T>(path: string, body: unknown, parse: (value: unknown) => T): Promise<T> {
+export async function postJson<T>(path: string, body: unknown, parse: (value: unknown) => T): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -69,51 +69,4 @@ export function fetchTrack() {
 
 export function fetchDriverPrediction(driverNumber: number) {
   return fetchJson(`/api/drivers/${driverNumber}/prediction`, assertPrediction);
-}
-
-export type ReplayStatus = {
-  status: string;
-  running: boolean;
-  session_key: number | null;
-  speed: number | null;
-  error: string | null;
-};
-
-function assertReplayStatus(value: unknown): ReplayStatus {
-  if (!isRecord(value) || typeof value.status !== "string" || typeof value.running !== "boolean") {
-    throw new Error("Replay status response did not match the expected shape.");
-  }
-  return value as ReplayStatus;
-}
-
-export function startReplay(sessionKey: number, speed: number) {
-  return postJson("/api/replay/start", { session_key: sessionKey, speed }, assertReplayStatus);
-}
-
-export function stopReplay() {
-  return postJson("/api/replay/stop", {}, assertReplayStatus);
-}
-
-export function fetchReplayStatus() {
-  return fetchJson("/api/replay/status", assertReplayStatus);
-}
-
-export type ReplaySessionOption = {
-  session_key: number;
-  year: number;
-  country_name: string | null;
-  location: string | null;
-  circuit_short_name: string | null;
-  date_start: string | null;
-};
-
-function assertReplaySessions(value: unknown): ReplaySessionOption[] {
-  if (!Array.isArray(value)) {
-    throw new Error("Replay sessions response did not match the expected shape.");
-  }
-  return value as ReplaySessionOption[];
-}
-
-export function fetchReplaySessions() {
-  return fetchJson("/api/replay/sessions", assertReplaySessions);
 }

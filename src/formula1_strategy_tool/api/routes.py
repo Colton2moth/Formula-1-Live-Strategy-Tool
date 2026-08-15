@@ -278,8 +278,22 @@ def start_replay(request: ReplayStartRequest) -> ReplayStatus:
     return _replay_status()
 
 
+@router.post("/replay/pause", response_model=ReplayStatus)
+def pause_replay() -> ReplayStatus:
+    """Suspend the running replay clock; resume from the same position."""
+    replay_controller.pause()
+    return _replay_status()
+
+
+@router.post("/replay/resume", response_model=ReplayStatus)
+def resume_replay() -> ReplayStatus:
+    """Continue a paused replay from where it left off."""
+    replay_controller.resume()
+    return _replay_status()
+
+
 @router.post("/replay/stop", response_model=ReplayStatus)
 def stop_replay() -> ReplayStatus:
-    """Stop the running replay at its next checkpoint."""
+    """Stop the running replay and restore the live MQTT listener."""
     replay_controller.stop()
     return _replay_status()

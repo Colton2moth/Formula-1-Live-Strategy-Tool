@@ -58,81 +58,22 @@
   fill: currentColor;
 }
 
-.replay-controls {
-  @apply flex flex-wrap items-center justify-center gap-2;
+.dashboard-brand-nav {
+  @apply absolute right-4 top-1/2 -translate-y-1/2;
 }
 
-.replay-controls-label {
-  @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
-}
-
-.replay-controls-input {
-  @apply w-28 border border-app-line bg-app-panelAlt px-2 py-1 text-xs font-semibold tabular-nums text-app-text;
+.dashboard-brand-nav-link {
+  @apply inline-flex items-center gap-1.5 border border-app-line bg-app-panelAlt px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-app-text;
   border-radius: var(--radius-compact);
   transition:
     border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard);
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
-.replay-controls-input:focus-visible {
-  outline: 0.125rem solid var(--color-f1-red);
-  outline-offset: 0.125rem;
-}
-
-.replay-controls-input--speed {
-  @apply w-16;
-}
-
-.replay-controls-select {
-  @apply border border-app-line bg-app-panelAlt px-2 py-1 text-xs font-semibold text-app-text;
-  border-radius: var(--radius-compact);
-  cursor: pointer;
-  transition:
-    border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard);
-}
-
-.replay-controls-select:focus-visible {
-  outline: 0.125rem solid var(--color-f1-red);
-  outline-offset: 0.125rem;
-}
-
-.replay-controls-select:disabled {
-  @apply opacity-50;
-}
-
-.replay-controls-select--year {
-  @apply w-20;
-}
-
-.replay-controls-select--country {
-  @apply w-44;
-}
-
-.replay-controls-button {
-  @apply border border-app-line bg-app-panelAlt px-3 py-1 text-xs font-semibold uppercase tracking-wide text-app-text;
-  border-radius: var(--radius-compact);
-  transition:
-    background-color var(--motion-duration-fast) var(--motion-easing-standard),
-    border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard);
-}
-
-.replay-controls-button:hover:not(:disabled) {
+.dashboard-brand-nav-link:hover,
+.dashboard-brand-nav-link:focus-visible {
   @apply border-app-red text-white;
-  background-color: var(--color-f1-red);
-}
-
-.replay-controls-button--stop {
-  @apply text-app-muted;
-}
-
-.replay-controls-button:disabled {
-  @apply opacity-50;
-}
-
-.replay-controls-status {
-  @apply text-xs font-semibold text-app-muted;
 }
 
 .dashboard-layout {

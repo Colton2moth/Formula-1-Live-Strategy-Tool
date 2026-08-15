@@ -158,7 +158,14 @@ def test_replay_controller_start_stop(monkeypatch):
     started = threading.Event()
 
     def fake_replay(
-        session_key, speed=10.0, state=None, *, stop_event=None, on_seeded=None
+        session_key,
+        speed=10.0,
+        state=None,
+        *,
+        stop_event=None,
+        pause_event=None,
+        progress=None,
+        on_seeded=None,
     ):
         if on_seeded is not None:
             on_seeded()
@@ -183,6 +190,73 @@ def test_replay_controller_start_stop(monkeypatch):
         time.sleep(0.01)
     assert controller.snapshot()["status"] == "idle"
     assert controller.snapshot()["running"] is False
+
+
+def test_replay_controller_pause_resume(monkeypatch):
+    captured_pause: threading.Event | None = None
+    seeded = threading.Event()
+
+    def fake_replay(
+        session_key,
+        speed=10.0,
+        state=None,
+        *,
+        stop_event=None,
+        pause_event=None,
+        progress=None,
+        on_seeded=None,
+    ):
+        nonlocal captured_pause
+        captured_pause = pause_event
+        if on_seeded is not None:
+            on_seeded()
+        seeded.set()
+        if stop_event is not None:
+            stop_event.wait(timeout=2.0)
+
+    controller = replay_mod.ReplayController()
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+
+    controller.start(9979, speed=5)
+    assert seeded.wait(timeout=1.0)
+    assert controller.snapshot()["status"] == "running"
+
+    controller.pause()
+    assert controller.snapshot()["status"] == "paused"
+    assert captured_pause is not None and captured_pause.is_set()
+
+    controller.resume()
+    assert controller.snapshot()["status"] == "running"
+    assert captured_pause is not None and not captured_pause.is_set()
+
+    controller.stop()
+
+
+def test_replay_controller_stop_fires_restore_hook(monkeypatch):
+    restored = threading.Event()
+
+    def fake_replay(
+        session_key,
+        speed=10.0,
+        state=None,
+        *,
+        stop_event=None,
+        pause_event=None,
+        progress=None,
+        on_seeded=None,
+    ):
+        if on_seeded is not None:
+            on_seeded()
+        if stop_event is not None:
+            stop_event.wait(timeout=2.0)
+
+    controller = replay_mod.ReplayController()
+    controller.on_after_stop = restored.set
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+
+    controller.start(9979, speed=10)
+    controller.stop()
+    assert restored.wait(timeout=1.0)
 
 
 def test_fetch_replay_sessions_filters_completed():

@@ -95,7 +95,10 @@ never leaking a future stint boundary to the model. The shared feature pipeline
 Before replaying, `LIVE_STATE` is cleared so stale live/test data cannot mix
 with the historical race. The worker then advances a race clock scaled by the
 replay speed, emitting every event whose offset is due, and sleeping until the
-next event. At race end the final state is left visible rather than cleared.
+next event. A `pause_event` suspends the clock (the paused wall-clock time is
+excluded from the scaled elapsed time), and the authoritative clock is written
+back to a shared progress dict so `/api/replay/status` can report time and lap
+progress. At race end the final state is left visible rather than cleared.
 
 ## Using it
 
@@ -124,17 +127,35 @@ listener and REST bootstrap are disabled and replay starts automatically:
 .\.venv\Scripts\python.exe -m uvicorn formula1_strategy_tool.main:app --host 127.0.0.1 --port 8000
 ```
 
-### Option B — start from the website (footer button)
+### Option B — start from the dedicated Replay page
 
 Start the backend without `REPLAY_SESSION_KEY`, then run the frontend. A
-**Replay** control sits in the footer: pick a **year**, then a **race** (by
-country) from the dropdowns, set the speed, and press **Start**. The dropdowns
-are backed by `GET /api/replay/sessions`, which lists completed Race sessions
-from 2023 onward. Pressing **Start** stops the live MQTT listener so live
-pushes cannot mix with the replay. **Stop** halts the replay at its next
-checkpoint.
+**Race Replay** link in the header navigates to `/replay`, a dedicated page
+with its own control panel. Pick a **year**, then a **race** (by country /
+Grand Prix) from the dropdowns, choose a **Replay Speed**, and press **Play**.
+The dropdowns are backed by `GET /api/replay/sessions`, which lists completed
+Race sessions from 2023 onward.
 
-Optionally prefill only the speed input with `frontend/.env`:
+The replay page shows a `REPLAY — <year> <Grand Prix>` banner so historical
+data is never mistaken for the live race, plus the same race header, track
+map, leaderboard, and strategy panel used by the live dashboard. A read-only
+progress bar reports replay time and lap progress from the replay controller's
+authoritative clock.
+
+Playback controls map to the runtime API:
+
+| Control | Behaviour |
+| ------- | --------- |
+| Play    | start (or restart a finished replay) |
+| Pause   | suspend the replay clock |
+| Resume  | continue from the paused position |
+| Stop    | halt the replay and restore the live MQTT listener |
+
+Pressing **Play** stops the live MQTT listener so live pushes cannot mix with
+the replay. **Stop** (or leaving the page while a replay is active) restarts
+it, so returning to Live mode works without a backend restart.
+
+Optionally prefill the replay speed with `frontend/.env`:
 
 ```
 VITE_REPLAY_SPEED=10
@@ -155,13 +176,20 @@ Replay without the API server (useful for checking the producer):
 
 | Method | Path                  | Purpose                                   |
 | ------ | --------------------- | ----------------------------------------- |
-| GET    | `/api/replay/status`  | `idle` / `downloading` / `running` / `finished` / `error` |
+| GET    | `/api/replay/status`  | `idle` / `downloading` / `running` / `paused` / `finished` / `error`, plus progress |
 | GET    | `/api/replay/sessions`| completed Race sessions (year + country)  |
 | POST   | `/api/replay/start`   | start a replay (`{session_key, speed}`)   |
-| POST   | `/api/replay/stop`    | stop the running replay                   |
+| POST   | `/api/replay/pause`   | suspend the running replay clock          |
+| POST   | `/api/replay/resume`  | continue a paused replay                  |
+| POST   | `/api/replay/stop`    | stop the replay and restore live MQTT     |
 
 `session_key` on `/api/replay/start` falls back to `REPLAY_SESSION_KEY`, then
 `INFERENCE_SESSION_KEY`, and returns 400 if none are set.
+
+`GET /api/replay/status` also returns the replay progress the producer owns:
+`current_time` (race-clock seconds), `total_duration` (seconds from the last
+timeline event), `current_lap`, and `total_laps` (from the full lap history).
+The frontend never estimates progress on its own.
 
 ## Verifying a replay
 
@@ -180,15 +208,14 @@ Replay without the API server (useful for checking the producer):
 | ----------------------- | -------- | ------- | ------------------------------------ |
 | `REPLAY_SESSION_KEY`    | backend  | unset   | session to replay at startup         |
 | `REPLAY_SPEED`          | backend  | `10`    | replay speed multiplier (1x = real)  |
-| `VITE_REPLAY_SPEED`     | frontend | `10`    | prefill the footer speed input       |
+| `VITE_REPLAY_SPEED`     | frontend | `10`    | prefill the Replay Speed control     |
 
 ## Current limitations
 
 - Location is thinned to ~1 sample/driver/second to bound memory.
-- There is no pause/resume or seek yet — only start and stop.
+- There is no seek yet — only play, pause, resume, and stop. The progress bar
+  is read-only for now.
 - The race picker is a flat year → country list; there is no search or
   meeting-name grouping.
-- Stopping a replay leaves MQTT off; restart the backend to return to live
-  mode.
 - Predictions require `data/models` to exist; otherwise they fall back to the
   configured CSV snapshot (pre-existing behaviour, not replay-specific).
