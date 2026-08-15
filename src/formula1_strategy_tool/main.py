@@ -71,29 +71,56 @@ def _run_bootstrap() -> None:
         print(f"OpenF1 REST bootstrap skipped: {exc}")
 
 
+def _replay_worker(session_key: int, speed: float) -> None:
+    """Background thread target: replay a completed session into LIVE_STATE."""
+    from formula1_strategy_tool.acquisition.replay import replay_session
+
+    try:
+        replay_session(session_key, speed=speed)
+    except Exception as exc:  # noqa: BLE001 — keep API up if replay dies
+        print(f"Replay worker exited: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Bootstrap REST snapshot, then start MQTT (both optional via env)."""
-    # LIVE_BOOTSTRAP default on — disable with LIVE_BOOTSTRAP=0 for MQTT-only.
-    boot_flag = os.getenv("LIVE_BOOTSTRAP", "1").strip().lower()
-    if boot_flag not in {"0", "false", "no", "off"}:
-        # Run in a thread so slow OpenF1 calls do not block startup forever
-        # without still sequencing before we serve traffic... We join briefly.
-        boot = threading.Thread(
-            target=_run_bootstrap, name="openf1-bootstrap", daemon=True
-        )
-        boot.start()
-        boot.join(timeout=120.0)
+    """Start replay, or bootstrap + MQTT (replay mode disables both)."""
+    replay_key = os.getenv("REPLAY_SESSION_KEY", "").strip()
 
-    thread: threading.Thread | None = None
-    if _mqtt_enabled():
+    if replay_key:
+        # Replay mode: a developer-controlled historical race drives LIVE_STATE.
+        speed = float(os.getenv("REPLAY_SPEED", "10").strip())
         thread = threading.Thread(
-            target=_mqtt_worker, name="openf1-mqtt", daemon=True
+            target=_replay_worker,
+            args=(int(replay_key), speed),
+            name="openf1-replay",
+            daemon=True,
         )
         thread.start()
-        print("OpenF1 MQTT listener thread started (LIVE_MQTT=1)")
+        print(
+            f"Replay mode: session_key={replay_key} speed={speed}x "
+            "(bootstrap + MQTT disabled)"
+        )
     else:
-        print("OpenF1 MQTT listener disabled (LIVE_MQTT=0)")
+        # LIVE_BOOTSTRAP default on — disable with LIVE_BOOTSTRAP=0 for MQTT-only.
+        boot_flag = os.getenv("LIVE_BOOTSTRAP", "1").strip().lower()
+        if boot_flag not in {"0", "false", "no", "off"}:
+            # Run in a thread so slow OpenF1 calls do not block startup forever
+            # without still sequencing before we serve traffic... We join briefly.
+            boot = threading.Thread(
+                target=_run_bootstrap, name="openf1-bootstrap", daemon=True
+            )
+            boot.start()
+            boot.join(timeout=120.0)
+
+        thread: threading.Thread | None = None
+        if _mqtt_enabled():
+            thread = threading.Thread(
+                target=_mqtt_worker, name="openf1-mqtt", daemon=True
+            )
+            thread.start()
+            print("OpenF1 MQTT listener thread started (LIVE_MQTT=1)")
+        else:
+            print("OpenF1 MQTT listener disabled (LIVE_MQTT=0)")
 
     # WebSocket broadcaster: flushes changed live values to /ws/live clients.
     broadcast_task = asyncio.create_task(broadcaster_loop(broadcaster))
