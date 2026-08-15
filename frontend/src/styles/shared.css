@@ -129,6 +129,10 @@
   @apply border-app-red text-white;
 }
 
+.status-chip--amber {
+  @apply border-amber-300 text-amber-200;
+}
+
 .probability-bar {
   @apply grid gap-1;
 }

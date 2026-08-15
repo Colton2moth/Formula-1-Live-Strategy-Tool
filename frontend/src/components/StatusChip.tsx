@@ -1,6 +1,6 @@
 type StatusChipProps = {
   label: string;
-  tone?: "red" | "green" | "neutral";
+  tone?: "red" | "green" | "amber" | "neutral";
 };
 
 export function StatusChip({ label, tone = "neutral" }: StatusChipProps) {

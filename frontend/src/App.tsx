@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchDriverPrediction, fetchRaceState, fetchTrack, isApiRequestError } from "./api/raceState";
+import { fetchRaceState, fetchTrack, isApiRequestError } from "./api/raceState";
 import { ErrorScreen } from "./components/ErrorScreen";
 import type { ErrorVariant } from "./components/ErrorScreen";
 import { LoadingScreen } from "./components/LoadingScreen";
@@ -8,7 +8,8 @@ import { RaceHeader } from "./features/race-header/RaceHeader";
 import { StrategyPanel } from "./features/strategy-panel/StrategyPanel";
 import { TrackMap } from "./features/track-map/TrackMap";
 import { Footer } from "./components/Footer";
-import type { ApiPrediction, RaceState, TrackState } from "./types/race";
+import { useLiveState } from "./hooks/useLiveState";
+import type { ApiDriver, RaceState, TrackState } from "./types/race";
 
 function classifyError(message: string): ErrorVariant {
   if (message.includes("Failed to fetch") || message.includes("NetworkError")) {
@@ -23,13 +24,10 @@ function classifyError(message: string): ErrorVariant {
   return "server-error";
 }
 
-const PREDICTION_POLL_MS = 5000;
-
 function App() {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [track, setTrack] = useState<TrackState | null>(null);
   const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
-  const [livePrediction, setLivePrediction] = useState<{ driverNumber: number; prediction: ApiPrediction } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,43 +68,23 @@ function App() {
     };
   }, []);
 
-  const selectedDriver = raceState?.drivers.find((driver) => driver.driver_number === selectedDriverNumber) ?? null;
-  const snapshotPrediction =
-    raceState?.predictions.find((prediction) => prediction.driver_number === selectedDriver?.driver_number) ?? null;
+  const live = useLiveState(raceState);
 
-  useEffect(() => {
-    if (selectedDriverNumber === null) {
-      setLivePrediction(null);
-      return;
-    }
-
-    let active = true;
-
-    const refresh = async () => {
-      try {
-        const prediction = await fetchDriverPrediction(selectedDriverNumber);
-        if (active) setLivePrediction({ driverNumber: selectedDriverNumber, prediction });
-      } catch {
-        // Fall back to the snapshot prediction on error.
-      }
-    };
-
-    refresh();
-    const interval = setInterval(refresh, PREDICTION_POLL_MS);
-
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [selectedDriverNumber]);
-
-  const selectedPrediction =
-    livePrediction?.driverNumber === selectedDriverNumber
-      ? livePrediction.prediction
-      : snapshotPrediction;
+  const selectedDriver = live.drivers.find((driver) => driver.driver_number === selectedDriverNumber) ?? null;
+  const selectedPrediction = selectedDriver
+    ? live.predictions.get(selectedDriver.driver_number) ?? null
+    : null;
   const sortedDrivers = useMemo(
-    () => [...(raceState?.drivers ?? [])].sort((a, b) => a.position - b.position),
-    [raceState],
+    () => [...live.drivers].sort((a, b) => a.position - b.position),
+    [live.drivers],
+  );
+  const mapDrivers = useMemo<ApiDriver[]>(
+    () =>
+      sortedDrivers.map((driver) => {
+        const location = live.locations.get(driver.driver_number);
+        return location ? { ...driver, x: location.x, y: location.y } : driver;
+      }),
+    [sortedDrivers, live.locations],
   );
   const toggleSelectedDriver = (driverNumber: number) => {
     setSelectedDriverNumber((currentDriverNumber) => (currentDriverNumber === driverNumber ? null : driverNumber));
@@ -120,6 +98,8 @@ function App() {
     return <LoadingScreen variant="connecting" />;
   }
 
+  const session = live.session ?? raceState.session;
+
   return (
     <main className="dashboard-shell">
       <div className="dashboard-container">
@@ -129,13 +109,13 @@ function App() {
           </div>
           <div className="dashboard-brand-subtitle">F1 Live Strategy Tool</div>
         </div>
-        <RaceHeader session={raceState.session} />
+        <RaceHeader session={session} connectionStatus={live.status} />
         <div className="dashboard-layout">
           <div className="dashboard-stack">
             <TrackMap
               track={track}
-              session={raceState.session}
-              drivers={sortedDrivers}
+              session={session}
+              drivers={mapDrivers}
               selectedDriver={selectedDriver}
               onSelectDriver={toggleSelectedDriver}
             />

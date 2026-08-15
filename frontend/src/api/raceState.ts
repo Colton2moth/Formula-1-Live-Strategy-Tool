@@ -1,6 +1,6 @@
 import type { ApiPrediction, RaceState, TrackState } from "../types/race";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
+export const apiBaseUrl: string = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export interface ApiRequestError extends Error {
   status: number;
