@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
 import type { ApiDriver, ApiSession, TrackState } from "../../types/race";
 
@@ -23,7 +23,7 @@ const START_FINISH_SQUARE_SIZE = 1.2;
 const START_FINISH_COLUMN_COUNT = 3;
 const START_FINISH_OUTSIDE_OFFSET = 6;
 
-export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
+function buildTrackGeometry(track: TrackState) {
   const rawBounds = boundsOf(track.path);
   const transform = buildTransform(rawBounds);
   const displayPoints = smoothTrackPoints(track.path.map((point) => applyTransform(point, transform)));
@@ -31,6 +31,13 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
   const startFinish = applyTransform(track.start_finish, transform);
   const startFinishSquares = startFinishMarkerSquares(startFinish);
   const startFinishRotation = startFinishMarkerRotation(displayPoints, startFinish);
+
+  return { rawBounds, transform, mapPath, startFinish, startFinishSquares, startFinishRotation };
+}
+
+export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
+  const geometry = useMemo(() => buildTrackGeometry(track), [track]);
+
   return (
     <Panel label={`${session.meeting_name.toUpperCase()} | ${track.circuit_name.toUpperCase()} | ${session.session_name.toUpperCase()}`} className="track-map-panel">
       <div className="track-map-frame">
@@ -40,19 +47,19 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
           role="img"
           aria-label={`${track.circuit_name} circuit map with selectable driver markers`}
         >
-          <path d={mapPath} className="track-map-road" />
+          <path d={geometry.mapPath} className="track-map-road" />
           <g
             aria-label="Start finish line"
-            transform={`rotate(${startFinishRotation}, ${startFinish.x}, ${startFinish.y})`}
+            transform={`rotate(${geometry.startFinishRotation}, ${geometry.startFinish.x}, ${geometry.startFinish.y})`}
           >
             <line
               className="track-map-start-finish-line"
-              x1={startFinish.x}
-              x2={startFinish.x}
-              y1={startFinish.y - START_FINISH_SQUARE_SIZE * 1.5}
-              y2={startFinish.y + START_FINISH_SQUARE_SIZE * 1.5}
+              x1={geometry.startFinish.x}
+              x2={geometry.startFinish.x}
+              y1={geometry.startFinish.y - START_FINISH_SQUARE_SIZE * 1.5}
+              y2={geometry.startFinish.y + START_FINISH_SQUARE_SIZE * 1.5}
             />
-            {startFinishSquares.map((square) => (
+            {geometry.startFinishSquares.map((square) => (
               <rect
                 key={`${square.row}-${square.column}`}
                 className={`track-map-start-finish-square track-map-start-finish-square--${square.isLight ? "light" : "dark"}`}
@@ -67,12 +74,15 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
             if (driver.x === null || driver.y === null) {
               return null;
             }
-            if (!isOnTrack({ x: driver.x, y: driver.y }, rawBounds)) {
+            if (!isOnTrack({ x: driver.x, y: driver.y }, geometry.rawBounds)) {
               return null;
             }
-            const marker = applyTransform({ x: driver.x, y: driver.y }, transform);
+            const marker = applyTransform({ x: driver.x, y: driver.y }, geometry.transform);
             const isSelected = driver.driver_number === selectedDriver?.driver_number;
-            const markerStyle = { "--driver-colour": `#${driver.team_colour}` } as CSSProperties;
+            const markerStyle = {
+              "--driver-colour": `#${driver.team_colour}`,
+              transform: `translate(${marker.x}px, ${marker.y}px)`,
+            } as CSSProperties;
 
             return (
               <g
@@ -87,8 +97,8 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
                   if (event.key === "Enter" || event.key === " ") onSelectDriver(driver.driver_number);
                 }}
               >
-                <circle className="track-map-marker-dot" cx={marker.x} cy={marker.y} />
-                <text className="track-map-marker-label" x={marker.x + 3} y={marker.y + 1}>
+                <circle className="track-map-marker-dot" cx={0} cy={0} />
+                <text className="track-map-marker-label" x={3} y={1}>
                   {driver.acronym}
                 </text>
               </g>

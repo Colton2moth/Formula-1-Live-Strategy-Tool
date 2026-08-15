@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { openLiveSocket } from "../api/liveSocket";
 import type { LiveEvent, LiveSocketStatus } from "../api/liveSocket";
 import { fetchRaceState } from "../api/raceState";
@@ -68,9 +68,14 @@ export function useLiveState(snapshot: RaceState | null): LiveStateResult {
                 ? {
                     ...driver,
                     position: event.position,
+                    current_lap: event.current_lap,
                     compound: event.compound,
                     tyre_age: event.tyre_age,
                     last_lap_time: event.last_lap_time,
+                    gap_to_leader: event.gap_to_leader,
+                    interval_ahead: event.interval_ahead,
+                    interval_behind: event.interval_behind,
+                    pit_stops: event.pit_stops,
                   }
                 : driver,
             ),
@@ -145,5 +150,16 @@ export function useLiveState(snapshot: RaceState | null): LiveStateResult {
     };
   }, [snapshot]);
 
-  return { status, session, drivers, predictions, locations };
+  const liveSession = useMemo<ApiSession | null>(() => {
+    if (!session) {
+      return null;
+    }
+    const liveLap = drivers.reduce((max, driver) => Math.max(max, driver.current_lap), 0);
+    if (liveLap <= session.current_lap) {
+      return session;
+    }
+    return { ...session, current_lap: liveLap };
+  }, [session, drivers]);
+
+  return { status, session: liveSession, drivers, predictions, locations };
 }

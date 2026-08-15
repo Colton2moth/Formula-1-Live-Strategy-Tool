@@ -16,6 +16,10 @@ export type DriverUpdate = {
   compound: string;
   tyre_age: number;
   last_lap_time: number;
+  gap_to_leader: number;
+  interval_ahead: number | null;
+  interval_behind: number | null;
+  pit_stops: number;
 };
 
 export type WeatherUpdate = {
@@ -66,6 +70,10 @@ function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function toNullableNumber(value: unknown): number | null {
+  return isNumber(value) ? value : null;
+}
+
 function parseCompoundProbabilities(value: unknown): ApiCompoundProbabilities | null {
   if (value === null || !isRecord(value)) {
     return null;
@@ -108,6 +116,10 @@ function parseDriverUpdate(value: Record<string, unknown>): DriverUpdate | null 
     compound: typeof value.compound === "string" ? value.compound : "",
     tyre_age: value.tyre_age,
     last_lap_time: value.last_lap_time,
+    gap_to_leader: isNumber(value.gap_to_leader) ? value.gap_to_leader : 0,
+    interval_ahead: toNullableNumber(value.interval_ahead),
+    interval_behind: toNullableNumber(value.interval_behind),
+    pit_stops: isNumber(value.pit_stops) ? value.pit_stops : 0,
   };
 }
 

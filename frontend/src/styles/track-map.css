@@ -40,6 +40,7 @@
 .track-map-marker {
   --driver-colour: var(--color-f1-red);
   @apply cursor-pointer outline-none;
+  transition: transform var(--motion-duration-standard) var(--motion-easing-standard);
 }
 
 .track-map-marker-dot {

@@ -215,7 +215,11 @@ Every event contains a `type` field.
   "current_lap": 25,
   "compound": "MEDIUM",
   "tyre_age": 14,
-  "last_lap_time": 75.421
+  "last_lap_time": 75.421,
+  "gap_to_leader": 3.8,
+  "interval_ahead": 1.2,
+  "interval_behind": 2.1,
+  "pit_stops": 1
 }
 ```
 

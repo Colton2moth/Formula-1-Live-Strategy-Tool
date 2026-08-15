@@ -17,6 +17,7 @@ export type ApiDriver = {
   team_name: string;
   team_colour: string;
   position: number;
+  current_lap: number;
   x: number | null;
   y: number | null;
   compound: string;
@@ -24,6 +25,7 @@ export type ApiDriver = {
   last_lap_time: number;
   gap_to_leader: number;
   interval_ahead: number | null;
+  interval_behind: number | null;
   pit_stops: number;
 };
 

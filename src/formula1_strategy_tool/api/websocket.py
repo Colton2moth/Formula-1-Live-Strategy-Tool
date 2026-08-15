@@ -100,6 +100,10 @@ def _driver_event(driver: Any) -> dict[str, Any]:
         "compound": driver.compound,
         "tyre_age": driver.tyre_age,
         "last_lap_time": driver.last_lap_time,
+        "gap_to_leader": driver.gap_to_leader,
+        "interval_ahead": driver.interval_ahead,
+        "interval_behind": driver.interval_behind,
+        "pit_stops": driver.pit_stops,
     }
 
 
@@ -183,6 +187,10 @@ class Broadcaster:
                 driver.compound,
                 driver.tyre_age,
                 driver.last_lap_time,
+                driver.gap_to_leader,
+                driver.interval_ahead,
+                driver.interval_behind,
+                driver.pit_stops,
             )
             if self._last_drivers.get(driver.driver_number) == key:
                 continue
