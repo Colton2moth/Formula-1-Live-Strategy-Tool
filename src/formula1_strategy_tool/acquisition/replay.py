@@ -108,7 +108,12 @@ def _download_location(
     timeline step thins again to close gaps at window boundaries.
     """
     start = parse_openf1_datetime(session.get("date_start"))
-    end = parse_openf1_datetime(session.get("date_end")) or _last_lap_end(laps)
+    last = _last_lap_end(laps)
+    end = (
+        last + timedelta(minutes=5)
+        if last
+        else parse_openf1_datetime(session.get("date_end"))
+    )
     if start is None or end is None or end <= start:
         return []
 
@@ -120,16 +125,22 @@ def _download_location(
     index = 0
     while window < end:
         window_end = min(window + timedelta(seconds=_LOCATION_WINDOW_SECONDS), end)
-        chunk = get_or_download(
-            client,
-            "location",
-            {
-                "session_key": session_key,
-                "date>": window.isoformat(),
-                "date<": window_end.isoformat(),
-            },
-            location_dir / f"{index:04d}.json",
-        )
+        try:
+            chunk = get_or_download(
+                client,
+                "location",
+                {
+                    "session_key": session_key,
+                    "date>": window.isoformat(),
+                    "date<": window_end.isoformat(),
+                },
+                location_dir / f"{index:04d}.json",
+            )
+        except Exception as exc:  # noqa: BLE001 — location is optional polish
+            print(f"replay location window {index} failed: {exc}")
+            index += 1
+            window = window_end
+            continue
         rows.extend(_thin_location(chunk))
         index += 1
         window = window_end
@@ -215,20 +226,34 @@ def build_timeline(data: dict[str, Any]) -> list[tuple[float, str, dict[str, Any
         if offset is not None:
             events.append((offset, "v1/location", row))
 
-    # Stints: schedule at the lap they start, and drop the future lap_end so
-    # the current-stint reconstruction sees only data available at the cursor.
+    # Stints: reconstruct a live-like stream. Each stint opens at its lap_start
+    # with lap_end=None (still unknown); the previous stint is closed with its
+    # true lap_end at the same moment the next stint starts. This keeps the
+    # current stint open-ended without leaking future stint boundaries.
     lap_start = _lap_start_index(data["laps"])
+    by_driver: dict[int, list[dict[str, Any]]] = {}
     for row in data["stints"]:
         number = row.get("driver_number")
-        stint_lap = row.get("lap_start")
-        stamp = (
-            lap_start.get((int(number), int(stint_lap)))
-            if number is not None and stint_lap is not None
-            else None
-        )
-        offset = _event_offset(stamp, t0)
-        stint = {key: value for key, value in row.items() if key != "lap_end"}
-        events.append((offset if offset is not None else 0.0, "v1/stints", stint))
+        if number is not None:
+            by_driver.setdefault(int(number), []).append(row)
+
+    for rows in by_driver.values():
+        rows.sort(key=lambda r: int(r.get("stint_number") or 0))
+        for index, row in enumerate(rows):
+            number = row.get("driver_number")
+            stint_lap = row.get("lap_start")
+            stamp = (
+                lap_start.get((int(number), int(stint_lap)))
+                if number is not None and stint_lap is not None
+                else None
+            )
+            offset = _event_offset(stamp, t0)
+            offset = offset if offset is not None else 0.0
+            open_row = {k: (None if k == "lap_end" else v) for k, v in row.items()}
+            events.append((offset, "v1/stints", open_row))
+            if index > 0:
+                closed = dict(rows[index - 1])
+                events.append((offset, "v1/stints", closed))
 
     events.sort(key=lambda item: item[0])
     return events

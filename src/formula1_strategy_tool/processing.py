@@ -71,6 +71,13 @@ def add_stint_features(spine: pd.DataFrame, stints: pd.DataFrame) -> pd.DataFram
 
     A stint covers laps lap_start … lap_end inclusive for one driver.
     """
+    stints = stints.copy()
+    # A live/current stint has lap_end=None; treat it as open through the
+    # latest lap so it is not dropped by the covering-stint filter below.
+    stints["lap_end"] = pd.to_numeric(stints["lap_end"], errors="coerce").fillna(
+        int(spine["lap_number"].max())
+    )
+
     # Expand to spine×stints per driver, then keep the covering stint only.
     merged = spine.merge(
         stints[

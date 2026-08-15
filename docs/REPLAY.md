@@ -83,10 +83,12 @@ later laps, pits, positions, intervals, race-control events, and predictions
 are never visible early.
 
 Stints need special handling: the historical REST row describes a *completed*
-stint range (`lap_start` → `lap_end`). Replay reconstructs a live-like current
-stint instead by dropping `lap_end`, so the model only ever sees an open-ended
-stint covering the current lap. The next stint supersedes it when the replay
-reaches its start lap.
+stint range (`lap_start` → `lap_end`). Replay reconstructs a live-like stream
+instead — each stint opens at its `lap_start` with `lap_end = null` (still
+unknown), and the previous stint is closed with its true `lap_end` at the same
+moment the next stint starts. This keeps the current stint open-ended while
+never leaking a future stint boundary to the model. The shared feature pipeline
+(`add_stint_features`) treats an open stint as covering through the latest lap.
 
 ### 4. Playback
 

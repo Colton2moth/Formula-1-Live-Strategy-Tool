@@ -80,11 +80,12 @@ def test_timeline_schedules_lap_at_date_end():
     assert lap_events[0][1]["lap_number"] == 1
 
 
-def test_stint_drops_future_lap_end():
+def test_stint_opens_with_null_lap_end():
     events = build_timeline(_data())
     stint_payloads = [payload for _, topic, payload in events if topic == "v1/stints"]
     assert len(stint_payloads) == 1
-    assert "lap_end" not in stint_payloads[0]
+    assert "lap_end" in stint_payloads[0]
+    assert stint_payloads[0]["lap_end"] is None
     assert stint_payloads[0]["compound"] == "MEDIUM"
 
 
@@ -93,6 +94,48 @@ def test_stint_scheduled_at_start_lap():
     stint_events = [offset for offset, topic, _ in events if topic == "v1/stints"]
     # Stint 1 starts at lap 1 → race clock offset 0.
     assert stint_events == [0.0]
+
+
+def test_previous_stint_closes_when_next_starts():
+    data = _data()
+    data["stints"] = [
+        {
+            "driver_number": 4,
+            "stint_number": 1,
+            "compound": "MEDIUM",
+            "lap_start": 1,
+            "lap_end": 20,
+            "tyre_age_at_start": 0,
+        },
+        {
+            "driver_number": 4,
+            "stint_number": 2,
+            "compound": "HARD",
+            "lap_start": 21,
+            "lap_end": 40,
+            "tyre_age_at_start": 0,
+        },
+    ]
+    events = build_timeline(data)
+    stints = [
+        (offset, payload)
+        for offset, topic, payload in events
+        if topic == "v1/stints"
+    ]
+    # Three events: stint 1 opens (None), stint 1 closes (20), stint 2 opens (None).
+    assert len(stints) == 3
+    stint1_open = [
+        p for o, p in stints if p["stint_number"] == 1 and p["lap_end"] is None
+    ]
+    stint1_closed = [
+        p for o, p in stints if p["stint_number"] == 1 and p["lap_end"] == 20
+    ]
+    stint2_open = [
+        p for o, p in stints if p["stint_number"] == 2 and p["lap_end"] is None
+    ]
+    assert len(stint1_open) == 1
+    assert len(stint1_closed) == 1
+    assert len(stint2_open) == 1
 
 
 def test_thin_location_keeps_one_per_driver_per_second():
