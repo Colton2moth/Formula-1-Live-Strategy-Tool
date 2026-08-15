@@ -39,6 +39,19 @@ MIN_REQUEST_INTERVAL_SECONDS = 2.1
 MAX_RETRIES = 6
 
 
+def _describe_http_error(exc: BaseException) -> str:
+    """One-line diagnostic for a failed request (status, body, or cause)."""
+    response = getattr(exc, "response", None)
+    if response is not None:
+        body = response.text[:200] if response.text else ""
+        return f"HTTP {response.status_code}: {body!r}"
+    if isinstance(exc, requests.Timeout):
+        return f"timeout ({type(exc).__name__})"
+    if isinstance(exc, requests.ConnectionError):
+        return f"connection error: {exc}"
+    return f"{type(exc).__name__}: {exc}"
+
+
 class OpenF1Client:
     """
     Rate-limited HTTP client for the OpenF1 REST API.
@@ -127,7 +140,8 @@ class OpenF1Client:
                 # which endpoint and params failed.
                 if attempt == MAX_RETRIES - 1:
                     raise RuntimeError(
-                        f"Failed GET {endpoint} with {params}"
+                        f"Failed GET {endpoint} with {params} "
+                        f"({_describe_http_error(exc)})"
                     ) from exc
 
                 # Exponential backoff with jitter before the next attempt.

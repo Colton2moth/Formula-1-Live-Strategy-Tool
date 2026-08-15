@@ -43,14 +43,14 @@ data/
         ├── weather.json
         ├── race_control.json
         └── location/
-            └── 0000.json, 0001.json, …   (10-minute windows)
+            └── 0000.json, 0001.json, …   (5-minute windows)
 ```
 
 This cache is separate from the modelling dataset in `data/raw/`. Repeated
 replays reuse the cache and do not re-hit OpenF1.
 
 `location` is high frequency and the whole-session endpoint returns 422, so it
-is downloaded in 10-minute windows and thinned in memory to roughly one sample
+is downloaded in 5-minute windows and thinned in memory to roughly one sample
 per driver per second (the frontend map only ever displays the latest sample
 per driver anyway).
 

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -46,7 +46,7 @@ _ENDPOINTS = (
 # full session stays memory-friendly while the map still moves smoothly.
 _LOCATION_THIN_SECONDS = 1.0
 # Download window for the paginated location endpoint (whole-session returns 422).
-_LOCATION_WINDOW_SECONDS = 600
+_LOCATION_WINDOW_SECONDS = 300
 
 
 def replay_dir(session_key: int) -> Path:
@@ -57,16 +57,21 @@ def replay_dir(session_key: int) -> Path:
 _SESSION_LIST_START_YEAR = 2023
 
 
-def fetch_replay_sessions(client: OpenF1Client) -> list[dict[str, Any]]:
+def fetch_replay_sessions(
+    client: OpenF1Client,
+    years: Sequence[int] | None = None,
+) -> list[dict[str, Any]]:
     """
-    Download completed Race sessions from OpenF1 (2023 → current year).
+    Download completed Race sessions from OpenF1 for the given years.
 
-    Returns one dict per finished race with the fields the frontend needs to
-    build a year → country picker.
+    Defaults to 2023 → current year. Returns one dict per finished race with
+    the fields the frontend needs to build a year → country picker.
     """
     now = datetime.now(timezone.utc)
+    if years is None:
+        years = range(_SESSION_LIST_START_YEAR, now.year + 1)
     out: list[dict[str, Any]] = []
-    for year in range(_SESSION_LIST_START_YEAR, now.year + 1):
+    for year in years:
         for row in client.get("sessions", {"year": year, "session_name": "Race"}):
             end = parse_openf1_datetime(row.get("date_end"))
             if end is None or end > now:
@@ -133,6 +138,35 @@ def _last_lap_end(laps: list[dict[str, Any]]) -> datetime | None:
     return max((end for end in ends if end is not None), default=None)
 
 
+def _location_bounds(
+    session: dict[str, Any], laps: list[dict[str, Any]]
+) -> tuple[datetime, datetime] | None:
+    """(start, end) range for one session's location stream, or None if absent."""
+    start = parse_openf1_datetime(session.get("date_start"))
+    last = _last_lap_end(laps)
+    end = (
+        last + timedelta(minutes=5)
+        if last
+        else parse_openf1_datetime(session.get("date_end"))
+    )
+    if start is None or end is None or end <= start:
+        return None
+    return start, end
+
+
+def location_window_count(
+    session: dict[str, Any], laps: list[dict[str, Any]]
+) -> int:
+    """Number of 5-minute location windows needed to cover one session."""
+    bounds = _location_bounds(session, laps)
+    if bounds is None:
+        return 0
+    start, end = bounds
+    window = timedelta(seconds=_LOCATION_WINDOW_SECONDS)
+    delta = end - start
+    return int(delta // window) + (1 if delta % window else 0)
+
+
 def _download_location(
     client: OpenF1Client,
     session_key: int,
@@ -148,15 +182,10 @@ def _download_location(
     Chunks are thinned per window to keep peak memory bounded; the caller's
     timeline step thins again to close gaps at window boundaries.
     """
-    start = parse_openf1_datetime(session.get("date_start"))
-    last = _last_lap_end(laps)
-    end = (
-        last + timedelta(minutes=5)
-        if last
-        else parse_openf1_datetime(session.get("date_end"))
-    )
-    if start is None or end is None or end <= start:
+    bounds = _location_bounds(session, laps)
+    if bounds is None:
         return []
+    start, end = bounds
 
     location_dir = cache / "location"
     location_dir.mkdir(parents=True, exist_ok=True)

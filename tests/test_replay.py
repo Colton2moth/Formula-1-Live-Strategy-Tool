@@ -3,10 +3,14 @@
 import threading
 import time
 
+from formula1_strategy_tool.acquisition import cache_replays
 from formula1_strategy_tool.acquisition import replay as replay_mod
+from formula1_strategy_tool.acquisition.client import atomic_write_json
 from formula1_strategy_tool.acquisition.replay import (
     _thin_location,
     build_timeline,
+    download_replay_data,
+    location_window_count,
 )
 
 
@@ -290,3 +294,96 @@ def test_fetch_replay_sessions_filters_completed():
     assert monaco["year"] == 2025
     assert monaco["country_name"] == "Monaco"
     assert monaco["circuit_short_name"] == "Monaco"
+
+
+def test_fetch_replay_sessions_respects_years():
+    queried = []
+
+    class FakeClient:
+        def get(self, endpoint, params):
+            assert endpoint == "sessions"
+            queried.append(params["year"])
+            return [
+                {
+                    "session_key": params["year"],
+                    "country_name": "Test",
+                    "location": "Test",
+                    "circuit_short_name": "Test",
+                    "date_end": "2025-01-01T00:00:00+00:00",
+                }
+            ]
+
+    sessions = replay_mod.fetch_replay_sessions(FakeClient(), years=[2025, 2026])
+    assert sorted(queried) == [2025, 2026]
+    assert [s["session_key"] for s in sessions] == [2025, 2026]
+
+
+def test_location_window_count():
+    session = {
+        "date_start": "2026-07-26T13:00:00+00:00",
+        "date_end": "2026-07-26T15:00:00+00:00",
+    }
+    assert location_window_count(session, []) == 24
+    session["date_end"] = "2026-07-26T14:05:00+00:00"
+    assert location_window_count(session, []) == 13
+
+
+def test_download_replay_data_reuses_cache(tmp_path):
+    session_key = 1
+    cache = tmp_path / str(session_key)
+    cache.mkdir(parents=True)
+    atomic_write_json(
+        cache / "sessions.json",
+        [
+            {
+                "session_key": session_key,
+                "meeting_key": 2,
+                "date_start": "2026-07-26T13:00:00+00:00",
+                "date_end": "2026-07-26T14:00:00+00:00",
+            }
+        ],
+    )
+    atomic_write_json(cache / "meetings.json", [{"meeting_key": 2}])
+    for endpoint in replay_mod._ENDPOINTS:
+        atomic_write_json(cache / f"{endpoint}.json", [])
+    location_dir = cache / "location"
+    location_dir.mkdir()
+    for index in range(12):
+        atomic_write_json(location_dir / f"{index:04d}.json", [])
+
+    class ExplodingClient:
+        def get(self, endpoint, params):
+            raise AssertionError(f"unexpected network call to {endpoint}")
+
+    data = download_replay_data(ExplodingClient(), session_key, cache=cache)
+    assert data["session"]["session_key"] == session_key
+    assert set(data) >= set(replay_mod._ENDPOINTS) | {"location", "session", "meetings"}
+
+
+def test_cache_session_reports_missing_location_window(monkeypatch, tmp_path):
+    session = {
+        "session_key": 5,
+        "year": 2025,
+        "country_name": "Test",
+        "location": "Test",
+    }
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+
+    def fake_download(client, session_key, cache=None):
+        return {
+            "session": {
+                "date_start": "2026-07-26T13:00:00+00:00",
+                "date_end": "2026-07-26T14:00:00+00:00",
+            },
+            "laps": [],
+        }
+
+    monkeypatch.setattr(cache_replays, "download_replay_data", fake_download)
+
+    location_dir = tmp_path / "5" / "location"
+    location_dir.mkdir(parents=True)
+    for index in range(11):  # 12 windows needed, only 11 present
+        atomic_write_json(location_dir / f"{index:04d}.json", [])
+
+    failures = cache_replays.cache_session(object(), session)
+    assert failures == ["location window 0011 missing"]
