@@ -27,6 +27,7 @@ from formula1_strategy_tool.api.schemas import (
     DriverState,
     LiveStatus,
     LiveTopicStats,
+    LocationState,
     PredictionState,
     RaceStateSnapshot,
     SessionState,
@@ -66,7 +67,7 @@ def _active_session() -> SessionState:
 
 def _live_circuit_key() -> int | None:
     """circuit_key of the ingested session, or None before data arrives."""
-    sessions = list(LIVE_STATE.docs.get("v1/sessions", {}).values())
+    sessions = LIVE_STATE.docs_for("v1/sessions")
     if not sessions:
         return None
     key = sessions[0].get("circuit_key")
@@ -142,6 +143,21 @@ def get_driver(driver_number: int) -> DriverState:
     if driver is None:
         raise HTTPException(status_code=404, detail="Driver not found")
     return driver
+
+
+@router.get("/locations", response_model=list[LocationState])
+def get_locations() -> list[LocationState]:
+    """
+    Compact newest live location per driver (for high-frequency polling/stream).
+
+    Keyed by driver_number; x/y are null for cars without useful telemetry.
+    Memory is bounded to one entry per driver.
+    """
+    locations = LIVE_STATE.latest_locations()
+    return [
+        LocationState(**locations[number])
+        for number in sorted(locations)
+    ]
 
 
 @router.get("/predictions", response_model=list[PredictionState])

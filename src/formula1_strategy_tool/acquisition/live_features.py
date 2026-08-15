@@ -28,7 +28,7 @@ from formula1_strategy_tool.processing import (
 
 def _topic_frame(state: LiveState, topic: str) -> pd.DataFrame:
     """Convert one MQTT/REST topic bucket into a DataFrame."""
-    rows = list(state.docs.get(topic, {}).values())
+    rows = state.docs_for(topic)
     if not rows:
         return pd.DataFrame()
     return pd.DataFrame(rows)

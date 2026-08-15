@@ -48,6 +48,20 @@ class DriverState(BaseModel):
     pit_stops: int
 
 
+class LocationState(BaseModel):
+    """
+    Compact live car location for high-frequency streaming.
+
+    Keyed by ``driver_number``; ``x``/``y`` are raw track coordinates and null
+    when the car has no useful telemetry (garage / no position sample).
+    """
+
+    driver_number: int
+    x: float | None
+    y: float | None
+    date: str | None = None
+
+
 class CompoundProbabilities(BaseModel):
     """Multiclass probabilities from the next-compound XGBoost model."""
 

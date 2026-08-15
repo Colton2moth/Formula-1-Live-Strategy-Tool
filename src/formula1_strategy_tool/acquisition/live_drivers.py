@@ -12,13 +12,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from formula1_strategy_tool.acquisition.live_state import LiveState
+from formula1_strategy_tool.acquisition.live_state import LiveState, location_xy
 from formula1_strategy_tool.api.schemas import DriverState
 
 
 def _docs(state: LiveState, topic: str) -> list[dict[str, Any]]:
     """All stored payloads for one MQTT topic."""
-    return list(state.docs.get(topic, {}).values())
+    return state.docs_for(topic)
 
 
 def _latest_by_driver(
@@ -74,15 +74,7 @@ def _car_location(
     """
     if location_row is None:
         return None, None
-    raw_x = location_row.get("x")
-    raw_y = location_row.get("y")
-    if raw_x is None or raw_y is None:
-        return None, None
-    x = float(raw_x)
-    y = float(raw_y)
-    if x == 0 and y == 0:
-        return None, None
-    return x, y
+    return location_xy(location_row)
 
 
 def drivers_from_live(state: LiveState) -> list[DriverState] | None:

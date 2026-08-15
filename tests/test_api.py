@@ -93,3 +93,21 @@ def test_track_404_unknown_circuit():
     )
     response = client.get("/api/track")
     assert response.status_code == 404
+
+
+def test_locations_endpoint_compact_shape():
+    LIVE_STATE.update(
+        "v1/location",
+        {"driver_number": 4, "x": 100, "y": 200, "date": "2026-07-26T14:00:00"},
+    )
+    LIVE_STATE.update(
+        "v1/location",
+        {"driver_number": 1, "x": 0, "y": 0, "date": "2026-07-26T14:00:00"},
+    )
+    response = client.get("/api/locations")
+    assert response.status_code == 200
+    data = response.json()
+    by_number = {row["driver_number"]: row for row in data}
+    assert by_number[4]["x"] == 100.0
+    assert by_number[4]["y"] == 200.0
+    assert by_number[1]["x"] is None

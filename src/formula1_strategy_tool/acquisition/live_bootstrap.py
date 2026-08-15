@@ -47,7 +47,7 @@ def _reference_time(buffer: LiveState, session: dict) -> datetime:
     session's ``date_end``/``date_start``, then now for a live session.
     """
     latest: str | None = None
-    for row in buffer.docs.get("v1/laps", {}).values():
+    for row in buffer.docs_for("v1/laps"):
         for field in ("date_end", "date_start"):
             value = row.get(field)
             if isinstance(value, str) and (latest is None or value > latest):
@@ -98,7 +98,7 @@ def bootstrap_live_state(
             if isinstance(row, dict):
                 buffer.update(topic, row)
 
-        print(f"bootstrap {topic}: stored={len(buffer.docs.get(topic, {}))}")
+        print(f"bootstrap {topic}: stored={len(buffer.docs_for(topic))}")
 
     # Location is fetched separately: the unfiltered endpoint rejects
     # whole-session requests, so anchor a small window to the last known
@@ -119,6 +119,6 @@ def bootstrap_live_state(
     for row in _latest_by_driver(location_rows).values():
         buffer.update("v1/location", row)
 
-    print(f"bootstrap v1/location: stored={len(buffer.docs.get('v1/location', {}))}")
+    print(f"bootstrap v1/location: stored={len(buffer.docs_for('v1/location'))}")
 
     return resolved
