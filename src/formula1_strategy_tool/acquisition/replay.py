@@ -26,7 +26,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from formula1_strategy_tool.acquisition.client import OpenF1Client, get_or_download
+from formula1_strategy_tool.acquisition.client import (
+    OpenF1Client,
+    atomic_write_json,
+    get_or_download,
+    load_json,
+)
 from formula1_strategy_tool.acquisition.downloader import parse_openf1_datetime
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
 
@@ -45,6 +50,10 @@ _ENDPOINTS = (
 # Location is high-frequency; replay thins it to ~1 sample/driver/second so a
 # full session stays memory-friendly while the map still moves smoothly.
 _LOCATION_THIN_SECONDS = 1.0
+# Bump when the prepared timeline's shape changes (new topics, ordering rules,
+# thinning intervals, or payload edits). Older prepared files are rebuilt from
+# the raw cache instead of being trusted.
+_TIMELINE_FORMAT_VERSION = 1
 # Download window for the paginated location endpoint (whole-session returns 422).
 _LOCATION_WINDOW_SECONDS = 300
 
@@ -329,6 +338,99 @@ def build_timeline(data: dict[str, Any]) -> list[tuple[float, str, dict[str, Any
     return events
 
 
+def _timeline_path(cache: Path) -> Path:
+    """Prepared chronological-event file for one session's replay cache."""
+    return cache / "timeline.json"
+
+
+def _timeline_meta(
+    events: list[tuple[float, str, dict[str, Any]]], data: dict[str, Any]
+) -> dict[str, Any]:
+    """Metadata stored alongside the prepared event list."""
+    total_duration = events[-1][0] if events else 0.0
+    total_laps = max(
+        (int(row.get("lap_number") or 0) for row in data["laps"]), default=0
+    )
+    return {
+        "format_version": _TIMELINE_FORMAT_VERSION,
+        "session_key": data["session"].get("session_key"),
+        "total_duration": total_duration,
+        "total_laps": total_laps,
+        "event_count": len(events),
+    }
+
+
+def save_timeline(
+    cache: Path,
+    events: list[tuple[float, str, dict[str, Any]]],
+    data: dict[str, Any],
+) -> None:
+    """Persist the prepared event list + metadata under the session cache."""
+    meta = _timeline_meta(events, data)
+    payload = {
+        **meta,
+        "events": [[offset, topic, payload] for offset, topic, payload in events],
+    }
+    atomic_write_json(_timeline_path(cache), payload)
+
+
+def load_timeline(
+    cache: Path, session_key: int
+) -> tuple[list[tuple[float, str, dict[str, Any]]], dict[str, Any]] | None:
+    """Return (events, meta) from the prepared file, or None if unusable.
+
+    Unusable means missing, wrong format version, wrong session, or malformed.
+    The caller then rebuilds from the raw cache via ``build_timeline``.
+    """
+    path = _timeline_path(cache)
+    if not path.exists():
+        return None
+    try:
+        blob = load_json(path)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(blob, dict):
+        return None
+    if blob.get("format_version") != _TIMELINE_FORMAT_VERSION:
+        return None
+    if blob.get("session_key") != session_key:
+        return None
+    raw_events = blob.get("events")
+    if not isinstance(raw_events, list):
+        return None
+    events: list[tuple[float, str, dict[str, Any]]] = []
+    for item in raw_events:
+        if not (isinstance(item, list) and len(item) == 3):
+            return None
+        offset, topic, payload = item
+        if (
+            not isinstance(offset, (int, float))
+            or not isinstance(topic, str)
+            or not isinstance(payload, dict)
+        ):
+            return None
+        events.append((float(offset), topic, payload))
+    meta = {key: value for key, value in blob.items() if key != "events"}
+    return events, meta
+
+
+def _load_identity(
+    cache: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Load the small identity rows seeded before playback starts.
+
+    Kept separate so a prepared-timeline hit skips the heavy endpoint files
+    (laps, location, position, ...) entirely; only these three small files are
+    read.
+    """
+    sessions = load_json(cache / "sessions.json")
+    session = sessions[0] if sessions else {}
+    meetings_path = cache / "meetings.json"
+    meetings = load_json(meetings_path) if meetings_path.exists() else []
+    drivers = load_json(cache / "drivers.json")
+    return session, meetings, drivers
+
+
 def replay_session(
     session_key: int,
     speed: float = 10.0,
@@ -354,26 +456,34 @@ def replay_session(
         raise ValueError("speed must be positive")
     buffer = state if state is not None else LIVE_STATE
 
-    client = OpenF1Client()
-    data = download_replay_data(client, session_key)
-    if stop_event is not None and stop_event.is_set():
-        return
-    events = build_timeline(data)
+    cache = replay_dir(session_key)
+    prepared = load_timeline(cache, session_key)
+    if prepared is None:
+        data = download_replay_data(OpenF1Client(), session_key, cache=cache)
+        if stop_event is not None and stop_event.is_set():
+            return
+        events = build_timeline(data)
+        save_timeline(cache, events, data)
+        meta = _timeline_meta(events, data)
+        session = data["session"]
+        meetings = data["meetings"]
+        drivers = data["drivers"]
+    else:
+        events, meta = prepared
+        session, meetings, drivers = _load_identity(cache)
 
-    total_duration = events[-1][0] if events else 0.0
-    total_laps = max(
-        (int(row.get("lap_number") or 0) for row in data["laps"]), default=0
-    )
+    total_duration = meta["total_duration"]
+    total_laps = meta["total_laps"]
     if progress is not None:
         progress["total_duration"] = total_duration
         progress["total_laps"] = total_laps
 
     # Clear stale live/test data, then seed non-time-varying identity first.
     buffer.clear()
-    buffer.update("v1/sessions", data["session"])
-    for meeting in data["meetings"]:
+    buffer.update("v1/sessions", session)
+    for meeting in meetings:
         buffer.update("v1/meetings", meeting)
-    for driver in data["drivers"]:
+    for driver in drivers:
         buffer.update("v1/drivers", driver)
 
     if on_seeded is not None:

@@ -23,10 +23,12 @@ from typing import Any
 from formula1_strategy_tool.acquisition.client import OpenF1Client
 from formula1_strategy_tool.acquisition.replay import (
     _ENDPOINTS,
+    build_timeline,
     download_replay_data,
     fetch_replay_sessions,
     location_window_count,
     replay_dir,
+    save_timeline,
 )
 
 FAILURES_PATH = Path("data/replay/cache_failures.txt")
@@ -110,6 +112,11 @@ def cache_session(client: OpenF1Client, session: dict[str, Any]) -> list[str]:
         failures.extend(f"location window {i:04d} missing" for i in missing)
     else:
         print("  location: none required", flush=True)
+
+    if not failures:
+        events = build_timeline(data)
+        save_timeline(cache, events, data)
+        print(f"  timeline: {len(events)} events prepared", flush=True)
 
     return failures
 

@@ -5,12 +5,14 @@ import time
 
 from formula1_strategy_tool.acquisition import cache_replays
 from formula1_strategy_tool.acquisition import replay as replay_mod
-from formula1_strategy_tool.acquisition.client import atomic_write_json
+from formula1_strategy_tool.acquisition.client import atomic_write_json, load_json
 from formula1_strategy_tool.acquisition.replay import (
     _thin_location,
     build_timeline,
     download_replay_data,
+    load_timeline,
     location_window_count,
+    save_timeline,
 )
 
 
@@ -358,6 +360,42 @@ def test_download_replay_data_reuses_cache(tmp_path):
     data = download_replay_data(ExplodingClient(), session_key, cache=cache)
     assert data["session"]["session_key"] == session_key
     assert set(data) >= set(replay_mod._ENDPOINTS) | {"location", "session", "meetings"}
+
+
+def test_save_and_load_timeline_roundtrip(tmp_path):
+    data = _data()
+    events = build_timeline(data)
+    save_timeline(tmp_path, events, data)
+
+    loaded = load_timeline(tmp_path, data["session"]["session_key"])
+    assert loaded is not None
+    loaded_events, meta = loaded
+    assert loaded_events == events
+    assert meta["format_version"] == replay_mod._TIMELINE_FORMAT_VERSION
+    assert meta["session_key"] == 1
+    assert meta["event_count"] == len(events)
+    assert meta["total_duration"] == events[-1][0]
+    assert meta["total_laps"] == 2
+
+
+def test_load_timeline_missing_returns_none(tmp_path):
+    assert load_timeline(tmp_path, 1) is None
+
+
+def test_load_timeline_version_mismatch_returns_none(tmp_path):
+    data = _data()
+    save_timeline(tmp_path, build_timeline(data), data)
+    path = replay_mod._timeline_path(tmp_path)
+    blob = load_json(path)
+    blob["format_version"] += 999
+    atomic_write_json(path, blob)
+    assert load_timeline(tmp_path, data["session"]["session_key"]) is None
+
+
+def test_load_timeline_session_mismatch_returns_none(tmp_path):
+    data = _data()
+    save_timeline(tmp_path, build_timeline(data), data)
+    assert load_timeline(tmp_path, 9999) is None
 
 
 def test_cache_session_reports_missing_location_window(monkeypatch, tmp_path):
