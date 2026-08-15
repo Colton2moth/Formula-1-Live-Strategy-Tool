@@ -77,6 +77,10 @@ export function pauseReplay() {
   return postJson("/api/replay/pause", {}, assertReplayStatus);
 }
 
+export function seekReplay(lap: number) {
+  return postJson("/api/replay/seek", { lap }, assertReplayStatus);
+}
+
 export function resumeReplay() {
   return postJson("/api/replay/resume", {}, assertReplayStatus);
 }

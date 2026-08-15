@@ -146,6 +146,12 @@ class ReplayStartRequest(BaseModel):
     speed: float = 10.0
 
 
+class ReplaySeekRequest(BaseModel):
+    """Body for POST /api/replay/seek. ``lap`` is a completed-lap target."""
+
+    lap: int = Field(ge=0)
+
+
 class ReplayStatus(BaseModel):
     """Runtime replay controller state returned by the /api/replay endpoints."""
 

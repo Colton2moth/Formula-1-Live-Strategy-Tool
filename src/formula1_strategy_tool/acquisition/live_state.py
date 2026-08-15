@@ -113,6 +113,22 @@ class LiveState:
             self.counts.clear()
             self._dirty.clear()
 
+    def snapshot_docs(self) -> dict[str, dict[str, dict[str, Any]]]:
+        """Copy the store (topic -> key -> payload) for checkpoint persistence."""
+        with self._lock:
+            return {
+                topic: dict(bucket) for topic, bucket in self.docs.items()
+            }
+
+    def replace_docs(self, docs: dict[str, dict[str, dict[str, Any]]]) -> None:
+        """Replace the whole store with a restored snapshot (thread-safe)."""
+        with self._lock:
+            self.docs = {
+                topic: dict(bucket) for topic, bucket in docs.items()
+            }
+            self.counts = {topic: len(bucket) for topic, bucket in self.docs.items()}
+            self._dirty = set(self.docs)
+
     def docs_for(self, topic: str) -> list[dict[str, Any]]:
         """Return a snapshot list of stored payloads for one topic."""
         with self._lock:

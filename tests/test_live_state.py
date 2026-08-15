@@ -56,3 +56,29 @@ def test_other_topics_still_use_key():
         {"_key": "b", "driver_number": 1, "lap_number": 2, "lap_duration": 89.0},
     )
     assert len(state.docs_for("v1/laps")) == 2
+
+
+def test_snapshot_and_replace_docs_roundtrip():
+    state = LiveState()
+    state.update("v1/laps", {"driver_number": 1, "lap_number": 1, "lap_duration": 90.0})
+    state.update("v1/location", _location(44, 12, 34))
+
+    snapshot = state.snapshot_docs()
+    assert snapshot["v1/laps"] == state.docs["v1/laps"]
+    assert snapshot["v1/location"] == state.docs["v1/location"]
+
+    restored = LiveState()
+    restored.replace_docs(snapshot)
+    assert restored.docs_for("v1/laps") == state.docs_for("v1/laps")
+    assert restored.latest_locations()[44]["x"] == 12.0
+    assert set(restored.counts) == {"v1/laps", "v1/location"}
+
+
+def test_replace_docs_marks_all_topics_dirty():
+    state = LiveState()
+    state.update("v1/laps", {"driver_number": 1, "lap_number": 1, "lap_duration": 90.0})
+    assert state.drain_dirty() == {"v1/laps"}
+    assert state.drain_dirty() == set()
+
+    state.replace_docs({"v1/laps": state.docs["v1/laps"]})
+    assert state.drain_dirty() == {"v1/laps"}

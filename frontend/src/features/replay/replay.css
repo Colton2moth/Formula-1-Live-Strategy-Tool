@@ -179,8 +179,57 @@
   @apply mx-1 text-app-muted;
 }
 
+.replay-seek {
+  @apply grid items-center gap-2;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.replay-seek-label {
+  @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.replay-seek-slider {
+  @apply w-full accent-app-red;
+  cursor: pointer;
+}
+
+.replay-seek-slider:disabled {
+  @apply cursor-not-allowed opacity-50;
+}
+
+.replay-seek-button {
+  @apply inline-flex items-center gap-1.5 border border-app-line bg-app-panelAlt px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-app-text;
+  border-radius: var(--radius-compact);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.replay-seek-button:hover:not(:disabled) {
+  @apply border-app-red text-white;
+  background-color: var(--color-f1-red);
+}
+
+.replay-seek-button:disabled {
+  @apply cursor-not-allowed opacity-50;
+}
+
+.replay-seek-button-value {
+  @apply tabular-nums;
+}
+
+.replay-seek-button-label {
+  @apply text-xs;
+}
+
 @media (max-width: 48rem) {
   .replay-picker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .replay-seek {
     grid-template-columns: minmax(0, 1fr);
   }
 }

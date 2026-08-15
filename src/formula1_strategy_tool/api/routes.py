@@ -31,6 +31,7 @@ from formula1_strategy_tool.api.schemas import (
     LocationState,
     PredictionState,
     RaceStateSnapshot,
+    ReplaySeekRequest,
     ReplaySessionOption,
     ReplayStartRequest,
     ReplayStatus,
@@ -282,6 +283,19 @@ def start_replay(request: ReplayStartRequest) -> ReplayStatus:
 def pause_replay() -> ReplayStatus:
     """Suspend the running replay clock; resume from the same position."""
     replay_controller.pause()
+    return _replay_status()
+
+
+@router.post("/replay/seek", response_model=ReplayStatus)
+def seek_replay(request: ReplaySeekRequest) -> ReplayStatus:
+    """
+    Jump the active replay to the nearest checkpoint at or before ``lap``.
+
+    The producer restores that checkpoint's buffer state and applies only the
+    events between the checkpoint cursor and the target, instead of replaying
+    from lap 1.
+    """
+    replay_controller.seek(request.lap)
     return _replay_status()
 
 

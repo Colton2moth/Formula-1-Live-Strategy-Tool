@@ -23,12 +23,13 @@ from typing import Any
 from formula1_strategy_tool.acquisition.client import OpenF1Client
 from formula1_strategy_tool.acquisition.replay import (
     _ENDPOINTS,
-    build_timeline,
     download_replay_data,
     fetch_replay_sessions,
+    load_checkpoint_index,
+    load_timeline,
     location_window_count,
+    prepare_timeline,
     replay_dir,
-    save_timeline,
 )
 
 FAILURES_PATH = Path("data/replay/cache_failures.txt")
@@ -113,10 +114,19 @@ def cache_session(client: OpenF1Client, session: dict[str, Any]) -> list[str]:
     else:
         print("  location: none required", flush=True)
 
-    if not failures:
-        events = build_timeline(data)
-        save_timeline(cache, events, data)
-        print(f"  timeline: {len(events)} events prepared", flush=True)
+    # Location is optional polish: a window that 404s (cars parked, red flag,
+    # race ended early) leaves a gap but must not block preparation. Build the
+    # timeline + checkpoints whenever the core endpoints downloaded and they
+    # are not already current, so missing location windows stay a report-only
+    # concern.
+    if (
+        load_timeline(cache, session_key) is None
+        or load_checkpoint_index(cache, session_key) is None
+    ):
+        events, _ = prepare_timeline(cache, data)
+        print(f"  timeline + checkpoints: {len(events)} events prepared", flush=True)
+    else:
+        print("  timeline + checkpoints: up to date", flush=True)
 
     return failures
 

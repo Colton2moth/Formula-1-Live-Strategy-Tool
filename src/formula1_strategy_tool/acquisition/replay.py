@@ -51,9 +51,9 @@ _ENDPOINTS = (
 # full session stays memory-friendly while the map still moves smoothly.
 _LOCATION_THIN_SECONDS = 1.0
 # Bump when the prepared timeline's shape changes (new topics, ordering rules,
-# thinning intervals, or payload edits). Older prepared files are rebuilt from
-# the raw cache instead of being trusted.
-_TIMELINE_FORMAT_VERSION = 1
+# thinning intervals, or payload edits) or the checkpoint layout changes.
+# Older prepared files are rebuilt from the raw cache instead of being trusted.
+_TIMELINE_FORMAT_VERSION = 2
 # Download window for the paginated location endpoint (whole-session returns 422).
 _LOCATION_WINDOW_SECONDS = 300
 
@@ -431,6 +431,215 @@ def _load_identity(
     return session, meetings, drivers
 
 
+def prepare_timeline(
+    cache: Path, data: dict[str, Any]
+) -> tuple[list[tuple[float, str, dict[str, Any]]], dict[str, Any]]:
+    """Build + persist the prepared timeline and lap checkpoints from raw data.
+
+    Single preparation path used by both the bulk cache run and the lazy
+    replay rebuild, so the timeline and checkpoints always come from the same
+    ``build_timeline`` event stream.
+    """
+    events = build_timeline(data)
+    save_timeline(cache, events, data)
+    checkpoints = build_checkpoints(
+        events, data["session"], data["meetings"], data["drivers"]
+    )
+    save_checkpoints(cache, checkpoints, data["session"].get("session_key"))
+    return events, _timeline_meta(events, data)
+
+
+def _checkpoint_dir(cache: Path) -> Path:
+    """Directory holding one checkpoint state file per completed lap."""
+    return cache / "checkpoints"
+
+
+def _checkpoint_index_path(cache: Path) -> Path:
+    return _checkpoint_dir(cache) / "index.json"
+
+
+def _checkpoint_state_path(cache: Path, lap: int) -> Path:
+    return _checkpoint_dir(cache) / f"checkpoint-{lap:04d}.json"
+
+
+def build_checkpoints(
+    events: list[tuple[float, str, dict[str, Any]]],
+    session: dict[str, Any],
+    meetings: list[dict[str, Any]],
+    drivers: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Snapshot the buffer at each completed lap by replaying the prepared events
+    through a LiveState, using the same update/keying as live playback.
+
+    A checkpoint only contains state available at its race-clock position: the
+    snapshot is taken immediately after the event that completes each new lap,
+    so later laps, stints, and messages are never present. Identity rows are
+    seeded first, matching ``replay_session``'s start.
+    """
+    state = LiveState()
+    state.update("v1/sessions", session)
+    for meeting in meetings:
+        state.update("v1/meetings", meeting)
+    for driver in drivers:
+        state.update("v1/drivers", driver)
+
+    checkpoints: list[dict[str, Any]] = []
+    current_lap = 0
+    for cursor, (offset, topic, payload) in enumerate(events):
+        state.update(topic, payload)
+        if topic == "v1/laps":
+            lap = int(payload.get("lap_number") or 0)
+            if lap > current_lap:
+                current_lap = lap
+                checkpoints.append(
+                    {
+                        "lap": current_lap,
+                        "time": offset,
+                        "cursor": cursor + 1,
+                        "state": state.snapshot_docs(),
+                    }
+                )
+    return checkpoints
+
+
+def save_checkpoints(
+    cache: Path, checkpoints: list[dict[str, Any]], session_key: int
+) -> None:
+    """Persist per-lap checkpoint states plus a lightweight cursor index.
+
+    State files are written before the index so a partially-written set is
+    detected (the index points at files that must already exist).
+    """
+    index: list[dict[str, Any]] = []
+    for checkpoint in checkpoints:
+        lap = checkpoint["lap"]
+        file_name = f"checkpoint-{lap:04d}.json"
+        atomic_write_json(_checkpoint_state_path(cache, lap), checkpoint)
+        index.append(
+            {
+                "lap": checkpoint["lap"],
+                "time": checkpoint["time"],
+                "cursor": checkpoint["cursor"],
+                "file": file_name,
+            }
+        )
+    atomic_write_json(
+        _checkpoint_index_path(cache),
+        {
+            "format_version": _TIMELINE_FORMAT_VERSION,
+            "session_key": session_key,
+            "checkpoints": index,
+        },
+    )
+
+
+def load_checkpoint_index(cache: Path, session_key: int) -> list[dict[str, Any]] | None:
+    """Return the lightweight checkpoint index, or None if unusable.
+
+    Unusable means missing, wrong format version, wrong session, or malformed.
+    """
+    path = _checkpoint_index_path(cache)
+    if not path.exists():
+        return None
+    try:
+        blob = load_json(path)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(blob, dict):
+        return None
+    if blob.get("format_version") != _TIMELINE_FORMAT_VERSION:
+        return None
+    if blob.get("session_key") != session_key:
+        return None
+    entries = blob.get("checkpoints")
+    if not isinstance(entries, list):
+        return None
+    for entry in entries:
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("lap"), int)
+            or not isinstance(entry.get("cursor"), int)
+            or not isinstance(entry.get("file"), str)
+        ):
+            return None
+    return entries
+
+
+def load_checkpoint_state(cache: Path, entry: dict[str, Any]) -> dict[str, Any] | None:
+    """Load one checkpoint's snapshot from disk, or None if missing/malformed."""
+    file_name = entry.get("file")
+    if not isinstance(file_name, str):
+        return None
+    path = _checkpoint_dir(cache) / file_name
+    if not path.exists():
+        return None
+    try:
+        checkpoint = load_json(path)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(checkpoint, dict) or not isinstance(
+        checkpoint.get("state"), dict
+    ):
+        return None
+    return checkpoint
+
+
+def nearest_checkpoint(
+    checkpoints: Sequence[dict[str, Any]], lap: int
+) -> dict[str, Any] | None:
+    """Last checkpoint at or before ``lap`` (index is lap-ascending)."""
+    chosen: dict[str, Any] | None = None
+    for checkpoint in checkpoints:
+        if int(checkpoint["lap"]) <= lap:
+            chosen = checkpoint
+        else:
+            break
+    return chosen
+
+
+def restore_checkpoint(state: LiveState, checkpoint: dict[str, Any]) -> int:
+    """Restore ``state`` from one checkpoint; return the cursor to resume from."""
+    state.replace_docs(checkpoint["state"])
+    return int(checkpoint["cursor"])
+
+
+def _restore_seek(
+    cache: Path,
+    session_key: int,
+    events: list[tuple[float, str, dict[str, Any]]],
+    session: dict[str, Any],
+    meetings: list[dict[str, Any]],
+    drivers: list[dict[str, Any]],
+    seek_lap: int,
+    buffer: LiveState,
+) -> tuple[int, int, float]:
+    """Restore the nearest checkpoint <= ``seek_lap``; return (cursor, lap, time).
+
+    Builds checkpoints from the loaded timeline when they are missing (e.g. an
+    older cache prepared before checkpoints existed), then falls back to the
+    identity seed when there is no checkpoint before ``seek_lap``.
+    """
+    index = load_checkpoint_index(cache, session_key)
+    if index is None:
+        checkpoints = build_checkpoints(events, session, meetings, drivers)
+        save_checkpoints(cache, checkpoints, session_key)
+        index = load_checkpoint_index(cache, session_key)
+
+    entry = nearest_checkpoint(index or [], seek_lap)
+    checkpoint = load_checkpoint_state(cache, entry) if entry is not None else None
+    if checkpoint is None:
+        buffer.update("v1/sessions", session)
+        for meeting in meetings:
+            buffer.update("v1/meetings", meeting)
+        for driver in drivers:
+            buffer.update("v1/drivers", driver)
+        return 0, 0, 0.0
+
+    cursor = restore_checkpoint(buffer, checkpoint)
+    return cursor, int(checkpoint["lap"]), float(checkpoint["time"])
+
+
 def replay_session(
     session_key: int,
     speed: float = 10.0,
@@ -440,6 +649,7 @@ def replay_session(
     pause_event: threading.Event | None = None,
     progress: dict[str, Any] | None = None,
     on_seeded: Callable[[], None] | None = None,
+    seek_lap: int | None = None,
 ) -> None:
     """
     Download/cache one session, clear the buffer, then feed it chronologically.
@@ -450,7 +660,9 @@ def replay_session(
     ``progress`` (when provided) is updated in place with the authoritative
     replay clock, total duration, and lap progress. ``on_seeded`` fires right
     after identity + the first data are written, so the API can mark the replay
-    as actively running.
+    as actively running. ``seek_lap`` (when set) restores the nearest prepared
+    checkpoint at or before that lap and resumes from its cursor instead of
+    replaying from the start.
     """
     if speed <= 0:
         raise ValueError("speed must be positive")
@@ -462,9 +674,7 @@ def replay_session(
         data = download_replay_data(OpenF1Client(), session_key, cache=cache)
         if stop_event is not None and stop_event.is_set():
             return
-        events = build_timeline(data)
-        save_timeline(cache, events, data)
-        meta = _timeline_meta(events, data)
+        events, meta = prepare_timeline(cache, data)
         session = data["session"]
         meetings = data["meetings"]
         drivers = data["drivers"]
@@ -478,13 +688,23 @@ def replay_session(
         progress["total_duration"] = total_duration
         progress["total_laps"] = total_laps
 
-    # Clear stale live/test data, then seed non-time-varying identity first.
+    # Clear stale live/test data, then seed identity or restore a checkpoint.
     buffer.clear()
-    buffer.update("v1/sessions", session)
-    for meeting in meetings:
-        buffer.update("v1/meetings", meeting)
-    for driver in drivers:
-        buffer.update("v1/drivers", driver)
+    if seek_lap is not None and seek_lap > 0:
+        cursor, current_lap, base_offset = _restore_seek(
+            cache, session_key, events, session, meetings, drivers, seek_lap, buffer
+        )
+    else:
+        buffer.update("v1/sessions", session)
+        for meeting in meetings:
+            buffer.update("v1/meetings", meeting)
+        for driver in drivers:
+            buffer.update("v1/drivers", driver)
+        cursor, current_lap, base_offset = 0, 0, 0.0
+
+    if progress is not None:
+        progress["current_time"] = min(base_offset, total_duration)
+        progress["current_lap"] = current_lap
 
     if on_seeded is not None:
         on_seeded()
@@ -494,9 +714,7 @@ def replay_session(
     start = time.monotonic()
     paused_since: float | None = None
     paused_total = 0.0
-    cursor = 0
     total = len(events)
-    current_lap = 0
     while cursor < total:
         if stop_event is not None and stop_event.is_set():
             print("replay: stopped early")
@@ -510,7 +728,7 @@ def replay_session(
             if paused_since is not None:
                 paused_total += time.monotonic() - paused_since
                 paused_since = None
-        elapsed = (time.monotonic() - start - paused_total) * speed
+        elapsed = base_offset + (time.monotonic() - start - paused_total) * speed
         if progress is not None:
             progress["current_time"] = min(elapsed, total_duration)
             progress["current_lap"] = current_lap
@@ -564,29 +782,56 @@ class ReplayController:
     def start(self, session_key: int, speed: float = 10.0) -> None:
         """Stop any running replay, then start a new one in a daemon thread."""
         with self._lock:
-            self._stop.set()
-            stop_event = threading.Event()
-            self._stop = stop_event
-            self._pause = threading.Event()
-            self.status = "downloading"
-            self.session_key = session_key
-            self.speed = speed
-            self.error = None
-            self.progress = {
-                "current_time": 0.0,
-                "total_duration": None,
-                "current_lap": 0,
-                "total_laps": None,
-            }
             if self.on_before_start is not None:
                 self.on_before_start()
-            self._thread = threading.Thread(
-                target=self._run,
-                args=(session_key, speed, stop_event, self._pause, self.progress),
-                name="openf1-replay",
-                daemon=True,
-            )
-            self._thread.start()
+            self._launch(session_key, speed, seek_lap=None)
+
+    def seek(self, lap: int) -> None:
+        """Restart the active replay at the nearest checkpoint <= ``lap``.
+
+        Only valid while a replay is running/paused/finished. The live MQTT
+        hooks are not re-fired: the listener is already stopped, and this must
+        not restore live mode.
+        """
+        with self._lock:
+            if self.status not in {"running", "paused", "finished"}:
+                return
+            if self.session_key is None or self.speed is None:
+                return
+            self._launch(self.session_key, self.speed, seek_lap=lap)
+
+    def _launch(
+        self, session_key: int, speed: float, *, seek_lap: int | None
+    ) -> None:
+        """Swap in a fresh stop/pause pair and start a new producer thread."""
+        self._stop.set()
+        stop_event = threading.Event()
+        self._stop = stop_event
+        self._pause = threading.Event()
+        self.status = "downloading"
+        self.session_key = session_key
+        self.speed = speed
+        self.error = None
+        self.progress = {
+            "current_time": 0.0,
+            "total_duration": None,
+            "current_lap": 0,
+            "total_laps": None,
+        }
+        self._thread = threading.Thread(
+            target=self._run,
+            args=(
+                session_key,
+                speed,
+                stop_event,
+                self._pause,
+                self.progress,
+                seek_lap,
+            ),
+            name="openf1-replay",
+            daemon=True,
+        )
+        self._thread.start()
 
     def pause(self) -> None:
         """Suspend the replay clock; playback resumes from the same position."""
@@ -623,6 +868,7 @@ class ReplayController:
         stop_event: threading.Event,
         pause_event: threading.Event,
         progress: dict[str, Any],
+        seek_lap: int | None = None,
     ) -> None:
         try:
             replay_session(
@@ -632,6 +878,7 @@ class ReplayController:
                 pause_event=pause_event,
                 progress=progress,
                 on_seeded=self._on_seeded,
+                seek_lap=seek_lap,
             )
         except Exception as exc:  # noqa: BLE001 — keep API up if replay dies
             self.error = str(exc)

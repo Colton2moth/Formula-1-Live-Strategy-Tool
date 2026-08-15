@@ -36,6 +36,12 @@ export function ReplayPage() {
     ? `REPLAY — ${replay.selectedSession.year} ${grandPrixName(replay.selectedSession)}`
     : "REPLAY";
 
+  const canSeek =
+    (replay.status === "running" ||
+      replay.status === "paused" ||
+      replay.status === "finished") &&
+    !replay.busy;
+
   return (
     <main className="dashboard-shell">
       <div className="dashboard-container">
@@ -44,7 +50,7 @@ export function ReplayPage() {
           {banner}
         </div>
         <ReplayControls {...replay} />
-        <ReplayProgress progress={replay.progress} />
+        <ReplayProgress progress={replay.progress} onSeek={replay.seek} canSeek={canSeek} />
         {error ? (
           <Panel label="Race data">
             <div className="p-4">
