@@ -161,21 +161,21 @@ The main goal is to help the developer understand the system.
 
 ## State screens
 
-The app has reusable loading and error screens rendered when the REST API is unavailable or returns unexpected data. Each screen is documented in `docs/state-screens.md` and has an isolated test route so its production appearance can be verified directly in the browser.
+The app has reusable loading and error screens rendered when the REST API is unavailable or returns unexpected data. Each screen is documented in `docs/frontend/STATE_SCREENS.md` and has an isolated test route so its production appearance can be verified directly in the browser.
 
 ### When to update state screen documentation
 
-- **Adding or changing a data-fetching call** in `api/` or `App.tsx` that introduces a new failure mode — add the corresponding error variant and a new test route, then update `docs/state-screens.md`.
-- **Changing the copy or icon** in `LoadingScreen` or `ErrorScreen` — update the variant descriptions in `docs/state-screens.md` so the table stays accurate.
+- **Adding or changing a data-fetching call** in `api/` or `App.tsx` that introduces a new failure mode — add the corresponding error variant and a new test route, then update `docs/frontend/STATE_SCREENS.md`.
+- **Changing the copy or icon** in `LoadingScreen` or `ErrorScreen` — update the variant descriptions in `docs/frontend/STATE_SCREENS.md` so the table stays accurate.
 - **Adding a new loading context** (e.g. WebSocket connection, individual component-level fetch) — add a new `LoadingVariant` with its own test route and document the trigger condition.
-- **Changing the `classifyError()` logic** in `App.tsx` — update the classification rules section in `docs/state-screens.md` to match the new mapping.
+- **Changing the `classifyError()` logic** in `useRaceData.ts` — update the classification rules section in `docs/frontend/STATE_SCREENS.md` to match the new mapping.
 
 ### How to add a new screen variant
 
 1. Add the variant to the union type in the relevant component (`LoadingScreen.tsx` or `ErrorScreen.tsx`).
 2. Add its content record (icon, title, message, help).
 3. Add a test route in `main.tsx` under `/test/`.
-4. Add an entry in `docs/state-screens.md` describing the trigger condition and the test link.
+4. Add an entry in `docs/frontend/STATE_SCREENS.md` describing the trigger condition and the test link.
 
 ### Test routes
 

@@ -44,7 +44,7 @@ from formula1_strategy_tool.inference import predict_feature_rows, predict_snaps
 # Load .env from the project root when the API process starts.
 load_dotenv()
 
-# All contract REST paths live under /api (see docs/API_CONTRACT.md).
+# All contract REST paths live under /api (see docs/api/CONTRACT.md).
 router = APIRouter(prefix="/api", tags=["strategy-api"])
 
 # CSV fallback cache; live predictions are recomputed from LIVE_STATE.

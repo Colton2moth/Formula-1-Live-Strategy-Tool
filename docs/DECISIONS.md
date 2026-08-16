@@ -2,7 +2,7 @@
 
 Record important choices here so they are not silently changed.
 
-Full modelling plan: [TWO_MODEL_ARCHITECTURE.md](TWO_MODEL_ARCHITECTURE.md).
+Full modelling plan: [models/README.md](models/README.md).
 
 ## D001 — Backend owns OpenF1 access
 
@@ -63,7 +63,7 @@ Reason:
 - uncertain value for the first baseline;
 - lap, stint, pit, interval, weather, and race-control data are more directly relevant.
 
-Telemetry *summary* features remain a later option (see TWO_MODEL_ARCHITECTURE.md). Do not invent them without downloading `car_data`.
+Telemetry *summary* features remain a later option (see models/DATA_AND_FEATURES.md). Do not invent them without downloading `car_data`.
 
 ## D006 — Raw JSON first
 
@@ -148,7 +148,7 @@ Reason:
 
 ## D013 — Wide driver-lap table, select features later
 
-Build one wide processed table with all agreed columns in [DRIVER_LAP_SCHEMA.md](DRIVER_LAP_SCHEMA.md), then pick feature subsets per model (and ablate later).
+Build one wide processed table with all agreed columns in [data/DRIVER_LAP_SCHEMA.md](data/DRIVER_LAP_SCHEMA.md), then pick feature subsets per model (and ablate later).
 
 Reason:
 

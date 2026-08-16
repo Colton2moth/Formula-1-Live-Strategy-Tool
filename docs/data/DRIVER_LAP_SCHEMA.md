@@ -1,15 +1,18 @@
 # Driver-lap schema (wide v1)
 
-Approved target for the processed training table.
+Structure of the processed ML training table. The one-row-per-lap feature
+engineering rules live in [../models/DATA_AND_FEATURES.md](../models/DATA_AND_FEATURES.md);
+the implemented pipeline is `src/formula1_strategy_tool/processing.py`.
 
 **Grain:** one row = one driver at the end of one completed lap.
 
-**Philosophy:** build a wide leakage-safe table from OpenF1 endpoints we already have; choose model feature subsets later.
+**Philosophy:** build a wide leakage-safe table from OpenF1 endpoints we
+already have; choose model feature subsets later.
 
-**Reference race for first implementation:** 2024 Bahrain  
+**Reference race for first implementation:** 2024 Bahrain
 `data/raw/2024/sessions/1229_9472_bahrain_race/`
 
-See also: [TWO_MODEL_ARCHITECTURE.md](TWO_MODEL_ARCHITECTURE.md), [DECISIONS.md](DECISIONS.md).
+See also: [../models/README.md](../models/README.md), [../DECISIONS.md](../DECISIONS.md).
 
 ---
 
@@ -137,13 +140,14 @@ See also: [TWO_MODEL_ARCHITECTURE.md](TWO_MODEL_ARCHITECTURE.md), [DECISIONS.md]
 
 ## Out of scope for this table
 
-- Telemetry summaries (`car_data` not downloaded)
-- Hand-wavy track scores (pit-lane loss, overtaking difficulty)
-- `starting_grid` (unavailable from API)
+- Telemetry summaries (`car_data` not downloaded).
+- Hand-wavy track scores (pit-lane loss, overtaking difficulty).
+- `starting_grid` / `session_result` / `overtakes` (downloaded, but not yet
+  per-lap table features).
 
 ---
 
-## Model usage (later)
+## Model usage
 
-- **Pit models (3):** shared feature matrix `X`; targets `pit_within_{3,5,7}_laps`
-- **Compound model:** train on rows where `pit_within_3_laps == 1`; target `next_compound`
+- **Pit models (3):** shared feature matrix `X`; targets `pit_within_{3,5,7}_laps`.
+- **Compound model:** train on rows where `pit_within_3_laps == 1`; target `next_compound`.

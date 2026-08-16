@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
-# Identifier columns kept on the spine (see docs/DRIVER_LAP_SCHEMA.md §A).
+# Identifier columns kept on the spine (see docs/data/DRIVER_LAP_SCHEMA.md §A).
 _SPINE_COLS = ["meeting_key", "session_key", "driver_number", "lap_number", "date_start"]
 
 # JSON files process_race needs. Sessions missing any are skipped in bulk mode.

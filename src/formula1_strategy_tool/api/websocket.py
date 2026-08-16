@@ -5,7 +5,7 @@ The browser connects to ``/ws/live`` and receives incremental JSON events as
 the LIVE_STATE buffer changes. REST (``/api/*``) stays the source of full
 snapshots; the WebSocket only pushes deltas.
 
-Event types match docs/API_CONTRACT.md: ``location_update``,
+Event types match docs/api/CONTRACT.md: ``location_update``,
 ``driver_update``, ``weather_update``, ``race_control_update``, and
 ``prediction_update``.
 
@@ -258,7 +258,7 @@ router = APIRouter()
 
 @router.websocket("/ws/live")
 async def websocket_live(websocket: WebSocket) -> None:
-    """Stream incremental live events (see docs/API_CONTRACT.md)."""
+    """Stream incremental live events (see docs/api/CONTRACT.md)."""
     await manager.connect(websocket)
     try:
         while True:

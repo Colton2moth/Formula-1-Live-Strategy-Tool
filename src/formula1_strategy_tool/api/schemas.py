@@ -1,7 +1,7 @@
 """
 Pydantic response models for the REST API.
 
-These shapes match docs/API_CONTRACT.md exactly. FastAPI uses them to:
+These shapes match docs/api/CONTRACT.md exactly. FastAPI uses them to:
     - Validate outgoing JSON field names and types
     - Generate OpenAPI docs at /docs for the frontend developer
 """

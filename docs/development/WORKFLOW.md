@@ -1,5 +1,8 @@
 # Development Workflow
 
+How changes should be developed, separate from how the project is installed or
+started (see [SETUP.md](./SETUP.md)).
+
 ## For every task
 
 1. Discuss the purpose.
@@ -11,7 +14,7 @@
 7. Commit the change.
 8. Continue only when the current piece is understood.
 
-## Cursor prompt format
+## Prompt format
 
 Use prompts like:
 

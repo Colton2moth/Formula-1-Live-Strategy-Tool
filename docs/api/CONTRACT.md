@@ -1,6 +1,7 @@
 # API Contract
 
-This file defines the initial contract between the backend and frontend.
+Contract between the backend and frontend. Replay control endpoints are
+documented separately in [../replay/API.md](../replay/API.md).
 
 Base URL:
 
@@ -66,30 +67,13 @@ Returns the current state of every driver.
 ]
 ```
 
+`x` / `y` are raw OpenF1/FastF1 track coordinates and `null` when the car has
+no live telemetry.
+
 ### GET `/api/drivers/{driver_number}`
 
-Returns the current state of one driver.
-
-```json
-{
-  "driver_number": 4,
-  "name": "Lando Norris",
-  "acronym": "NOR",
-  "team_name": "McLaren",
-  "team_colour": "FF8000",
-  "position": 2,
-  "x": 1245,
-  "y": -438,
-  "current_lap": 25,
-  "compound": "MEDIUM",
-  "tyre_age": 14,
-  "last_lap_time": 75.421,
-  "gap_to_leader": 3.8,
-  "interval_ahead": 1.2,
-  "interval_behind": 2.1,
-  "pit_stops": 1
-}
-```
+Returns the current state of one driver (same shape as `/api/drivers`).
+Returns `404` if the car is not in the current grid.
 
 ### GET `/api/predictions`
 
@@ -113,35 +97,22 @@ Three pit-window probabilities (3 / 5 / 7 laps) plus next-compound multiclass:
       "INTERMEDIATE": 0.00,
       "WET": 0.00
     },
+    "predicted_pit_window_start": 26,
+    "predicted_pit_window_end": 30,
     "updated_at": "2026-06-14T18:34:10Z"
   }
 ]
 ```
 
-`predicted_next_compound` / `compound_probabilities` may be `null` when pit risk is low. Raw compound probabilities may still be exposed for debugging.
+`predicted_next_compound` is a string and defaults to `"UNKNOWN"` (never
+`null`). `compound_probabilities` may be `null` when no prediction is
+available. `predicted_pit_window_start` / `predicted_pit_window_end` are a
+placeholder window for the strategy panel (not from a dedicated model yet).
 
 ### GET `/api/drivers/{driver_number}/prediction`
 
-Returns the latest prediction for one driver.
-
-```json
-{
-  "driver_number": 4,
-  "lap_number": 25,
-  "pit_within_3_laps": 0.55,
-  "pit_within_5_laps": 0.72,
-  "pit_within_7_laps": 0.84,
-  "predicted_next_compound": "HARD",
-  "compound_probabilities": {
-    "SOFT": 0.04,
-    "MEDIUM": 0.21,
-    "HARD": 0.75,
-    "INTERMEDIATE": 0.00,
-    "WET": 0.00
-  },
-  "updated_at": "2026-06-14T18:34:10Z"
-}
-```
+Returns the latest prediction for one driver (same shape as one element of
+`/api/predictions`). Returns `404` if that car is not in the snapshot.
 
 ### GET `/api/race-state`
 
@@ -155,7 +126,8 @@ Returns a full snapshot for initial frontend loading.
 }
 ```
 
-The fields use the same schemas as `/api/session`, `/api/drivers`, and `/api/predictions`.
+The fields use the same schemas as `/api/session`, `/api/drivers`, and
+`/api/predictions`.
 
 ### GET `/api/track`
 
@@ -188,23 +160,44 @@ geometry, so the frontend must treat it as optional and only draw it when presen
 Returns `503` before any live session is ingested and `404` when the session's
 `circuit_key` is not yet in the circuit library.
 
-### POST `/api/replay/seek`
+### GET `/api/locations`
 
-Jumps an active or finished replay to exactly one target. Use replay-clock
-seconds for timeline seeking:
-
-```json
-{"time": 540.5}
-```
-
-Use a completed lap number for checkpoint seeking:
+Returns the newest live location per driver, for high-frequency map updates.
 
 ```json
-{"lap": 12}
+[
+  {
+    "driver_number": 4,
+    "x": 1245,
+    "y": -438,
+    "date": "2026-06-14T18:34:10Z"
+  }
+]
 ```
 
-Providing neither target, both targets, or a lap below 1 returns `422`. The
-response is the current replay status object.
+`x` / `y` are `null` for cars without useful telemetry.
+
+### GET `/api/live-status`
+
+Returns an in-memory MQTT buffer summary, useful for confirming the live
+listener is receiving OpenF1 pushes.
+
+```json
+{
+  "mqtt_enabled": true,
+  "topics": {
+    "v1/laps": {"messages": 120, "unique_keys": 20},
+    "v1/location": {"messages": 4000, "unique_keys": 20}
+  }
+}
+```
+
+Empty topics mean no push traffic yet (normal between sessions).
+
+### Replay endpoints
+
+Replay control endpoints (`/api/replay/...`) are documented in
+[../replay/API.md](../replay/API.md).
 
 ---
 
@@ -216,7 +209,8 @@ Connect to:
 /ws/live
 ```
 
-Every event contains a `type` field.
+Every event contains a `type` field. Events are pushed only when the relevant
+value changes.
 
 ### Location update
 
@@ -307,6 +301,7 @@ Common status codes:
 404 Not Found
 422 Validation Error
 500 Internal Server Error
+503 Service Unavailable
 ```
 
 ---
@@ -320,3 +315,5 @@ Common status codes:
 - New fields may be added without removing existing fields.
 - Unknown live values should use `null`.
 - `driver_number` is an identifier, not a model feature.
+
+[Back to Documentation](../README.md)

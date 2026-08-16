@@ -6,7 +6,7 @@ The frontend talks only to this backend — not directly to OpenF1.
 
 Current scope:
     - GET /              — liveness check
-    - GET /api/*         — REST contract (docs/API_CONTRACT.md)
+    - GET /api/*         — REST contract (docs/api/CONTRACT.md)
     - GET /api/live-status — MQTT in-memory buffer summary
     - Background OpenF1 MQTT listener (LIVE_MQTT=1, default on)
     - Predictions from trained models on a historical CSV snapshot

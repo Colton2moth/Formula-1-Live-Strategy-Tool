@@ -1,10 +1,12 @@
 # Backend Architecture
 
-See also: [TWO_MODEL_ARCHITECTURE.md](TWO_MODEL_ARCHITECTURE.md) for full modelling detail.
+High-level view of the whole system. Modelling detail lives in
+[models/README.md](models/README.md); Replay Mode detail lives in
+[replay/README.md](replay/README.md).
 
 ## 1. Historical data acquisition
 
-Downloads completed sessions from the free OpenF1 REST API.
+Downloads completed Race sessions from the free OpenF1 REST API.
 
 ```text
 OpenF1
@@ -12,9 +14,11 @@ OpenF1
 → raw JSON file
 ```
 
-Raw files are stored unchanged so they can be processed again without another API request.
+Raw files are stored unchanged under `data/raw/` so they can be processed again
+without another API request. See [data/ACQUISITION.md](data/ACQUISITION.md).
 
-Skip cancelled / data-less races when building training sets (e.g. 2023 Emilia-Romagna, 2026 Bahrain, 2026 Saudi Arabia).
+Skip cancelled / data-less races when building training sets (e.g. 2023
+Emilia-Romagna, 2026 Bahrain, 2026 Saudi Arabia).
 
 ## 2. Historical processing
 
@@ -37,71 +41,59 @@ Example feature groups:
 - race control
 - season / regulation era (`is_2026_regulations`)
 
-Identifiers (`session_key`, `driver_number`, etc.) are kept for joins and splits but are not model features.
+Identifiers (`session_key`, `driver_number`, etc.) are kept for joins and
+splits but are not model features. See
+[models/DATA_AND_FEATURES.md](models/DATA_AND_FEATURES.md) and
+[data/DRIVER_LAP_SCHEMA.md](data/DRIVER_LAP_SCHEMA.md).
 
-## 3. Labels (two models)
+## 3. Models
 
-Both models share the same processed driver-lap table, then use different labels / row filters.
+Four XGBoost models share the same processed driver-lap table and differ only
+by label / row filter:
 
-### Model 1 — Pit-window (binary)
+- **Pit-window (binary, ×3)** — `pit_within_3_laps`, `pit_within_5_laps`,
+  `pit_within_7_laps` (see [models/PIT_WINDOW.md](models/PIT_WINDOW.md)).
+- **Next compound (multiclass)** — `SOFT | MEDIUM | HARD | INTERMEDIATE | WET`,
+  trained on rows where a stop is imminent (see
+  [models/NEXT_COMPOUND.md](models/NEXT_COMPOUND.md)).
 
-```text
-pit_within_3_laps = 1 if the driver pits within the next 3 laps, else 0
-```
-
-Initial window: `N = 3` (see D003 / D008).
-
-### Model 2 — Next compound (multiclass)
-
-```text
-SOFT | MEDIUM | HARD | INTERMEDIATE | WET
-```
-
-Trained primarily on rows where `pit_within_3_laps == 1` (a stop is imminent).
-
-Features must only use information available at the current lap. Labels may use future pit / compound outcomes.
-
-## 4. Model training
+Features must only use information available at the current lap; labels may use
+future pit / compound outcomes.
 
 ```text
 processed driver-lap rows
-→ race-based train / validation / test split
-→ XGBoost pit-window classifier
+→ season-based train / validation split
+→ XGBoost pit-window classifiers (×3)
 → XGBoost next-compound classifier
-→ evaluation
 → saved models + feature lists
 ```
 
-```text
-Raw OpenF1 data
-→ driver-lap feature table
-→ model-specific labels
-→ Pit-window model    Next-compound model
-```
-
-Live inference pipeline:
+Live inference:
 
 ```text
 driver-lap features
-→ pit-window model → pit probability
-→ if above threshold → compound model → next compound (+ probabilities)
+→ pit-window models → pit probabilities (3 / 5 / 7 laps)
+→ next-compound model → next compound (+ probabilities)
 ```
 
-## 5. Live race state
+## 4. Live race state
 
-During a live session, the backend receives OpenF1 updates and maintains the latest state for each driver.
+During a live session the backend receives OpenF1 MQTT updates (with a REST
+bootstrap fallback) and maintains the latest state for each driver in
+`LIVE_STATE`.
 
 ```text
 live messages
-→ RaceState
-→ DriverState
+→ LIVE_STATE
+→ DriverState / SessionState
 ```
 
-Location data is used for the frontend map, not the initial models.
+Location data is used for the frontend map, not the strategy models.
 
-## 6. Shared feature generation
+## 5. Shared feature generation
 
-Historical training and live inference must call the same feature-building code.
+Historical training and live inference call the same feature-building code
+(`_prepare_features`), so the live feature rows match the training columns.
 
 ```text
 historical state ┐
@@ -109,15 +101,19 @@ historical state ┐
 live state       ┘
 ```
 
-This prevents training-serving mismatch. Both models start from the same broad leakage-safe feature set; feature subsets can be refined later via ablation.
+This prevents training-serving mismatch. Both model families start from the
+same broad leakage-safe feature set; subsets are refined later via ablation.
 
-## 7. Application API
+## 6. Application API
 
-FastAPI will provide:
+The backend provides:
 
-- REST endpoints for initial state
-- WebSocket updates for live changes
-- prediction results (pit probability + next compound)
-- race data for the frontend
+- REST endpoints for initial state (`/api/*`, see
+  [api/CONTRACT.md](api/CONTRACT.md));
+- WebSocket updates for live changes (`/ws/live`);
+- prediction results (pit probability + next compound);
+- race data and track geometry for the frontend.
 
 The frontend communicates only with this backend.
+
+[Back to Documentation](README.md)
