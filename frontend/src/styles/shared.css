@@ -1,11 +1,11 @@
 .dashboard-shell {
-  @apply min-h-screen bg-app-bg px-6 py-4 font-sans text-app-text;
+  @apply flex min-h-screen flex-col bg-app-bg px-6 py-4 font-sans text-app-text;
 }
 
 .dashboard-container {
   @apply mx-auto grid max-w-[90rem] gap-4;
   min-width: 0;
-  padding-top: 3.75rem;
+  padding-top: 5.5rem;
   width: 100%;
 }
 
@@ -18,6 +18,62 @@
 
 .dashboard-brand-title {
   @apply text-3xl font-black uppercase tracking-[0.12em] text-white;
+}
+
+.dashboard-brand-subtitle {
+  @apply text-xs font-semibold uppercase tracking-[0.24em] text-app-muted;
+}
+
+.footer {
+  @apply flex flex-col items-center gap-3 border-t border-app-line px-1 py-4 text-center;
+  margin-top: auto;
+}
+
+.footer-brand {
+  @apply text-lg font-black uppercase tracking-[0.12em] text-white;
+}
+
+.footer-links {
+  @apply flex flex-wrap items-center justify-center gap-x-5 gap-y-2;
+}
+
+.footer-link {
+  @apply inline-flex items-center gap-2 text-sm font-semibold text-app-muted;
+  transition:
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.footer-link:hover,
+.footer-link:focus-visible {
+  @apply text-white;
+}
+
+.footer-link:hover {
+  @apply -translate-y-px;
+}
+
+.footer-link-icon {
+  @apply h-5 w-5 shrink-0;
+  fill: currentColor;
+}
+
+.dashboard-brand-nav {
+  @apply absolute right-4 top-1/2 -translate-y-1/2;
+}
+
+.dashboard-brand-nav-link {
+  @apply inline-flex items-center gap-1.5 border border-app-line bg-app-panelAlt px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-app-text;
+  border-radius: var(--radius-compact);
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.dashboard-brand-nav-link:hover,
+.dashboard-brand-nav-link:focus-visible {
+  @apply border-app-red text-white;
 }
 
 .dashboard-layout {
@@ -91,8 +147,27 @@
   @apply border-app-red text-white;
 }
 
+.status-chip--amber {
+  @apply border-amber-300 text-amber-200;
+}
+
 .probability-bar {
   @apply grid gap-1;
+}
+
+.probability-bar--with-icon {
+  @apply items-center;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.5rem;
+}
+
+.probability-bar-icon {
+  @apply flex items-center;
+}
+
+.probability-bar-body {
+  @apply grid gap-1;
+  min-width: 0;
 }
 
 .probability-bar-header {
@@ -134,7 +209,7 @@
   }
 
   .dashboard-container {
-    padding-top: 3.25rem;
+    padding-top: 4.5rem;
   }
 
   .dashboard-brand {

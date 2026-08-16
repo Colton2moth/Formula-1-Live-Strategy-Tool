@@ -4,7 +4,7 @@ Build API DriverState list from the in-memory MQTT LiveState buffer.
 Input:  LiveState (topics: drivers, position, laps, stints, intervals, pit)
 Output: list[DriverState] or None if there is not enough live data yet
 
-When None, routes keep serving mocks. During a live session, MQTT fills the
+When None, routes serve an empty list. During a live session, MQTT fills the
 buffer and /api/drivers switches over automatically.
 """
 
@@ -12,13 +12,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from formula1_strategy_tool.acquisition.live_state import LiveState
+from formula1_strategy_tool.acquisition.live_state import LiveState, location_xy
 from formula1_strategy_tool.api.schemas import DriverState
 
 
 def _docs(state: LiveState, topic: str) -> list[dict[str, Any]]:
     """All stored payloads for one MQTT topic."""
-    return list(state.docs.get(topic, {}).values())
+    return state.docs_for(topic)
 
 
 def _latest_by_driver(
@@ -62,6 +62,21 @@ def _current_stint(
     return max(pool, key=lambda s: int(s.get("stint_number") or 0))
 
 
+def _car_location(
+    location_row: dict[str, Any] | None,
+) -> tuple[float | None, float | None]:
+    """
+    Extract the latest car x/y from a v1/location row.
+
+    Returns (None, None) when the row is missing or carries OpenF1's
+    "no position" sentinel (0, 0), which marks a car in the garage / with no
+    telemetry rather than a real on-track location.
+    """
+    if location_row is None:
+        return None, None
+    return location_xy(location_row)
+
+
 def drivers_from_live(state: LiveState) -> list[DriverState] | None:
     """
     Map LIVE_STATE into contract DriverState rows.
@@ -76,6 +91,7 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
 
     positions = _latest_by_driver(_docs(state, "v1/position"))
     intervals = _latest_by_driver(_docs(state, "v1/intervals"))
+    locations = _latest_by_driver(_docs(state, "v1/location"))
     laps = _docs(state, "v1/laps")
     stints = _docs(state, "v1/stints")
     pits = _docs(state, "v1/pit")
@@ -128,10 +144,7 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
 
         colour = str(d.get("team_colour") or "FFFFFF").lstrip("#")
         position = int(pos_row.get("position") or 0) if pos_row else 0
-        # Spread markers along the map by grid order (placeholder, not GPS).
-        track_progress = 0.0
-        if position > 0:
-            track_progress = min(0.95, max(0.0, (position - 1) / 20.0))
+        x, y = _car_location(locations.get(num))
 
         results.append(
             DriverState(
@@ -141,7 +154,8 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
                 team_name=str(d.get("team_name") or "Unknown"),
                 team_colour=colour,
                 position=position,
-                track_progress=track_progress,
+                x=x,
+                y=y,
                 current_lap=current_lap,
                 compound=compound,
                 tyre_age=tyre_age,

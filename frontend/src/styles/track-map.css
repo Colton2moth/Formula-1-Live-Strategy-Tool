@@ -19,6 +19,16 @@
   stroke-linejoin: round;
 }
 
+.track-map-pit-lane {
+  fill: none;
+  stroke: var(--color-track-surface);
+  stroke-width: .05rem;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 0.35rem 0.3rem;
+  opacity: 0.7;
+}
+
 .track-map-start-finish-line {
   stroke: var(--color-f1-red);
   stroke-width: 0.046875rem;
@@ -40,6 +50,7 @@
 .track-map-marker {
   --driver-colour: var(--color-f1-red);
   @apply cursor-pointer outline-none;
+  transition: transform var(--motion-duration-marker) linear;
 }
 
 .track-map-marker-dot {

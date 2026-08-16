@@ -15,7 +15,7 @@ from formula1_strategy_tool.api.schemas import SessionState
 
 
 def _docs(state: LiveState, topic: str) -> list[dict[str, Any]]:
-    return list(state.docs.get(topic, {}).values())
+    return state.docs_for(topic)
 
 
 def _parse_dt(value: Any) -> datetime | None:
@@ -77,7 +77,7 @@ def session_from_live(state: LiveState) -> SessionState | None:
     """
     Map LIVE_STATE into SessionState.
 
-    Returns None when v1/sessions has not been seeded yet (routes use mocks).
+    Returns None when v1/sessions has not been seeded yet.
     """
     sessions = _docs(state, "v1/sessions")
     if not sessions:
@@ -85,7 +85,9 @@ def session_from_live(state: LiveState) -> SessionState | None:
     session = sessions[0]
 
     meetings = _docs(state, "v1/meetings")
-    meeting_name = session.get("circuit_short_name") or session.get("location") or "Unknown"
+    meeting_name = (
+        session.get("circuit_short_name") or session.get("location") or "Unknown"
+    )
     if meetings:
         meeting_name = str(
             meetings[0].get("meeting_name") or meeting_name
@@ -103,10 +105,14 @@ def session_from_live(state: LiveState) -> SessionState | None:
 
     return SessionState(
         meeting_name=str(meeting_name),
-        session_name=str(session.get("session_name") or session.get("session_type") or "Session"),
+        session_name=str(
+            session.get("session_name")
+            or session.get("session_type")
+            or "Session"
+        ),
         session_status=_session_status(session),
         current_lap=current,
-        total_laps=current,  # unknown true distance; avoid fake 70 from mocks
+        total_laps=current,  # unknown true distance; avoid guessing a lap count
         track_temperature=track_temp,
         air_temperature=air_temp,
         rainfall=rainfall,

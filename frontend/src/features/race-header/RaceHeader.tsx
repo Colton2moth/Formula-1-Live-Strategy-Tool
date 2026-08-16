@@ -1,8 +1,23 @@
 import type { ApiSession } from "../../types/race";
+import type { LiveSocketStatus } from "../../api/liveSocket";
 import { Panel } from "../../components/Panel";
+import { StatusChip } from "../../components/StatusChip";
 
 type RaceHeaderProps = {
   session: ApiSession;
+  connectionStatus: LiveSocketStatus;
+};
+
+const LIVE_STATUS_TONES: Record<LiveSocketStatus, "green" | "amber" | "red" | "neutral"> = {
+  connecting: "neutral",
+  open: "green",
+  reconnecting: "amber",
+};
+
+const LIVE_STATUS_LABELS: Record<LiveSocketStatus, string> = {
+  connecting: "Connecting",
+  open: "Live",
+  reconnecting: "Reconnecting",
 };
 
 type FlagTone = "green" | "yellow" | "red" | "blue" | "neutral";
@@ -25,12 +40,17 @@ const raceControlStates: Record<string, { label: string; tone: FlagTone }> = {
   "SESSION ABORTED": { label: "Aborted", tone: "red" },
 };
 
-export function RaceHeader({ session }: RaceHeaderProps) {
+export function RaceHeader({ session, connectionStatus }: RaceHeaderProps) {
   const raceControl = getRaceControlState(session.race_control_status);
   const weatherIcon = session.rainfall ? "rainy" : "clear_day";
 
   return (
-    <Panel label="Race conditions">
+    <Panel
+      label="Race conditions"
+      headerContent={
+        <StatusChip label={LIVE_STATUS_LABELS[connectionStatus]} tone={LIVE_STATUS_TONES[connectionStatus]} />
+      }
+    >
       <div className="p-3">
       <div className="race-header-statuses">
         <div className="race-header-stat">

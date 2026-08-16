@@ -1,0 +1,79 @@
+# Replay troubleshooting
+
+Operational diagnosis and verification. Commands below assume Windows
+PowerShell from the repository root. See [COMMANDS.md](./COMMANDS.md) for the
+full cheat sheet and [CACHE.md](./CACHE.md) for how preparation works.
+
+## Race is not ready
+
+A race shows `not_ready` when the required replay artifacts (timeline +
+checkpoints) do not yet exist and no failure has been recorded.
+
+What to do:
+
+1. Check the race's readiness with the sessions list (see
+   [COMMANDS.md](./COMMANDS.md#inspect-race-readiness)).
+2. Prepare it with the bulk cache command (see
+   [CACHE.md](./CACHE.md#preparing-races)).
+
+`not_ready` does **not** mean a background preparation process is running — it
+simply means the race has not been prepared yet.
+
+## Race preparation failed
+
+A race shows `failed` when a preparation failure has been recorded in the
+failure log. Inspect the log:
+
+```powershell
+Get-Content data\replay\cache_failures.txt -Tail 50
+```
+
+Search for one session:
+
+```powershell
+Select-String -Path data\replay\cache_failures.txt -Pattern "<session_key>"
+```
+
+The log is diagnostic history only. Re-running the cache command will retry the
+race, and a successful timeline/checkpoint preparation takes precedence when
+readiness is calculated — so a race can move from `failed` back to `ready`
+after a successful re-run. Do not delete the log to force a state change.
+
+## Missing location windows
+
+`location` is downloaded in 5-minute windows, and a window can be missing when
+OpenF1 returns nothing for it (cars parked, red flag, race ended early).
+Missing location windows are report-only: they do **not** prevent
+timeline/checkpoint preparation, and a replay can still become `ready` without
+them. The map simply has no samples for that stretch.
+
+## Verify a replay
+
+- Backend logs `replay: session_key=... events=N speed=...x`, then
+  `replay: reached race end; leaving final state visible`.
+- The first run downloads and caches data (about a minute, rate-limited at
+  2.1s/request); later runs start instantly.
+- The dashboard advances on its own: lap counter ticks up, cars move on the
+  map, leaderboard/compound/tyre-age update, flags and weather change.
+- `GET /api/live-status` shows the topic counters filling;
+  `GET /api/race-state` returns the live snapshot.
+
+## Common status meanings
+
+`GET /api/replay/status` reports the replay controller's runtime state:
+
+| Status        | Meaning                                                       |
+| ------------- | ------------------------------------------------------------ |
+| `idle`        | no replay active (default)                                   |
+| `downloading` | replay started; historical data is being fetched/cached      |
+| `running`     | replay is actively advancing the race clock                  |
+| `paused`      | replay clock suspended; resume continues from the same point |
+| `finished`    | replay reached race end; final state left visible            |
+| `error`       | the replay worker exited with an error (see `error` field)   |
+
+Note: `downloading` here refers to the runtime download after pressing Play, not
+to bulk cache preparation. Readiness (`ready` / `not_ready` / `failed`) is a
+separate concept about whether the race has been prepared — see
+[CACHE.md](./CACHE.md#readiness-states).
+
+[Back to Replay overview](./README.md)

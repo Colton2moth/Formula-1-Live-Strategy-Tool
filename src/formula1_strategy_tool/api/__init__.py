@@ -1,1 +1,1 @@
-"""API package — schemas, mock data, and REST routes."""
+"""API package — schemas, circuit library, and REST routes."""

@@ -17,13 +17,24 @@ export type ApiDriver = {
   team_name: string;
   team_colour: string;
   position: number;
-  track_progress: number;
+  current_lap: number;
+  x: number | null;
+  y: number | null;
   compound: string;
   tyre_age: number;
   last_lap_time: number;
   gap_to_leader: number;
   interval_ahead: number | null;
+  interval_behind: number | null;
   pit_stops: number;
+};
+
+export type ApiCompoundProbabilities = {
+  SOFT: number;
+  MEDIUM: number;
+  HARD: number;
+  INTERMEDIATE: number;
+  WET: number;
 };
 
 export type ApiPrediction = {
@@ -31,9 +42,8 @@ export type ApiPrediction = {
   pit_within_3_laps: number;
   pit_within_5_laps: number;
   pit_within_7_laps: number;
-  predicted_pit_window_start: number;
-  predicted_pit_window_end: number;
   predicted_next_compound: string;
+  compound_probabilities: ApiCompoundProbabilities | null;
   updated_at: string;
 };
 
@@ -44,4 +54,9 @@ export type RaceState = {
 };
 
 export type TrackPoint = { x: number; y: number };
-export type TrackState = { circuit_name: string; start_finish: TrackPoint; path: TrackPoint[] };
+export type TrackState = {
+  circuit_name: string;
+  start_finish: TrackPoint;
+  path: TrackPoint[];
+  pit_lane?: TrackPoint[];
+};

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
-# Identifier columns kept on the spine (see docs/DRIVER_LAP_SCHEMA.md §A).
+# Identifier columns kept on the spine (see docs/data/DRIVER_LAP_SCHEMA.md §A).
 _SPINE_COLS = ["meeting_key", "session_key", "driver_number", "lap_number", "date_start"]
 
 # JSON files process_race needs. Sessions missing any are skipped in bulk mode.
@@ -71,6 +71,13 @@ def add_stint_features(spine: pd.DataFrame, stints: pd.DataFrame) -> pd.DataFram
 
     A stint covers laps lap_start … lap_end inclusive for one driver.
     """
+    stints = stints.copy()
+    # A live/current stint has lap_end=None; treat it as open through the
+    # latest lap so it is not dropped by the covering-stint filter below.
+    stints["lap_end"] = pd.to_numeric(stints["lap_end"], errors="coerce").fillna(
+        int(spine["lap_number"].max())
+    )
+
     # Expand to spine×stints per driver, then keep the covering stint only.
     merged = spine.merge(
         stints[
@@ -153,7 +160,12 @@ def add_current_position(
     )
     # OpenF1 timestamps sometimes omit fractional seconds.
     out["date_start"] = pd.to_datetime(out["date_start"], utc=True, format="ISO8601")
-    out["as_of"] = out["date_start"] + pd.to_timedelta(out["lap_duration"].fillna(0), unit="s")
+    # date_start + lap_duration must stay the same datetime precision as the
+    # position/interval/weather/race_control date columns so merge_asof can
+    # join them (all parse to the same pandas datetime64 unit).
+    out["as_of"] = out["date_start"] + pd.to_timedelta(
+        out["lap_duration"].fillna(0), unit="s"
+    )
     # Rare incomplete laps (null date_start) cannot be as-of joined — drop them.
     out = out.dropna(subset=["as_of"])
 

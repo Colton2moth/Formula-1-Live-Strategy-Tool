@@ -1,16 +1,14 @@
 """
 Pydantic response models for the REST API.
 
-These shapes match docs/API_CONTRACT.md exactly. FastAPI uses them to:
+These shapes match docs/api/CONTRACT.md exactly. FastAPI uses them to:
     - Validate outgoing JSON field names and types
     - Generate OpenAPI docs at /docs for the frontend developer
-
-Replace the mock data sources later; keep these schemas stable.
 """
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SessionState(BaseModel):
@@ -36,8 +34,10 @@ class DriverState(BaseModel):
     team_name: str
     team_colour: str  # hex without '#', e.g. "FF8000"
     position: int
-    # Placeholder for map markers until live location is wired (FE requires it).
-    track_progress: float = Field(default=0.0, ge=0.0, le=1.0)
+    # Raw OpenF1/FastF1 track coordinate (same space as the circuit path).
+    # Null when the car has no live telemetry (garage / no position sample).
+    x: float | None = None
+    y: float | None = None
     current_lap: int
     compound: str
     tyre_age: int
@@ -46,6 +46,20 @@ class DriverState(BaseModel):
     interval_ahead: float | None  # null when leading or no car ahead
     interval_behind: float | None
     pit_stops: int
+
+
+class LocationState(BaseModel):
+    """
+    Compact live car location for high-frequency streaming.
+
+    Keyed by ``driver_number``; ``x``/``y`` are raw track coordinates and null
+    when the car has no useful telemetry (garage / no position sample).
+    """
+
+    driver_number: int
+    x: float | None
+    y: float | None
+    date: str | None = None
 
 
 class CompoundProbabilities(BaseModel):
@@ -64,7 +78,7 @@ class PredictionState(BaseModel):
 
     Three binary pit-window probabilities (same features, different horizons)
     plus next-compound multiclass output. Compound fields may be null when
-    pit risk is low; mocks may still include them for frontend experimentation.
+    pit risk is low.
     """
 
     driver_number: int
@@ -105,6 +119,9 @@ class TrackState(BaseModel):
     # FE map draws a start/finish marker; default to first path point if omitted.
     start_finish: TrackPoint
     path: list[TrackPoint]
+    # Optional pit-lane centreline in the same raw coordinate space as ``path``.
+    # Null when no reviewed pit geometry exists for the circuit.
+    pit_lane: list[TrackPoint] | None = None
 
 
 class LiveTopicStats(BaseModel):
@@ -123,3 +140,56 @@ class LiveStatus(BaseModel):
 
     mqtt_enabled: bool
     topics: dict[str, LiveTopicStats]
+
+
+class ReplayStartRequest(BaseModel):
+    """Body for POST /api/replay/start. session_key falls back to env when omitted."""
+
+    session_key: int | None = None
+    speed: float = Field(default=10.0, ge=0.25, le=100.0)
+
+
+class ReplaySeekRequest(BaseModel):
+    """Body for POST /api/replay/seek with one clock-time or lap target."""
+
+    time: float | None = Field(default=None, ge=0)
+    lap: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> ReplaySeekRequest:
+        if (self.time is None) == (self.lap is None):
+            raise ValueError("provide exactly one of time or lap")
+        return self
+
+
+class ReplaySpeedRequest(BaseModel):
+    """Body for POST /api/replay/speed. Same valid range as start."""
+
+    speed: float = Field(ge=0.25, le=100.0)
+
+
+class ReplayStatus(BaseModel):
+    """Runtime replay controller state returned by the /api/replay endpoints."""
+
+    status: str  # idle | downloading | running | paused | finished | error
+    running: bool
+    session_key: int | None = None
+    speed: float | None = None
+    error: str | None = None
+    current_time: float | None = None
+    total_duration: float | None = None
+    current_lap: int | None = None
+    total_laps: int | None = None
+
+
+class ReplaySessionOption(BaseModel):
+    """One completed Race session, for the year → country replay picker."""
+
+    session_key: int
+    year: int
+    country_name: str | None = None
+    location: str | None = None
+    circuit_short_name: str | None = None
+    date_start: str | None = None
+    # Replay readiness: "ready" | "not_ready" | "failed" | "unknown".
+    readiness: str = "unknown"

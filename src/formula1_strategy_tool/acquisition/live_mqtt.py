@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import ssl
+import threading
 import time
 
 import paho.mqtt.client as mqtt
@@ -35,6 +36,7 @@ _TOPICS = (
     "v1/intervals",
     "v1/weather",
     "v1/race_control",
+    "v1/location",
 )
 
 
@@ -89,6 +91,7 @@ def run_listener(
     state: LiveState | None = None,
     *,
     verbose: bool = True,
+    stop_event: threading.Event | None = None,
 ) -> LiveState:
     """
     Connect to OpenF1 MQTT, fill `state`, return it when done.
@@ -97,6 +100,8 @@ def run_listener(
         seconds: If set, run this long then disconnect. None = until Ctrl+C.
         state: Buffer to write into (default: module LIVE_STATE).
         verbose: When False, skip per-message prints (used by FastAPI thread).
+        stop_event: When set, exit the listen loop (used to stop MQTT so a
+            replay can own LIVE_STATE exclusively).
     """
     buffer = state if state is not None else LIVE_STATE
     token = get_valid_access_token()
@@ -117,8 +122,8 @@ def run_listener(
     client.loop_start()
     try:
         if seconds is None:
-            while True:
-                time.sleep(1.0)
+            while not (stop_event is not None and stop_event.is_set()):
+                time.sleep(0.2)
         else:
             if verbose:
                 print(f"listening for {seconds:g}s (Ctrl+C to stop early)…")

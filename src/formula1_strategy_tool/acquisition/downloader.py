@@ -29,7 +29,7 @@ from formula1_strategy_tool.acquisition.client import (
     get_or_download,
 )
 
-# Endpoints needed for lap-level strategy modelling (see docs/DATA_ACQUISITION.md).
+# Endpoints needed for lap-level strategy modelling (see docs/data/ACQUISITION.md).
 # Deliberately excludes car_data and location — too large, not needed yet.
 ENDPOINTS = [
     "drivers",

@@ -1,6 +1,6 @@
-import type { CSSProperties } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
-import type { ApiDriver, ApiSession, TrackPoint, TrackState } from "../../types/race";
+import type { ApiDriver, ApiSession, TrackState } from "../../types/race";
 
 type TrackMapProps = {
   track: TrackState;
@@ -11,19 +11,37 @@ type TrackMapProps = {
 };
 
 type SvgPoint = { x: number; y: number };
+type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
+type Transform = { scale: number; offsetX: number; offsetY: number };
+
+const VIEW_WIDTH = 100;
+const VIEW_HEIGHT = 85;
+const PADDING = 6;
 
 const START_FINISH_SQUARE_COUNT = 12;
 const START_FINISH_SQUARE_SIZE = 1.2;
 const START_FINISH_COLUMN_COUNT = 3;
 const START_FINISH_OUTSIDE_OFFSET = 6;
 
-export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
-  const centeredTrack = centerTrackPoints(track.path);
-  const displayPoints = smoothTrackPoints(centeredTrack.points);
+function buildTrackGeometry(track: TrackState) {
+  const rawBounds = boundsOf([...track.path, ...(track.pit_lane ?? [])]);
+  const transform = buildTransform(rawBounds);
+  const displayPoints = smoothTrackPoints(track.path.map((point) => applyTransform(point, transform)));
   const mapPath = trackPath(displayPoints);
-  const startFinish = applyCenterOffset(scalePoint(track.start_finish), centeredTrack);
+  const pitLanePath =
+    track.pit_lane && track.pit_lane.length > 1
+      ? trackPath(track.pit_lane.map((point) => applyTransform(point, transform)))
+      : null;
+  const startFinish = applyTransform(track.start_finish, transform);
   const startFinishSquares = startFinishMarkerSquares(startFinish);
   const startFinishRotation = startFinishMarkerRotation(displayPoints, startFinish);
+
+  return { rawBounds, transform, mapPath, pitLanePath, startFinish, startFinishSquares, startFinishRotation };
+}
+
+export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
+  const geometry = useMemo(() => buildTrackGeometry(track), [track]);
+
   return (
     <Panel label={`${session.meeting_name.toUpperCase()} | ${track.circuit_name.toUpperCase()} | ${session.session_name.toUpperCase()}`} className="track-map-panel">
       <div className="track-map-frame">
@@ -33,19 +51,20 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
           role="img"
           aria-label={`${track.circuit_name} circuit map with selectable driver markers`}
         >
-          <path d={mapPath} className="track-map-road" />
+          <path d={geometry.mapPath} className="track-map-road" />
+          {geometry.pitLanePath && <path d={geometry.pitLanePath} className="track-map-pit-lane" />}
           <g
             aria-label="Start finish line"
-            transform={`rotate(${startFinishRotation}, ${startFinish.x}, ${startFinish.y})`}
+            transform={`rotate(${geometry.startFinishRotation}, ${geometry.startFinish.x}, ${geometry.startFinish.y})`}
           >
             <line
               className="track-map-start-finish-line"
-              x1={startFinish.x}
-              x2={startFinish.x}
-              y1={startFinish.y - START_FINISH_SQUARE_SIZE * 1.5}
-              y2={startFinish.y + START_FINISH_SQUARE_SIZE * 1.5}
+              x1={geometry.startFinish.x}
+              x2={geometry.startFinish.x}
+              y1={geometry.startFinish.y - START_FINISH_SQUARE_SIZE * 1.5}
+              y2={geometry.startFinish.y + START_FINISH_SQUARE_SIZE * 1.5}
             />
-            {startFinishSquares.map((square) => (
+            {geometry.startFinishSquares.map((square) => (
               <rect
                 key={`${square.row}-${square.column}`}
                 className={`track-map-start-finish-square track-map-start-finish-square--${square.isLight ? "light" : "dark"}`}
@@ -57,9 +76,18 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
             ))}
           </g>
           {drivers.map((driver) => {
-            const marker = pointAtTrackProgress(displayPoints, driver.track_progress);
+            if (driver.x === null || driver.y === null) {
+              return null;
+            }
+            if (!isOnTrack({ x: driver.x, y: driver.y }, geometry.rawBounds)) {
+              return null;
+            }
+            const marker = applyTransform({ x: driver.x, y: driver.y }, geometry.transform);
             const isSelected = driver.driver_number === selectedDriver?.driver_number;
-            const markerStyle = { "--driver-colour": `#${driver.team_colour}` } as CSSProperties;
+            const markerStyle = {
+              "--driver-colour": `#${driver.team_colour}`,
+              transform: `translate(${marker.x}px, ${marker.y}px)`,
+            } as CSSProperties;
 
             return (
               <g
@@ -74,8 +102,8 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
                   if (event.key === "Enter" || event.key === " ") onSelectDriver(driver.driver_number);
                 }}
               >
-                <circle className="track-map-marker-dot" cx={marker.x} cy={marker.y} />
-                <text className="track-map-marker-label" x={marker.x + 3} y={marker.y + 1}>
+                <circle className="track-map-marker-dot" cx={0} cy={0} />
+                <text className="track-map-marker-label" x={3} y={1}>
                   {driver.acronym}
                 </text>
               </g>
@@ -84,6 +112,44 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
         </svg>
       </div>
     </Panel>
+  );
+}
+
+function buildTransform(bounds: Bounds): Transform {
+  const width = Math.max(bounds.maxX - bounds.minX, 1);
+  const height = Math.max(bounds.maxY - bounds.minY, 1);
+  const scale = Math.min((VIEW_WIDTH - PADDING * 2) / width, (VIEW_HEIGHT - PADDING * 2) / height);
+  return {
+    scale,
+    offsetX: (VIEW_WIDTH - width * scale) / 2 - bounds.minX * scale,
+    offsetY: (VIEW_HEIGHT - height * scale) / 2 - bounds.minY * scale,
+  };
+}
+
+function applyTransform(point: SvgPoint, transform: Transform): SvgPoint {
+  return { x: point.x * transform.scale + transform.offsetX, y: point.y * transform.scale + transform.offsetY };
+}
+
+function boundsOf(points: SvgPoint[]): Bounds {
+  return points.reduce(
+    (bounds, point) => ({
+      minX: Math.min(bounds.minX, point.x),
+      maxX: Math.max(bounds.maxX, point.x),
+      minY: Math.min(bounds.minY, point.y),
+      maxY: Math.max(bounds.maxY, point.y),
+    }),
+    { minX: points[0].x, maxX: points[0].x, minY: points[0].y, maxY: points[0].y },
+  );
+}
+
+function isOnTrack(point: SvgPoint, bounds: Bounds) {
+  const marginX = Math.max((bounds.maxX - bounds.minX) * 0.02, 1);
+  const marginY = Math.max((bounds.maxY - bounds.minY) * 0.02, 1);
+  return (
+    point.x >= bounds.minX - marginX &&
+    point.x <= bounds.maxX + marginX &&
+    point.y >= bounds.minY - marginY &&
+    point.y <= bounds.maxY + marginY
   );
 }
 
@@ -154,6 +220,7 @@ function projectPointToSegment(point: SvgPoint, start: SvgPoint, end: SvgPoint) 
 function radiansToDegrees(radians: number) {
   return (radians * 180) / Math.PI;
 }
+
 function trackPath(points: SvgPoint[]) {
   return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
 }
@@ -194,39 +261,8 @@ function samePoint(a: SvgPoint, b: SvgPoint) {
   return a.x === b.x && a.y === b.y;
 }
 
-function pointAtTrackProgress(points: SvgPoint[], progress: number) {
-  if (points.length === 0) {
-    return { x: 50, y: 40 };
-  }
-  if (points.length === 1) {
-    return points[0];
-  }
-
-  const totalLength = pathLength(points);
-  if (totalLength === 0) {
-    return points[0];
-  }
-
-  let remainingDistance = totalLength * clampProgress(progress);
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const start = points[index];
-    const end = points[index + 1];
-    const segmentLength = distance(start, end);
-    if (remainingDistance <= segmentLength) {
-      return interpolate(start, end, remainingDistance / segmentLength);
-    }
-    remainingDistance -= segmentLength;
-  }
-
-  return points[points.length - 1];
-}
-
 function clampProgress(progress: number) {
   return Math.min(Math.max(progress, 0), 1);
-}
-
-function pathLength(points: SvgPoint[]) {
-  return points.slice(1).reduce((total, point, index) => total + distance(points[index], point), 0);
 }
 
 function distance(a: SvgPoint, b: SvgPoint) {
@@ -235,40 +271,4 @@ function distance(a: SvgPoint, b: SvgPoint) {
 
 function interpolate(a: SvgPoint, b: SvgPoint, progress: number) {
   return { x: a.x + (b.x - a.x) * progress, y: a.y + (b.y - a.y) * progress };
-}
-
-function scalePoint(point: TrackPoint) {
-  return { x: point.x * 100, y: point.y * 80 };
-}
-
-function centerTrackPoints(points: TrackPoint[]) {
-  const scaledPoints = points.map(scalePoint);
-  if (scaledPoints.length === 0) {
-    return { points: scaledPoints, offsetX: 0, offsetY: 0 };
-  }
-
-  const bounds = boundsOf(scaledPoints);
-  const offsetX = 50 - (bounds.minX + bounds.maxX) / 2;
-  const offsetY = 40 - (bounds.minY + bounds.maxY) / 2;
-  return {
-    points: scaledPoints.map((point) => applyCenterOffset(point, { offsetX, offsetY })),
-    offsetX,
-    offsetY,
-  };
-}
-
-function applyCenterOffset(point: SvgPoint, offset: { offsetX: number; offsetY: number }) {
-  return { x: point.x + offset.offsetX, y: point.y + offset.offsetY };
-}
-
-function boundsOf(points: SvgPoint[]) {
-  return points.reduce(
-    (bounds, point) => ({
-      minX: Math.min(bounds.minX, point.x),
-      maxX: Math.max(bounds.maxX, point.x),
-      minY: Math.min(bounds.minY, point.y),
-      maxY: Math.max(bounds.maxY, point.y),
-    }),
-    { minX: points[0].x, maxX: points[0].x, minY: points[0].y, maxY: points[0].y },
-  );
 }
