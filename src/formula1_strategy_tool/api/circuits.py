@@ -17,6 +17,7 @@ Not yet available (return 404 until sourced): Madring (153), Sepang (12).
 
 from __future__ import annotations
 
+from formula1_strategy_tool.api.pit_lanes import PIT_LANES
 from formula1_strategy_tool.api.schemas import TrackPoint, TrackState
 
 CIRCUITS: dict[int, TrackState] = {
@@ -3419,4 +3420,10 @@ CIRCUITS: dict[int, TrackState] = {
 
 def track_for_circuit(circuit_key: int) -> TrackState | None:
     """Return the static TrackState for a circuit_key, or None if unknown."""
-    return CIRCUITS.get(circuit_key)
+    track = CIRCUITS.get(circuit_key)
+    if track is None:
+        return None
+    pit_lane = PIT_LANES.get(circuit_key)
+    if pit_lane:
+        return track.model_copy(update={"pit_lane": pit_lane})
+    return track

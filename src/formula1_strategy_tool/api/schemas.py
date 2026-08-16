@@ -119,6 +119,9 @@ class TrackState(BaseModel):
     # FE map draws a start/finish marker; default to first path point if omitted.
     start_finish: TrackPoint
     path: list[TrackPoint]
+    # Optional pit-lane centreline in the same raw coordinate space as ``path``.
+    # Null when no reviewed pit geometry exists for the circuit.
+    pit_lane: list[TrackPoint] | None = None
 
 
 class LiveTopicStats(BaseModel):

@@ -94,6 +94,37 @@ def test_track_404_unknown_circuit():
     assert response.status_code == 404
 
 
+def seed_montreal_session() -> None:
+    LIVE_STATE.update(
+        "v1/sessions",
+        {"circuit_key": 23, "circuit_short_name": "Montreal", "session_name": "Race"},
+    )
+
+
+def test_track_includes_pit_lane_for_montreal():
+    seed_montreal_session()
+    response = client.get("/api/track")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["circuit_key"] == 23
+    assert data["pit_lane"] is not None
+    assert len(data["pit_lane"]) > 2
+
+
+def seed_interlagos_session() -> None:
+    LIVE_STATE.update(
+        "v1/sessions",
+        {"circuit_key": 14, "circuit_short_name": "Interlagos", "session_name": "Race"},
+    )
+
+
+def test_track_no_pit_lane_for_interlagos():
+    seed_interlagos_session()
+    response = client.get("/api/track")
+    assert response.status_code == 200
+    assert response.json().get("pit_lane") is None
+
+
 def test_locations_endpoint_compact_shape():
     LIVE_STATE.update(
         "v1/location",

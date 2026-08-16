@@ -24,15 +24,19 @@ const START_FINISH_COLUMN_COUNT = 3;
 const START_FINISH_OUTSIDE_OFFSET = 6;
 
 function buildTrackGeometry(track: TrackState) {
-  const rawBounds = boundsOf(track.path);
+  const rawBounds = boundsOf([...track.path, ...(track.pit_lane ?? [])]);
   const transform = buildTransform(rawBounds);
   const displayPoints = smoothTrackPoints(track.path.map((point) => applyTransform(point, transform)));
   const mapPath = trackPath(displayPoints);
+  const pitLanePath =
+    track.pit_lane && track.pit_lane.length > 1
+      ? trackPath(track.pit_lane.map((point) => applyTransform(point, transform)))
+      : null;
   const startFinish = applyTransform(track.start_finish, transform);
   const startFinishSquares = startFinishMarkerSquares(startFinish);
   const startFinishRotation = startFinishMarkerRotation(displayPoints, startFinish);
 
-  return { rawBounds, transform, mapPath, startFinish, startFinishSquares, startFinishRotation };
+  return { rawBounds, transform, mapPath, pitLanePath, startFinish, startFinishSquares, startFinishRotation };
 }
 
 export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
@@ -48,6 +52,7 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
           aria-label={`${track.circuit_name} circuit map with selectable driver markers`}
         >
           <path d={geometry.mapPath} className="track-map-road" />
+          {geometry.pitLanePath && <path d={geometry.pitLanePath} className="track-map-pit-lane" />}
           <g
             aria-label="Start finish line"
             transform={`rotate(${geometry.startFinishRotation}, ${geometry.startFinish.x}, ${geometry.startFinish.y})`}

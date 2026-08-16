@@ -171,13 +171,20 @@ library (see `src/formula1_strategy_tool/api/circuits.py`).
   "path": [
     {"x": -1710.5, "y": 76.6},
     {"x": -1950.7, "y": 275.8}
-  ]
+  ],
+  "pit_lane": null
 }
 ```
 
 `path` is a closed loop in the raw FastF1 coordinate system (first point repeats
 last). This is the same coordinate space as OpenF1 `v1/location` `x`/`y` on
 `/api/drivers`, so the frontend applies one shared display transform to both.
+
+`pit_lane` is an optional pit-lane centreline in the same raw coordinate space,
+generated offline from historical location traces (see
+`scripts/generate_pit_lanes.py`). It is `null` for circuits without reviewed pit
+geometry, so the frontend must treat it as optional and only draw it when present.
+
 Returns `503` before any live session is ingested and `404` when the session's
 `circuit_key` is not yet in the circuit library.
 
