@@ -47,13 +47,13 @@ _ENDPOINTS = (
     "race_control",
 )
 
-# Location is high-frequency; replay thins it to ~1 sample/driver/second so a
+# Location is high-frequency; replay thins it to ~4 samples/driver/second so a
 # full session stays memory-friendly while the map still moves smoothly.
-_LOCATION_THIN_SECONDS = 1.0
+_LOCATION_THIN_SECONDS = 0.25
 # Bump when the prepared timeline's shape changes (new topics, ordering rules,
 # thinning intervals, or payload edits) or the checkpoint layout changes.
 # Older prepared files are rebuilt from the raw cache instead of being trusted.
-_TIMELINE_FORMAT_VERSION = 2
+_TIMELINE_FORMAT_VERSION = 3
 # Download window for the paginated location endpoint (whole-session returns 422).
 _LOCATION_WINDOW_SECONDS = 300
 

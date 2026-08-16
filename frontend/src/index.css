@@ -20,6 +20,7 @@
   --shadow-surface-hover: 0 0.625rem 1.375rem rgb(0 0 0 / 0.24);
   --motion-duration-fast: 160ms;
   --motion-duration-standard: 220ms;
+  --motion-duration-marker: 100ms;
   --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -61,15 +62,4 @@ svg [tabindex="0"]:focus-visible {
   outline: 0.125rem solid var(--color-f1-red);
   outline-offset: 0.125rem;
   transition: outline-color var(--motion-duration-fast) var(--motion-easing-standard), outline-offset var(--motion-duration-fast) var(--motion-easing-standard);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
 }

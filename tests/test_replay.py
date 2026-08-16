@@ -151,20 +151,34 @@ def test_previous_stint_closes_when_next_starts():
     assert len(stint2_open) == 1
 
 
-def test_thin_location_keeps_one_per_driver_per_second():
+def test_thin_location_keeps_one_per_driver_per_quarter_second():
     rows = [
         {"driver_number": 4, "date": "2026-07-26T13:00:00+00:00"},
-        {"driver_number": 4, "date": "2026-07-26T13:00:00.400+00:00"},
-        {"driver_number": 4, "date": "2026-07-26T13:00:01+00:00"},
+        {"driver_number": 4, "date": "2026-07-26T13:00:00.100+00:00"},
+        {"driver_number": 4, "date": "2026-07-26T13:00:00.250+00:00"},
+        {"driver_number": 4, "date": "2026-07-26T13:00:00.500+00:00"},
         {"driver_number": 44, "date": "2026-07-26T13:00:00+00:00"},
     ]
     kept = _thin_location(rows)
-    assert len(kept) == 3
+    assert len(kept) == 4
     assert [row["date"] for row in kept] == [
         "2026-07-26T13:00:00+00:00",
-        "2026-07-26T13:00:01+00:00",
+        "2026-07-26T13:00:00.250+00:00",
+        "2026-07-26T13:00:00.500+00:00",
         "2026-07-26T13:00:00+00:00",
     ]
+
+
+def test_timeline_format_version_invalidates_old_thinning(tmp_path):
+    # A prepared timeline from the previous 1-second thinning (older format
+    # version) must be rejected and rebuilt from the raw cache.
+    data = _data()
+    save_timeline(tmp_path, build_timeline(data), data)
+    path = replay_mod._timeline_path(tmp_path)
+    blob = load_json(path)
+    blob["format_version"] = replay_mod._TIMELINE_FORMAT_VERSION - 1
+    atomic_write_json(path, blob)
+    assert load_timeline(tmp_path, data["session"]["session_key"]) is None
 
 
 def test_replay_controller_start_stop(monkeypatch):

@@ -9,7 +9,7 @@ Event types match docs/API_CONTRACT.md: ``location_update``,
 ``driver_update``, ``weather_update``, ``race_control_update``, and
 ``prediction_update``.
 
-A background async loop drains LIVE_STATE's dirty-topic flags every ~250 ms and
+A background async loop drains LIVE_STATE's dirty-topic flags every ~50 ms and
 broadcasts only the values that actually changed, so obsolete location samples
 are never queued and unrelated UI is not re-rendered.
 """
@@ -33,7 +33,7 @@ PREDICTION_TOPICS = frozenset({"v1/laps", "v1/stints", "v1/pit"})
 WEATHER_TOPIC = "v1/weather"
 RACE_CONTROL_TOPIC = "v1/race_control"
 
-BROADCAST_INTERVAL_SECONDS = 0.25
+BROADCAST_INTERVAL_SECONDS = 0.05
 PREDICTION_INTERVAL_SECONDS = 10.0
 
 
