@@ -40,21 +40,21 @@ export function RaceDashboard({ raceState, track }: RaceDashboardProps) {
 
   return (
     <>
-      <RaceHeader session={session} connectionStatus={live.status} />
       <div className="dashboard-layout">
         <div className="dashboard-stack">
-          <TrackMap
-            track={track}
-            session={session}
-            drivers={mapDrivers}
+          <StrategyPanel selectedDriver={selectedDriver} prediction={selectedPrediction} />
+          <Leaderboard
+            drivers={sortedDrivers}
             selectedDriver={selectedDriver}
             onSelectDriver={toggleSelectedDriver}
           />
         </div>
         <div className="dashboard-stack">
-          <StrategyPanel selectedDriver={selectedDriver} prediction={selectedPrediction} />
-          <Leaderboard
-            drivers={sortedDrivers}
+          <RaceHeader session={session} connectionStatus={live.status} />
+          <TrackMap
+            track={track}
+            session={session}
+            drivers={mapDrivers}
             selectedDriver={selectedDriver}
             onSelectDriver={toggleSelectedDriver}
           />

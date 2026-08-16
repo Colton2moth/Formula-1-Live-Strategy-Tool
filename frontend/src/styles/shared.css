@@ -77,7 +77,7 @@
 }
 
 .dashboard-layout {
-  @apply grid grid-cols-[1.6fr_1.55fr] gap-4;
+  @apply grid grid-cols-[1.55fr_1.6fr] gap-4;
   min-width: 0;
 }
 
