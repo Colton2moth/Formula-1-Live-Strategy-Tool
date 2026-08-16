@@ -5,6 +5,7 @@ import {
   pauseReplay,
   resumeReplay,
   seekReplay,
+  seekReplayLap,
   setReplaySpeed,
   startReplay,
   stopReplay,
@@ -302,6 +303,26 @@ export function useReplay(onSeeded: () => void) {
     }
   }, []);
 
+  const seekLap = useCallback(async (lap: number) => {
+    if (!Number.isInteger(lap) || lap < 1) {
+      setError("Pick a valid lap to seek to");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    seededRef.current = false;
+    try {
+      const next = await seekReplayLap(lap);
+      setStatus(next.status);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to seek replay",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   return {
     sessions,
     years,
@@ -327,5 +348,6 @@ export function useReplay(onSeeded: () => void) {
     resume,
     stop,
     seek,
+    seekLap,
   };
 }

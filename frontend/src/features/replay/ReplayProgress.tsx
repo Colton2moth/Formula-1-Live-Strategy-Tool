@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
 import type { ReplayProgress as ReplayProgressState } from "./useReplay";
 
 type ReplayProgressProps = {
   progress: ReplayProgressState;
   onSeek: (time: number) => void;
+  onSeekLap: (lap: number) => void;
   canSeek: boolean;
 };
 
@@ -22,13 +23,29 @@ function formatDuration(seconds: number | null): string {
   return `${minutes}:${String(secs).padStart(2, "0")}`;
 }
 
-export function ReplayProgress({ progress, onSeek, canSeek }: ReplayProgressProps) {
+export function ReplayProgress({ progress, onSeek, onSeekLap, canSeek }: ReplayProgressProps) {
   const { currentTime, totalDuration, currentLap, totalLaps } = progress;
   const [previewTime, setPreviewTime] = useState<number | null>(null);
+  const [lapText, setLapText] = useState("1");
+  const [lapInputFocused, setLapInputFocused] = useState(false);
 
   const max = totalDuration && totalDuration > 0 ? totalDuration : 0;
   const displayed = Math.min(max, previewTime ?? currentTime ?? 0);
   const disabled = !canSeek || max <= 0;
+  const lapTarget = Number(lapText);
+  const maxLap = totalLaps ?? 0;
+  const lapDisabled = !canSeek || maxLap <= 0;
+  const lapValid =
+    !lapDisabled && Number.isInteger(lapTarget) && lapTarget >= 1 && lapTarget <= maxLap;
+  const timelineStyle = {
+    "--replay-progress": `${max > 0 ? (displayed / max) * 100 : 0}%`,
+  } as CSSProperties;
+
+  useEffect(() => {
+    if (!lapInputFocused && currentLap !== null) {
+      setLapText(String(Math.max(1, currentLap)));
+    }
+  }, [currentLap, lapInputFocused]);
 
   const commit = (value: number) => {
     setPreviewTime(null);
@@ -48,6 +65,7 @@ export function ReplayProgress({ progress, onSeek, canSeek }: ReplayProgressProp
           max={max}
           step={0.1}
           value={displayed}
+          style={timelineStyle}
           disabled={disabled}
           onChange={(event) => setPreviewTime(Number(event.target.value))}
           onPointerUp={(event) => commit(Number((event.target as HTMLInputElement).value))}
@@ -55,15 +73,46 @@ export function ReplayProgress({ progress, onSeek, canSeek }: ReplayProgressProp
         />
         <div className="replay-progress-readouts">
           <div className="replay-progress-time">
+            <span className="replay-progress-label">Elapsed</span>
             <span className="replay-progress-value">{formatDuration(displayed)}</span>
             <span className="replay-progress-divider">/</span>
             <span className="replay-progress-value">{formatDuration(max)}</span>
           </div>
           {totalLaps !== null && totalLaps > 0 ? (
             <div className="replay-progress-laps">
-              Lap <span className="replay-progress-value">{currentLap ?? 0}</span>
+              <label className="replay-progress-label" htmlFor="replay-lap-target">
+                Lap
+              </label>
+              <input
+                id="replay-lap-target"
+                className="replay-lap-input"
+                type="number"
+                min={1}
+                max={totalLaps}
+                step={1}
+                value={lapText}
+                disabled={lapDisabled}
+                aria-invalid={lapText !== "" && !lapValid}
+                onFocus={() => setLapInputFocused(true)}
+                onBlur={() => setLapInputFocused(false)}
+                onChange={(event) => setLapText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && lapValid) onSeekLap(lapTarget);
+                }}
+              />
               <span className="replay-progress-divider">/</span>
               <span className="replay-progress-value">{totalLaps}</span>
+              <button
+                type="button"
+                className="replay-lap-button"
+                aria-label={`Jump to lap ${lapText || "number"}`}
+                onClick={() => onSeekLap(lapTarget)}
+                disabled={!lapValid}
+              >
+                <span className="material-symbols-rounded replay-lap-button-icon" aria-hidden="true">
+                  arrow_forward
+                </span>
+              </button>
             </div>
           ) : null}
         </div>

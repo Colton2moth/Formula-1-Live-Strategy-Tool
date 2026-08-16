@@ -612,6 +612,19 @@ def nearest_checkpoint_by_time(
     return chosen
 
 
+def nearest_checkpoint_by_lap(
+    checkpoints: Sequence[dict[str, Any]], lap: int
+) -> dict[str, Any] | None:
+    """Last checkpoint at or before ``lap`` (index is lap-ascending)."""
+    chosen: dict[str, Any] | None = None
+    for checkpoint in checkpoints:
+        if int(checkpoint["lap"]) <= lap:
+            chosen = checkpoint
+        else:
+            break
+    return chosen
+
+
 def restore_checkpoint(state: LiveState, checkpoint: dict[str, Any]) -> int:
     """Restore ``state`` from one checkpoint; return the cursor to resume from."""
     state.replace_docs(checkpoint["state"])
@@ -675,6 +688,7 @@ def replay_session(
     progress: dict[str, Any] | None = None,
     on_seeded: Callable[[], None] | None = None,
     seek_time: float | None = None,
+    seek_lap: int | None = None,
     speed_holder: dict[str, float] | None = None,
 ) -> None:
     """
@@ -686,9 +700,8 @@ def replay_session(
     ``progress`` (when provided) is updated in place with the authoritative
     replay clock, total duration, and lap progress. ``on_seeded`` fires right
     after identity + the first data are written, so the API can mark the replay
-    as actively running. ``seek_time`` (when set) restores the nearest prepared
-    checkpoint at or before that clock time and fast-forwards to it instead of
-    replaying from the start. ``speed_holder`` (when provided) is a mutable
+    as actively running. ``seek_time`` or ``seek_lap`` restores the nearest
+    prepared checkpoint and resumes from there. ``speed_holder`` is a mutable
     ``{"value": float}`` the clock reads each tick so the speed can change
     without restarting the worker.
     """
@@ -718,8 +731,19 @@ def replay_session(
 
     # Clear stale live/test data, then seed identity or restore a checkpoint.
     buffer.clear()
-    if seek_time is not None:
-        target = min(max(seek_time, 0.0), total_duration)
+    if seek_time is not None and seek_lap is not None:
+        raise ValueError("seek_time and seek_lap are mutually exclusive")
+    if seek_lap is not None:
+        index = load_checkpoint_index(cache, session_key)
+        if index is None:
+            checkpoints = build_checkpoints(events, session, meetings, drivers)
+            save_checkpoints(cache, checkpoints, session_key)
+            index = load_checkpoint_index(cache, session_key)
+        checkpoint = nearest_checkpoint_by_lap(index or [], seek_lap)
+        target = float(checkpoint["time"]) if checkpoint is not None else 0.0
+    else:
+        target = min(max(seek_time or 0.0, 0.0), total_duration)
+    if seek_time is not None or seek_lap is not None:
         cursor, current_lap = _restore_seek(
             cache, session_key, events, session, meetings, drivers, target, buffer
         )
@@ -816,7 +840,7 @@ class ReplayController:
         with self._lock:
             if self.on_before_start is not None:
                 self.on_before_start()
-            self._launch(session_key, speed, seek_time=None)
+            self._launch(session_key, speed, seek_time=None, seek_lap=None)
 
     def seek(self, time_: float) -> None:
         """Restart the active replay at the nearest checkpoint <= ``time_``.
@@ -832,7 +856,26 @@ class ReplayController:
                 return
             was_paused = self.status == "paused"
             self._launch(
-                self.session_key, self.speed, seek_time=time_, paused=was_paused
+                self.session_key,
+                self.speed,
+                seek_time=time_,
+                seek_lap=None,
+                paused=was_paused,
+            )
+
+    def seek_lap(self, lap: int) -> None:
+        """Restart the active replay at the checkpoint for ``lap``."""
+        with self._lock:
+            if self.status not in {"running", "paused", "finished"}:
+                return
+            if self.session_key is None or self.speed is None:
+                return
+            self._launch(
+                self.session_key,
+                self.speed,
+                seek_time=None,
+                seek_lap=lap,
+                paused=self.status == "paused",
             )
 
     def set_speed(self, speed: float) -> bool:
@@ -852,6 +895,7 @@ class ReplayController:
         speed: float,
         *,
         seek_time: float | None,
+        seek_lap: int | None,
         paused: bool = False,
     ) -> None:
         """Swap in a fresh stop/pause pair and start a new producer thread."""
@@ -884,6 +928,7 @@ class ReplayController:
                 self.progress,
                 holder,
                 seek_time,
+                seek_lap,
             ),
             name="openf1-replay",
             daemon=True,
@@ -927,6 +972,7 @@ class ReplayController:
         progress: dict[str, Any],
         speed_holder: dict[str, float],
         seek_time: float | None = None,
+        seek_lap: int | None = None,
     ) -> None:
         try:
             replay_session(
@@ -937,6 +983,7 @@ class ReplayController:
                 progress=progress,
                 on_seeded=self._on_seeded,
                 seek_time=seek_time,
+                seek_lap=seek_lap,
                 speed_holder=speed_holder,
             )
         except Exception as exc:  # noqa: BLE001 — keep API up if replay dies

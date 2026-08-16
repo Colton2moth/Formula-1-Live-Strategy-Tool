@@ -294,13 +294,15 @@ def pause_replay() -> ReplayStatus:
 @router.post("/replay/seek", response_model=ReplayStatus)
 def seek_replay(request: ReplaySeekRequest) -> ReplayStatus:
     """
-    Jump the active replay to ``time`` seconds on the replay clock.
+    Jump the active replay to a replay-clock time or completed-lap checkpoint.
 
-    The producer restores the nearest checkpoint at or before the target time,
-    fast-forwards through cached events up to the target, then resumes from
-    there. No event after the target time is exposed.
+    The producer restores the nearest checkpoint at or before the requested
+    target, then resumes without exposing future events.
     """
-    replay_controller.seek(request.time)
+    if request.lap is not None:
+        replay_controller.seek_lap(request.lap)
+    elif request.time is not None:
+        replay_controller.seek(request.time)
     return _replay_status()
 
 

@@ -8,7 +8,7 @@ These shapes match docs/API_CONTRACT.md exactly. FastAPI uses them to:
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SessionState(BaseModel):
@@ -150,9 +150,16 @@ class ReplayStartRequest(BaseModel):
 
 
 class ReplaySeekRequest(BaseModel):
-    """Body for POST /api/replay/seek. ``time`` is replay-clock seconds."""
+    """Body for POST /api/replay/seek with one clock-time or lap target."""
 
-    time: float = Field(ge=0)
+    time: float | None = Field(default=None, ge=0)
+    lap: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> ReplaySeekRequest:
+        if (self.time is None) == (self.lap is None):
+            raise ValueError("provide exactly one of time or lap")
+        return self
 
 
 class ReplaySpeedRequest(BaseModel):

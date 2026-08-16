@@ -16,6 +16,7 @@ from formula1_strategy_tool.acquisition.replay import (
     load_checkpoint_state,
     load_timeline,
     location_window_count,
+    nearest_checkpoint_by_lap,
     nearest_checkpoint_by_time,
     restore_checkpoint,
     save_checkpoints,
@@ -194,6 +195,7 @@ def test_replay_controller_start_stop(monkeypatch):
         progress=None,
         on_seeded=None,
         seek_time=None,
+        seek_lap=None,
         speed_holder=None,
     ):
         if on_seeded is not None:
@@ -235,6 +237,7 @@ def test_replay_controller_pause_resume(monkeypatch):
         progress=None,
         on_seeded=None,
         seek_time=None,
+        seek_lap=None,
         speed_holder=None,
     ):
         nonlocal captured_pause
@@ -276,6 +279,7 @@ def test_replay_controller_stop_fires_restore_hook(monkeypatch):
         progress=None,
         on_seeded=None,
         seek_time=None,
+        seek_lap=None,
         speed_holder=None,
     ):
         if on_seeded is not None:
@@ -293,7 +297,7 @@ def test_replay_controller_stop_fires_restore_hook(monkeypatch):
 
 
 def test_replay_controller_seek_restarts_with_time(monkeypatch):
-    seen: list[tuple[int, float, float | None]] = []
+    seen: list[tuple[int, float, float | None, int | None]] = []
     started = threading.Event()
 
     def fake_replay(
@@ -306,9 +310,10 @@ def test_replay_controller_seek_restarts_with_time(monkeypatch):
         progress=None,
         on_seeded=None,
         seek_time=None,
+        seek_lap=None,
         speed_holder=None,
     ):
-        seen.append((session_key, speed, seek_time))
+        seen.append((session_key, speed, seek_time, seek_lap))
         if on_seeded is not None:
             on_seeded()
         started.set()
@@ -326,8 +331,15 @@ def test_replay_controller_seek_restarts_with_time(monkeypatch):
     assert started.wait(timeout=1.0)
     assert seen[0][2] is None
 
+    started.clear()
     controller.seek(50.0)
-    assert seen[-1] == (9979, 20, 50.0)
+    assert started.wait(timeout=1.0)
+    assert seen[-1] == (9979, 20, 50.0, None)
+
+    started.clear()
+    controller.seek_lap(12)
+    assert started.wait(timeout=1.0)
+    assert seen[-1] == (9979, 20, None, 12)
 
     controller.stop()
 
@@ -346,6 +358,7 @@ def test_replay_controller_set_speed(monkeypatch):
         progress=None,
         on_seeded=None,
         seek_time=None,
+        seek_lap=None,
         speed_holder=None,
     ):
         nonlocal captured_holder
@@ -373,7 +386,7 @@ def test_replay_controller_set_speed(monkeypatch):
 
 
 def test_replay_controller_seek_preserves_pause(monkeypatch):
-    captured: list[tuple[threading.Event | None, float | None]] = []
+    captured: list[tuple[threading.Event | None, float | None, int | None]] = []
     seeded = threading.Event()
 
     def fake_replay(
@@ -386,9 +399,10 @@ def test_replay_controller_seek_preserves_pause(monkeypatch):
         progress=None,
         on_seeded=None,
         seek_time=None,
+        seek_lap=None,
         speed_holder=None,
     ):
-        captured.append((pause_event, seek_time))
+        captured.append((pause_event, seek_time, seek_lap))
         if on_seeded is not None:
             on_seeded()
         seeded.set()
@@ -409,6 +423,13 @@ def test_replay_controller_seek_preserves_pause(monkeypatch):
     # The new worker is paused and seeks to the requested time.
     assert captured[-1][0] is not None and captured[-1][0].is_set()
     assert captured[-1][1] == 50.0
+    assert controller.snapshot()["status"] == "paused"
+
+    seeded.clear()
+    controller.seek_lap(12)
+    assert seeded.wait(timeout=1.0)
+    assert captured[-1][0] is not None and captured[-1][0].is_set()
+    assert captured[-1][2] == 12
     assert controller.snapshot()["status"] == "paused"
 
     controller.stop()
@@ -687,6 +708,17 @@ def test_nearest_checkpoint_by_time():
     assert nearest_checkpoint_by_time(checkpoints, 90.0)["cursor"] == 10
     assert nearest_checkpoint_by_time(checkpoints, 89.9) is None
     assert nearest_checkpoint_by_time(checkpoints, 270.0)["cursor"] == 100
+
+
+def test_nearest_checkpoint_by_lap():
+    checkpoints = [
+        {"lap": 1, "cursor": 10},
+        {"lap": 2, "cursor": 50},
+        {"lap": 3, "cursor": 100},
+    ]
+    assert nearest_checkpoint_by_lap(checkpoints, 2)["cursor"] == 50
+    assert nearest_checkpoint_by_lap(checkpoints, 4)["cursor"] == 100
+    assert nearest_checkpoint_by_lap(checkpoints, 0) is None
 
 
 def test_load_checkpoint_index_missing_returns_none(tmp_path):

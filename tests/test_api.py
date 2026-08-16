@@ -160,6 +160,22 @@ def test_replay_speed_validates_range():
     assert response.status_code == 422
 
 
+def test_replay_seek_accepts_exactly_one_lap_or_time(monkeypatch):
+    from formula1_strategy_tool.api import routes as routes_mod
+
+    laps: list[int] = []
+    monkeypatch.setattr(routes_mod.replay_controller, "seek_lap", laps.append)
+
+    response = client.post("/api/replay/seek", json={"lap": 12})
+    assert response.status_code == 200
+    assert laps == [12]
+    assert client.post("/api/replay/seek", json={}).status_code == 422
+    assert (
+        client.post("/api/replay/seek", json={"lap": 12, "time": 50}).status_code
+        == 422
+    )
+
+
 def test_locations_endpoint_compact_shape():
     LIVE_STATE.update(
         "v1/location",

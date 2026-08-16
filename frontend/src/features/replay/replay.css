@@ -7,17 +7,19 @@
 }
 
 .replay-panel-body {
-  @apply grid gap-4;
+  @apply grid gap-3 p-4;
 }
 
 .replay-picker {
-  @apply grid gap-3;
+  @apply grid gap-2;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .replay-field {
-  @apply grid gap-1.5;
+  @apply grid gap-2 border border-app-line bg-app-bg p-3;
   min-width: 0;
+  border-radius: 0.5rem;
+  box-shadow: inset 0 0.0625rem 0 rgb(255 255 255 / 0.03);
 }
 
 .replay-field-label {
@@ -43,8 +45,9 @@
 }
 
 .replay-selected {
-  @apply grid gap-1.5 border border-app-line bg-app-bg px-3 py-2;
+  @apply grid gap-2 border border-app-line bg-app-panelAlt px-3 py-3;
   border-radius: 0.5rem;
+  box-shadow: inset 0.25rem 0 var(--color-f1-red);
 }
 
 .replay-selected-name {
@@ -61,7 +64,14 @@
 }
 
 .replay-speed {
-  @apply grid gap-2;
+  @apply grid gap-2 border border-app-line bg-app-bg p-3;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  border-radius: 0.5rem;
+}
+
+.replay-speed > .replay-speed-label,
+.replay-speed-options {
+  grid-column: 1 / -1;
 }
 
 .replay-speed-label {
@@ -73,7 +83,8 @@
 }
 
 .replay-speed-option {
-  @apply border border-app-line bg-app-panelAlt px-4 py-2 text-sm font-bold tabular-nums text-app-text;
+  @apply border border-app-line bg-app-panelAlt px-3 py-2 text-sm font-bold tabular-nums text-app-text;
+  flex: 1 1 5rem;
   border-radius: var(--radius-compact);
   cursor: pointer;
   transition:
@@ -97,6 +108,7 @@
 
 .replay-speed-readout {
   @apply text-sm font-black uppercase tracking-wide text-white;
+  align-self: end;
 }
 
 .replay-speed-helper {
@@ -104,21 +116,24 @@
 }
 
 .replay-transport {
-  @apply flex flex-wrap items-center gap-2;
+  @apply grid gap-2;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .replay-transport-button {
-  @apply inline-flex items-center gap-2 border border-app-line bg-app-panelAlt px-4 py-2 text-sm font-bold uppercase tracking-wide text-app-text;
+  @apply inline-flex min-h-11 items-center justify-center gap-2 border border-app-line bg-app-panelAlt px-3 py-2 text-sm font-bold uppercase tracking-wide text-app-text;
   border-radius: var(--radius-compact);
   transition:
     background-color var(--motion-duration-fast) var(--motion-easing-standard),
     border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard);
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
 .replay-transport-button:hover:not(:disabled) {
   @apply border-app-red text-white;
   background-color: var(--color-f1-red);
+  transform: translateY(-0.0625rem);
 }
 
 .replay-transport-button--play {
@@ -139,16 +154,56 @@
 }
 
 .replay-status {
-  @apply text-xs font-semibold text-app-muted;
+  @apply border-t border-app-line pt-3 text-xs font-semibold text-app-muted;
 }
 
 .replay-progress-body {
-  @apply grid gap-3;
+  @apply grid gap-4 p-4;
 }
 
 .replay-timeline {
-  @apply w-full accent-app-red;
+  --replay-progress: 0%;
+  @apply h-5 w-full appearance-none bg-transparent;
   cursor: pointer;
+}
+
+.replay-timeline::-webkit-slider-runnable-track {
+  height: 0.375rem;
+  border-radius: var(--radius-control);
+  background: linear-gradient(to right, var(--color-f1-red) var(--replay-progress), var(--color-panel-alt) 0);
+}
+
+.replay-timeline::-webkit-slider-thumb {
+  @apply appearance-none border-2 border-white bg-app-red;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.3125rem;
+  border-radius: 999rem;
+  box-shadow: 0 0 0 0.25rem rgb(225 6 0 / 0.18);
+  transition: transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.replay-timeline:hover:not(:disabled)::-webkit-slider-thumb {
+  transform: scale(1.08);
+}
+
+.replay-timeline::-moz-range-track {
+  height: 0.375rem;
+  border-radius: var(--radius-control);
+  background: var(--color-panel-alt);
+}
+
+.replay-timeline::-moz-range-progress {
+  height: 0.375rem;
+  border-radius: var(--radius-control);
+  background: var(--color-f1-red);
+}
+
+.replay-timeline::-moz-range-thumb {
+  @apply border-2 border-white bg-app-red;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 999rem;
 }
 
 .replay-timeline:focus-visible {
@@ -161,15 +216,64 @@
 }
 
 .replay-progress-readouts {
-  @apply flex flex-wrap items-center justify-between gap-2;
+  @apply grid gap-2;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
 }
 
-.replay-progress-time {
-  @apply text-lg font-black tabular-nums text-white;
+.replay-progress-time,
+.replay-progress-laps {
+  @apply flex items-baseline justify-center gap-1 border border-app-line bg-app-bg px-3 py-3 text-lg font-black tabular-nums text-white;
+  border-radius: 0.5rem;
 }
 
 .replay-progress-laps {
-  @apply text-sm font-bold uppercase tracking-wide text-app-muted;
+  @apply uppercase tracking-wide;
+}
+
+.replay-progress-label {
+  @apply mr-1 text-[0.625rem] font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.replay-lap-input {
+  @apply w-14 border border-app-line bg-app-panelAlt px-2 py-1 text-center text-base font-black tabular-nums text-white;
+  border-radius: var(--radius-compact);
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.replay-lap-input:focus-visible {
+  outline: 0.125rem solid var(--color-f1-red);
+  outline-offset: 0.125rem;
+}
+
+.replay-lap-input[aria-invalid="true"] {
+  @apply border-app-red;
+}
+
+.replay-lap-input:disabled {
+  @apply cursor-not-allowed opacity-50;
+}
+
+.replay-lap-button {
+  @apply ml-2 inline-flex h-8 w-8 items-center justify-center border border-app-red bg-app-red text-white;
+  border-radius: var(--radius-compact);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.replay-lap-button:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--color-f1-red) 82%, white);
+  transform: translateX(0.0625rem);
+}
+
+.replay-lap-button:disabled {
+  @apply cursor-not-allowed opacity-40;
+}
+
+.replay-lap-button-icon {
+  @apply text-lg leading-none;
 }
 
 .replay-progress-value {
@@ -182,6 +286,7 @@
 
 .replay-speed-custom {
   @apply grid gap-1.5;
+  grid-row: span 2;
 }
 
 .replay-speed-input {
@@ -252,8 +357,31 @@
   @apply text-xs font-semibold text-app-red;
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 480px) {
+  .replay-panel-body {
+    @apply p-3;
+  }
+
+  .replay-progress-body {
+    @apply p-3;
+  }
+
   .replay-picker {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .replay-speed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .replay-speed-custom,
+  .replay-speed-readout,
+  .replay-speed-helper {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .replay-transport {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

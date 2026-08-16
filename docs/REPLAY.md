@@ -181,6 +181,7 @@ Replay without the API server (useful for checking the producer):
 | POST   | `/api/replay/start`   | start a replay (`{session_key, speed}`)   |
 | POST   | `/api/replay/pause`   | suspend the running replay clock          |
 | POST   | `/api/replay/resume`  | continue a paused replay                  |
+| POST   | `/api/replay/seek`    | jump by replay-clock `time` or completed `lap` |
 | POST   | `/api/replay/stop`    | stop the replay and restore live MQTT     |
 
 `session_key` on `/api/replay/start` falls back to `REPLAY_SESSION_KEY`, then
@@ -190,6 +191,10 @@ Replay without the API server (useful for checking the producer):
 `current_time` (race-clock seconds), `total_duration` (seconds from the last
 timeline event), `current_lap`, and `total_laps` (from the full lap history).
 The frontend never estimates progress on its own.
+
+`POST /api/replay/seek` accepts exactly one target: `{ "time": 540.5 }` for
+the timeline or `{ "lap": 12 }` for the matching lap checkpoint. The Replay
+page exposes both through its seekable timeline and editable lap readout.
 
 ## Verifying a replay
 
@@ -212,9 +217,7 @@ The frontend never estimates progress on its own.
 
 ## Current limitations
 
-- Location is thinned to ~1 sample/driver/second to bound memory.
-- There is no seek yet — only play, pause, resume, and stop. The progress bar
-  is read-only for now.
+- Location is thinned to ~4 samples/driver/second to bound memory.
 - The race picker is a flat year → country list; there is no search or
   meeting-name grouping.
 - Predictions require `data/models` to exist; otherwise they fall back to the

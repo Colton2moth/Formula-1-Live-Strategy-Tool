@@ -50,7 +50,12 @@ export function ReplayPage() {
           {banner}
         </div>
         <ReplayControls {...replay} />
-        <ReplayProgress progress={replay.progress} onSeek={replay.seek} canSeek={canSeek} />
+        <ReplayProgress
+          progress={replay.progress}
+          onSeek={replay.seek}
+          onSeekLap={replay.seekLap}
+          canSeek={canSeek}
+        />
         {error ? (
           <Panel label="Race data">
             <div className="p-4">

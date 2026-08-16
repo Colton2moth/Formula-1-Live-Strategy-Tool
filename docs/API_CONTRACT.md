@@ -188,6 +188,24 @@ geometry, so the frontend must treat it as optional and only draw it when presen
 Returns `503` before any live session is ingested and `404` when the session's
 `circuit_key` is not yet in the circuit library.
 
+### POST `/api/replay/seek`
+
+Jumps an active or finished replay to exactly one target. Use replay-clock
+seconds for timeline seeking:
+
+```json
+{"time": 540.5}
+```
+
+Use a completed lap number for checkpoint seeking:
+
+```json
+{"lap": 12}
+```
+
+Providing neither target, both targets, or a lap below 1 returns `422`. The
+response is the current replay status object.
+
 ---
 
 ## WebSocket Events

@@ -104,6 +104,10 @@ export function seekReplay(time: number) {
   return postJson("/api/replay/seek", { time }, assertReplayStatus);
 }
 
+export function seekReplayLap(lap: number) {
+  return postJson("/api/replay/seek", { lap }, assertReplayStatus);
+}
+
 export function setReplaySpeed(speed: number) {
   return postJson("/api/replay/speed", { speed }, assertReplayStatus);
 }
