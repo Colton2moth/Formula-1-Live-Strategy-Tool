@@ -125,6 +125,29 @@ def test_track_no_pit_lane_for_interlagos():
     assert response.json().get("pit_lane") is None
 
 
+def test_tracks_lists_every_circuit_with_pit_lanes():
+    from formula1_strategy_tool.api.circuits import CIRCUITS
+    from formula1_strategy_tool.api.pit_lanes import PIT_LANES
+
+    response = client.get("/api/tracks")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == len(CIRCUITS)
+
+    by_key = {track["circuit_key"]: track for track in data}
+    assert set(by_key) == set(CIRCUITS)
+
+    for key, track in by_key.items():
+        assert len(track["path"]) > 2
+        assert track["path"][0] == track["path"][-1]
+        assert track["country_name"]
+        if key in PIT_LANES:
+            assert track["pit_lane"] is not None
+            assert len(track["pit_lane"]) > 2
+        else:
+            assert track["pit_lane"] is None
+
+
 def test_replay_sessions_include_readiness(monkeypatch):
     from formula1_strategy_tool.acquisition import cache_replays
     from formula1_strategy_tool.acquisition import replay as replay_mod

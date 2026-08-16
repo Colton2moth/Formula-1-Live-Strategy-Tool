@@ -6,10 +6,12 @@ import { ErrorScreen } from "./components/ErrorScreen";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { ReplayPage } from "./features/replay/ReplayPage";
 import { TestIndex } from "./features/test-screens/TestIndex";
+import { TrackMapPreviews } from "./features/test-screens/TrackMapPreviews";
 import "./index.css";
 import "./styles/shared.css";
 import "./styles/race-header.css";
 import "./styles/track-map.css";
+import "./styles/track-map-previews.css";
 import "./styles/leaderboard.css";
 import "./styles/strategy-panel.css";
 import "./styles/state-screens.css";
@@ -22,6 +24,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         <Route path="/" element={<App />} />
         <Route path="/replay" element={<ReplayPage />} />
         <Route path="/test" element={<TestIndex />} />
+        <Route path="/test/maps" element={<TrackMapPreviews />} />
         <Route path="/test/loading/connecting" element={<LoadingScreen variant="connecting" />} />
         <Route path="/test/loading/data" element={<LoadingScreen variant="loading" />} />
         <Route path="/test/error/unavailable" element={<ErrorScreen variant="unavailable" />} />

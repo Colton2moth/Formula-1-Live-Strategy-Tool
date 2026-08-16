@@ -139,6 +139,7 @@ library (see `src/formula1_strategy_tool/api/circuits.py`).
 {
   "circuit_name": "Hungaroring",
   "circuit_key": 4,
+  "country_name": "Hungary",
   "start_finish": {"x": -1470.9, "y": -123.3},
   "path": [
     {"x": -1710.5, "y": 76.6},
@@ -159,6 +160,30 @@ geometry, so the frontend must treat it as optional and only draw it when presen
 
 Returns `503` before any live session is ingested and `404` when the session's
 `circuit_key` is not yet in the circuit library.
+
+### GET `/api/tracks`
+
+Returns every circuit in the static library, sorted by `circuit_key`, so the
+developer track-map preview page can render them all without a live session.
+
+```json
+[
+  {
+    "circuit_name": "Silverstone Circuit",
+    "circuit_key": 2,
+    "country_name": "United Kingdom",
+    "start_finish": {"x": -1756.0, "y": 1208.0},
+    "path": [{"x": -1535.7, "y": 1556.3}],
+    "pit_lane": null
+  }
+]
+```
+
+Each entry uses the same `TrackState` schema as `/api/track`, including the
+optional `pit_lane` and the `country_name` resolved from a static
+circuit-key → country mapping. Unlike `/api/track`, this endpoint does not
+require a live session and returns all known circuits rather than only the
+current one.
 
 ### GET `/api/locations`
 

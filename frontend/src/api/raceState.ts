@@ -28,6 +28,13 @@ function assertTrackState(value: unknown): TrackState {
   return value as TrackState;
 }
 
+function assertTracks(value: unknown): TrackState[] {
+  if (!Array.isArray(value)) {
+    throw new Error("Tracks response did not match the expected shape.");
+  }
+  return value as TrackState[];
+}
+
 function assertPrediction(value: unknown): ApiPrediction {
   if (!isRecord(value) || typeof value.driver_number !== "number") {
     throw new Error("Prediction response did not match the expected shape.");
@@ -65,6 +72,10 @@ export function fetchRaceState() {
 
 export function fetchTrack() {
   return fetchJson("/api/track", assertTrackState);
+}
+
+export function fetchTracks() {
+  return fetchJson("/api/tracks", assertTracks);
 }
 
 export function fetchDriverPrediction(driverNumber: number) {

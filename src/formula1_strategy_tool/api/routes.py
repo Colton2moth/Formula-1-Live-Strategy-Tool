@@ -23,7 +23,8 @@ from formula1_strategy_tool.acquisition.live_features import (
 from formula1_strategy_tool.acquisition.live_session import session_from_live
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE
 from formula1_strategy_tool.acquisition.replay import replay_controller
-from formula1_strategy_tool.api.circuits import track_for_circuit
+from formula1_strategy_tool.api.circuits import CIRCUITS, track_for_circuit
+from formula1_strategy_tool.api.countries import COUNTRY_NAMES
 from formula1_strategy_tool.api.schemas import (
     DriverState,
     LiveStatus,
@@ -209,7 +210,21 @@ def get_track() -> TrackState:
         raise HTTPException(
             status_code=404, detail=f"No circuit map for circuit_key {circuit_key}"
         )
-    return track
+    return _with_country(track)
+
+
+@router.get("/tracks", response_model=list[TrackState])
+def get_tracks() -> list[TrackState]:
+    """Every static circuit map (with pit lane when available)."""
+    tracks = (track_for_circuit(key) for key in sorted(CIRCUITS))
+    return [_with_country(track) for track in tracks if track is not None]
+
+
+def _with_country(track: TrackState) -> TrackState:
+    """Attach the circuit's country name to a TrackState."""
+    return track.model_copy(
+        update={"country_name": COUNTRY_NAMES.get(track.circuit_key)}
+    )
 
 
 @router.get("/live-status", response_model=LiveStatus)

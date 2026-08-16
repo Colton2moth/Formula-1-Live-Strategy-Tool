@@ -13,6 +13,10 @@ const errorStates = [
   { path: "/test/error/timeout", label: "Request timeout", code: "error:timeout" },
 ] as const;
 
+const utilityPages = [
+  { path: "/test/maps", label: "Track map previews", code: "track-map-previews" },
+] as const;
+
 export const TestIndex: FC = () => {
   return (
     <main className="dashboard-shell">
@@ -37,6 +41,18 @@ export const TestIndex: FC = () => {
           <div className="test-index-group-title">Error States</div>
           <div className="test-index-links">
             {errorStates.map(({ path, label, code }) => (
+              <Link key={path} to={path} className="test-index-link">
+                <span>{label}</span>
+                <span className="test-index-link-code">{code}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="test-index-group">
+          <div className="test-index-group-title">Utilities</div>
+          <div className="test-index-links">
+            {utilityPages.map(({ path, label, code }) => (
               <Link key={path} to={path} className="test-index-link">
                 <span>{label}</span>
                 <span className="test-index-link-code">{code}</span>

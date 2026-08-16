@@ -27,6 +27,7 @@ document you need.
 
 - [API contract](./api/CONTRACT.md)
 - [Frontend state screens](./frontend/STATE_SCREENS.md)
+- [Track map previews](./frontend/TRACK_MAP_PREVIEW.md)
 
 ## Replay Mode
 

@@ -56,6 +56,8 @@ export type RaceState = {
 export type TrackPoint = { x: number; y: number };
 export type TrackState = {
   circuit_name: string;
+  circuit_key: number;
+  country_name?: string;
   start_finish: TrackPoint;
   path: TrackPoint[];
   pit_lane?: TrackPoint[];
