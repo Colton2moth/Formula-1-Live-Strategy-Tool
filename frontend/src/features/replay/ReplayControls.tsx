@@ -33,14 +33,14 @@ const STATUS_TONES: Record<string, "neutral" | "green" | "amber" | "red"> = {
 
 const READINESS_LABELS: Record<string, string> = {
   ready: "Ready",
-  preparing: "Preparing",
-  failed: "Failed",
+  not_ready: "Not ready",
+  failed: "Preparation failed",
   unknown: "Unknown",
 };
 
 const READINESS_TONES: Record<string, "neutral" | "green" | "amber" | "red"> = {
   ready: "green",
-  preparing: "amber",
+  not_ready: "amber",
   failed: "red",
   unknown: "neutral",
 };
@@ -145,8 +145,10 @@ export function ReplayControls(replay: ReplayControlsProps) {
     : isReady
       ? "Ready — press Play."
       : readiness === "failed"
-        ? "This race could not be prepared."
-        : "This race is still being prepared.";
+        ? "Replay preparation failed for this race."
+        : readiness === "not_ready"
+          ? "This race has not been prepared for replay yet."
+          : "Readiness could not be determined.";
 
   return (
     <Panel
@@ -197,8 +199,8 @@ export function ReplayControls(replay: ReplayControlsProps) {
                 races.map((session) => (
                   <option key={session.session_key} value={session.session_key}>
                     {sessionLabel(session)}
-                    {session.readiness === "preparing"
-                      ? " (preparing)"
+                    {session.readiness === "not_ready"
+                      ? " (not ready)"
                       : session.readiness === "failed"
                         ? " (failed)"
                         : ""}

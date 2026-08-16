@@ -923,10 +923,10 @@ def test_replay_readiness_ready(monkeypatch, tmp_path):
     assert cache_replays.replay_readiness(1) == "ready"
 
 
-def test_replay_readiness_preparing(monkeypatch, tmp_path):
+def test_replay_readiness_not_ready(monkeypatch, tmp_path):
     monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
     monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "no-failures.txt")
-    assert cache_replays.replay_readiness(99) == "preparing"
+    assert cache_replays.replay_readiness(99) == "not_ready"
 
 
 def test_replay_readiness_failed(monkeypatch, tmp_path):

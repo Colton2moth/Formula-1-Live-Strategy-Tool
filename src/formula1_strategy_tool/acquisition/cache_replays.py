@@ -41,7 +41,7 @@ def replay_readiness(session_key: int) -> str:
 
     - ``ready``: the prepared timeline and checkpoint/index data load successfully.
     - ``failed``: not ready and a recorded preparation failure exists.
-    - ``preparing``: not ready and no recorded failure (never prepared yet).
+    - ``not_ready``: not ready and no recorded failure (not prepared yet).
     """
     cache = replay_dir(session_key)
     if (cache / "timeline.json").exists() and load_checkpoint_index(
@@ -50,7 +50,7 @@ def replay_readiness(session_key: int) -> str:
         return "ready"
     if _session_in_failures(session_key):
         return "failed"
-    return "preparing"
+    return "not_ready"
 
 
 def _session_in_failures(session_key: int) -> bool:

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
 import type { ReplayProgress as ReplayProgressState } from "./useReplay";
 
@@ -27,7 +27,7 @@ export function ReplayProgress({ progress, onSeek, onSeekLap, canSeek }: ReplayP
   const { currentTime, totalDuration, currentLap, totalLaps } = progress;
   const [previewTime, setPreviewTime] = useState<number | null>(null);
   const [lapText, setLapText] = useState("1");
-  const [lapInputFocused, setLapInputFocused] = useState(false);
+  const lapInputFocusedRef = useRef(false);
 
   const max = totalDuration && totalDuration > 0 ? totalDuration : 0;
   const displayed = Math.min(max, previewTime ?? currentTime ?? 0);
@@ -42,10 +42,10 @@ export function ReplayProgress({ progress, onSeek, onSeekLap, canSeek }: ReplayP
   } as CSSProperties;
 
   useEffect(() => {
-    if (!lapInputFocused && currentLap !== null) {
+    if (!lapInputFocusedRef.current && currentLap !== null) {
       setLapText(String(Math.max(1, currentLap)));
     }
-  }, [currentLap, lapInputFocused]);
+  }, [currentLap]);
 
   const commit = (value: number) => {
     setPreviewTime(null);
@@ -93,8 +93,12 @@ export function ReplayProgress({ progress, onSeek, onSeekLap, canSeek }: ReplayP
                 value={lapText}
                 disabled={lapDisabled}
                 aria-invalid={lapText !== "" && !lapValid}
-                onFocus={() => setLapInputFocused(true)}
-                onBlur={() => setLapInputFocused(false)}
+                onFocus={() => {
+                  lapInputFocusedRef.current = true;
+                }}
+                onBlur={() => {
+                  lapInputFocusedRef.current = false;
+                }}
                 onChange={(event) => setLapText(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && lapValid) onSeekLap(lapTarget);
