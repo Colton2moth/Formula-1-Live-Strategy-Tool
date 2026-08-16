@@ -7,7 +7,7 @@ document you need.
 
 - [Project architecture](./ARCHITECTURE.md)
 - [First-time setup](./development/SETUP.md)
-- [Normal development startup](./development/SETUP.md#normal-daily-startup)
+- [Fast start (after setup)](./development/FAST_START.md)
 - [Development workflow](./development/WORKFLOW.md)
 
 ## Data
