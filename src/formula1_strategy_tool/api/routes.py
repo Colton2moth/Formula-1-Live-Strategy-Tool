@@ -245,6 +245,7 @@ def get_replay_status() -> ReplayStatus:
 @router.get("/replay/sessions", response_model=list[ReplaySessionOption])
 def get_replay_sessions() -> list[ReplaySessionOption]:
     """Completed Race sessions, for the year → country replay picker."""
+    from formula1_strategy_tool.acquisition.cache_replays import replay_readiness
     from formula1_strategy_tool.acquisition.replay import list_replay_sessions
 
     try:
@@ -253,7 +254,10 @@ def get_replay_sessions() -> list[ReplaySessionOption]:
         raise HTTPException(
             status_code=503, detail=f"Could not list sessions: {exc}"
         ) from exc
-    return [ReplaySessionOption(**row) for row in sessions]
+    return [
+        ReplaySessionOption(**row, readiness=replay_readiness(row["session_key"]))
+        for row in sessions
+    ]
 
 
 @router.post("/replay/start", response_model=ReplayStatus)

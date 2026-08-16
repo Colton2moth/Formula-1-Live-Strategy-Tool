@@ -125,6 +125,31 @@ def test_track_no_pit_lane_for_interlagos():
     assert response.json().get("pit_lane") is None
 
 
+def test_replay_sessions_include_readiness(monkeypatch):
+    from formula1_strategy_tool.acquisition import cache_replays
+    from formula1_strategy_tool.acquisition import replay as replay_mod
+
+    monkeypatch.setattr(
+        replay_mod,
+        "list_replay_sessions",
+        lambda: [
+            {
+                "session_key": 9963,
+                "year": 2025,
+                "country_name": "Canada",
+                "location": "Montreal",
+                "circuit_short_name": "Montreal",
+                "date_start": "2025-06-15T18:00:00+00:00",
+            }
+        ],
+    )
+    monkeypatch.setattr(cache_replays, "replay_readiness", lambda key: "ready")
+
+    response = client.get("/api/replay/sessions")
+    assert response.status_code == 200
+    assert response.json()[0]["readiness"] == "ready"
+
+
 def test_locations_endpoint_compact_shape():
     LIVE_STATE.update(
         "v1/location",

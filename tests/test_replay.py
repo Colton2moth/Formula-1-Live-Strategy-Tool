@@ -752,3 +752,46 @@ def test_cache_session_reports_missing_location_window(monkeypatch, tmp_path):
     # A location gap is report-only: the prepared representation still builds.
     assert load_timeline(tmp_path / "5", 5) is not None
     assert load_checkpoint_index(tmp_path / "5", 5) is not None
+
+
+def test_last_lap_end_derives_from_lap_duration():
+    laps = [
+        {
+            "driver_number": 4,
+            "date_start": "2026-07-26T13:00:00+00:00",
+            "lap_duration": 90.0,
+        },
+        {
+            "driver_number": 4,
+            "date_start": "2026-07-26T13:01:30+00:00",
+            "lap_duration": 89.0,
+        },
+    ]
+    assert replay_mod._last_lap_end(laps).isoformat() == "2026-07-26T13:02:59+00:00"
+
+
+def test_last_lap_end_empty_returns_none():
+    assert replay_mod._last_lap_end([]) is None
+
+
+def test_replay_readiness_ready(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    cache_replays.prepare_timeline(tmp_path / "1", _data())
+    assert cache_replays.replay_readiness(1) == "ready"
+
+
+def test_replay_readiness_preparing(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "no-failures.txt")
+    assert cache_replays.replay_readiness(99) == "preparing"
+
+
+def test_replay_readiness_failed(monkeypatch, tmp_path):
+    failures = tmp_path / "cache_failures.txt"
+    failures.write_text(
+        "2026-01-01T00:00:00+00:00 | 42 | 2025 Test | download failed\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", failures)
+    assert cache_replays.replay_readiness(42) == "failed"

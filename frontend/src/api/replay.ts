@@ -20,6 +20,8 @@ export type ReplayStatus = {
   total_laps: number | null;
 };
 
+export type ReplayReadiness = "ready" | "preparing" | "failed" | "unknown";
+
 export type ReplaySessionOption = {
   session_key: number;
   year: number;
@@ -27,6 +29,7 @@ export type ReplaySessionOption = {
   location: string | null;
   circuit_short_name: string | null;
   date_start: string | null;
+  readiness: ReplayReadiness;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -58,7 +61,27 @@ function assertReplaySessions(value: unknown): ReplaySessionOption[] {
   if (!Array.isArray(value)) {
     throw new Error("Replay sessions response did not match the expected shape.");
   }
-  return value as ReplaySessionOption[];
+  return value.map((session) => {
+    if (!isRecord(session)) {
+      throw new Error("Replay sessions response did not match the expected shape.");
+    }
+    const readiness =
+      session.readiness === "ready" ||
+      session.readiness === "preparing" ||
+      session.readiness === "failed"
+        ? session.readiness
+        : "unknown";
+    return {
+      session_key: session.session_key as number,
+      year: session.year as number,
+      country_name: typeof session.country_name === "string" ? session.country_name : null,
+      location: typeof session.location === "string" ? session.location : null,
+      circuit_short_name:
+        typeof session.circuit_short_name === "string" ? session.circuit_short_name : null,
+      date_start: typeof session.date_start === "string" ? session.date_start : null,
+      readiness,
+    };
+  });
 }
 
 export function fetchReplaySessions() {

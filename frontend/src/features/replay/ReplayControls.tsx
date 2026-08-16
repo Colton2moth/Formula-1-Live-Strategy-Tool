@@ -28,6 +28,20 @@ const STATUS_TONES: Record<string, "neutral" | "green" | "amber" | "red"> = {
   error: "red",
 };
 
+const READINESS_LABELS: Record<string, string> = {
+  ready: "Ready",
+  preparing: "Preparing",
+  failed: "Failed",
+  unknown: "Unknown",
+};
+
+const READINESS_TONES: Record<string, "neutral" | "green" | "amber" | "red"> = {
+  ready: "green",
+  preparing: "amber",
+  failed: "red",
+  unknown: "neutral",
+};
+
 export function ReplayControls(replay: ReplayControlsProps) {
   const {
     years,
@@ -54,9 +68,19 @@ export function ReplayControls(replay: ReplayControlsProps) {
   const isRunning = status === "running";
   const isPaused = status === "paused";
   const isDownloading = status === "downloading";
-  const canStart = (isIdle || isFinished) && !busy && !loadingSessions && selectedSession !== null;
+  const readiness = selectedSession?.readiness ?? "unknown";
+  const isReady = readiness === "ready";
+  const canStart =
+    (isIdle || isFinished) && !busy && !loadingSessions && selectedSession !== null && isReady;
   const canStop = (isRunning || isPaused || isFinished || isDownloading) && !busy;
   const playLabel = isFinished ? "Replay" : "Play";
+  const idleHint = !selectedSession
+    ? "Select a race and press Play."
+    : isReady
+      ? "Ready — press Play."
+      : readiness === "failed"
+        ? "This race could not be prepared."
+        : "This race is still being prepared.";
 
   return (
     <Panel
@@ -107,6 +131,11 @@ export function ReplayControls(replay: ReplayControlsProps) {
                 races.map((session) => (
                   <option key={session.session_key} value={session.session_key}>
                     {sessionLabel(session)}
+                    {session.readiness === "preparing"
+                      ? " (preparing)"
+                      : session.readiness === "failed"
+                        ? " (failed)"
+                        : ""}
                   </option>
                 ))
               )}
@@ -125,6 +154,10 @@ export function ReplayControls(replay: ReplayControlsProps) {
               {selectedSession.circuit_short_name ? (
                 <span className="replay-selected-chip">{selectedSession.circuit_short_name}</span>
               ) : null}
+              <StatusChip
+                label={READINESS_LABELS[readiness] ?? readiness}
+                tone={READINESS_TONES[readiness] ?? "neutral"}
+              />
             </div>
           </div>
         ) : null}
@@ -205,7 +238,7 @@ export function ReplayControls(replay: ReplayControlsProps) {
         <div className="replay-status" aria-live="polite">
           {loadingSessions
             ? "Loading races…"
-            : error ?? (status === "idle" ? "Select a race and press Play." : STATUS_LABELS[status])}
+            : error ?? (status === "idle" ? idleHint : STATUS_LABELS[status])}
         </div>
       </div>
     </Panel>

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from formula1_strategy_tool.acquisition.client import OpenF1Client
+from formula1_strategy_tool.acquisition.client import OpenF1Client, load_json
 from formula1_strategy_tool.acquisition.replay import (
     _ENDPOINTS,
     download_replay_data,
@@ -35,6 +35,47 @@ from formula1_strategy_tool.acquisition.replay import (
 FAILURES_PATH = Path("data/replay/cache_failures.txt")
 
 
+def replay_readiness(session_key: int) -> str:
+    """
+    Return the replay readiness state for one session.
+
+    - ``ready``: the prepared timeline and checkpoint/index data load successfully.
+    - ``failed``: not ready and a recorded preparation failure exists.
+    - ``preparing``: not ready and no recorded failure (never prepared yet).
+    """
+    cache = replay_dir(session_key)
+    if (cache / "timeline.json").exists() and load_checkpoint_index(
+        cache, session_key
+    ) is not None:
+        return "ready"
+    if _session_in_failures(session_key):
+        return "failed"
+    return "preparing"
+
+
+def _session_in_failures(session_key: int) -> bool:
+    if not FAILURES_PATH.exists():
+        return False
+    needle = f"| {session_key} |"
+    return any(
+        needle in line for line in FAILURES_PATH.read_text(encoding="utf-8").splitlines()
+    )
+
+
+def _local_sessions() -> list[dict[str, Any]]:
+    """Discover already-cached sessions from ``data/replay`` without OpenF1."""
+    sessions: list[dict[str, Any]] = []
+    for child in sorted(Path("data/replay").iterdir()):
+        if not child.is_dir():
+            continue
+        path = child / "sessions.json"
+        if not path.exists():
+            continue
+        for row in load_json(path):
+            sessions.append(row)
+    return sessions
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -46,8 +87,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--years",
         type=int,
         nargs="+",
-        required=True,
-        help="Season years to cache, e.g. --years 2025 2026.",
+        help="Season years to cache, e.g. --years 2025 2026. Required unless --local.",
+    )
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Reuse sessions already under data/replay/ instead of listing OpenF1.",
     )
     parser.add_argument(
         "--max-retries",
@@ -158,10 +203,16 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = build_parser().parse_args(list(argv) if argv is not None else None)
     client = OpenF1Client(max_retries=args.max_retries, min_interval=args.interval)
 
-    years_label = ", ".join(str(year) for year in args.years)
-    print(f"Loading completed races for {years_label}...", flush=True)
-    sessions = fetch_replay_sessions(client, years=args.years)
-    print(f"Found {len(sessions)} completed races.\n", flush=True)
+    if args.local:
+        sessions = _local_sessions()
+        print(f"Using {len(sessions)} locally cached sessions.\n", flush=True)
+    else:
+        if not args.years:
+            build_parser().error("--years is required unless --local")
+        years_label = ", ".join(str(year) for year in args.years)
+        print(f"Loading completed races for {years_label}...", flush=True)
+        sessions = fetch_replay_sessions(client, years=args.years)
+        print(f"Found {len(sessions)} completed races.\n", flush=True)
 
     failed_sessions: list[tuple[dict[str, Any], list[str]]] = []
 

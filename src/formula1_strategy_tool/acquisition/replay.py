@@ -143,8 +143,22 @@ def download_replay_data(
 
 
 def _last_lap_end(laps: list[dict[str, Any]]) -> datetime | None:
-    ends = (parse_openf1_datetime(row.get("date_end")) for row in laps)
-    return max((end for end in ends if end is not None), default=None)
+    """Latest lap end time; derives from ``date_start + lap_duration`` when
+    OpenF1 ``laps`` rows carry no ``date_end`` field."""
+    best: datetime | None = None
+    for row in laps:
+        end = parse_openf1_datetime(row.get("date_end"))
+        if end is None:
+            start = parse_openf1_datetime(row.get("date_start"))
+            duration = row.get("lap_duration")
+            if start is not None and duration is not None:
+                try:
+                    end = start + timedelta(seconds=float(duration))
+                except (TypeError, ValueError):
+                    end = None
+        if end is not None and (best is None or end > best):
+            best = end
+    return best
 
 
 def _location_bounds(
