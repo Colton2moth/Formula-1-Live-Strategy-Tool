@@ -61,7 +61,11 @@ class OpenF1Client:
     community-tier rate limit.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        max_retries: int = MAX_RETRIES,
+        min_interval: float = MIN_REQUEST_INTERVAL_SECONDS,
+    ) -> None:
         # Session object keeps the connection pool alive across multiple GETs.
         self.http = requests.Session()
 
@@ -69,6 +73,11 @@ class OpenF1Client:
         self.http.headers.update(
             {"User-Agent": "formula-1-live-strategy-tool/0.1.0"}
         )
+
+        # Number of total attempts per request and the minimum delay between
+        # requests (overridable so bulk runs can trade reliability for speed).
+        self.max_retries = max_retries
+        self.min_interval = min_interval
 
         # Timestamp (monotonic clock) of when the last request *started*.
         # Used to calculate how long to wait before the next request.
@@ -92,12 +101,12 @@ class OpenF1Client:
         # Build the full URL: e.g. https://api.openf1.org/v1/laps
         url = f"{BASE_URL}/{endpoint}"
 
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(self.max_retries):
             # --- Rate limiting ---
             # Measure time since our last request started and sleep if needed
             # so we never exceed the community-tier request rate.
             elapsed = time.monotonic() - self._last_request_started
-            wait = MIN_REQUEST_INTERVAL_SECONDS - elapsed
+            wait = self.min_interval - elapsed
             if wait > 0:
                 time.sleep(wait)
 
@@ -138,7 +147,7 @@ class OpenF1Client:
             except (requests.RequestException, ValueError) as exc:
                 # Last attempt — wrap the underlying error so the caller sees
                 # which endpoint and params failed.
-                if attempt == MAX_RETRIES - 1:
+                if attempt == self.max_retries - 1:
                     raise RuntimeError(
                         f"Failed GET {endpoint} with {params} "
                         f"({_describe_http_error(exc)})"

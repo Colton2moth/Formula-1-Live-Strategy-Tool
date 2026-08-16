@@ -49,6 +49,18 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Season years to cache, e.g. --years 2025 2026.",
     )
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=6,
+        help="Total attempts per request (1 = no retries, 2 = retry once).",
+    )
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=2.1,
+        help="Seconds between requests (OpenF1 free tier allows ~30/min).",
+    )
     return parser
 
 
@@ -144,7 +156,7 @@ def record_failures(session: dict[str, Any], failures: list[str]) -> None:
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = build_parser().parse_args(list(argv) if argv is not None else None)
-    client = OpenF1Client()
+    client = OpenF1Client(max_retries=args.max_retries, min_interval=args.interval)
 
     years_label = ", ".join(str(year) for year in args.years)
     print(f"Loading completed races for {years_label}...", flush=True)
