@@ -16,7 +16,7 @@ from formula1_strategy_tool.acquisition.replay import (
     load_checkpoint_state,
     load_timeline,
     location_window_count,
-    nearest_checkpoint,
+    nearest_checkpoint_by_time,
     restore_checkpoint,
     save_checkpoints,
     save_timeline,
@@ -193,7 +193,8 @@ def test_replay_controller_start_stop(monkeypatch):
         pause_event=None,
         progress=None,
         on_seeded=None,
-        seek_lap=None,
+        seek_time=None,
+        speed_holder=None,
     ):
         if on_seeded is not None:
             on_seeded()
@@ -233,7 +234,8 @@ def test_replay_controller_pause_resume(monkeypatch):
         pause_event=None,
         progress=None,
         on_seeded=None,
-        seek_lap=None,
+        seek_time=None,
+        speed_holder=None,
     ):
         nonlocal captured_pause
         captured_pause = pause_event
@@ -273,7 +275,8 @@ def test_replay_controller_stop_fires_restore_hook(monkeypatch):
         pause_event=None,
         progress=None,
         on_seeded=None,
-        seek_lap=None,
+        seek_time=None,
+        speed_holder=None,
     ):
         if on_seeded is not None:
             on_seeded()
@@ -289,8 +292,8 @@ def test_replay_controller_stop_fires_restore_hook(monkeypatch):
     assert restored.wait(timeout=1.0)
 
 
-def test_replay_controller_seek_restarts_with_lap(monkeypatch):
-    seen: list[tuple[int, float, int | None]] = []
+def test_replay_controller_seek_restarts_with_time(monkeypatch):
+    seen: list[tuple[int, float, float | None]] = []
     started = threading.Event()
 
     def fake_replay(
@@ -302,9 +305,10 @@ def test_replay_controller_seek_restarts_with_lap(monkeypatch):
         pause_event=None,
         progress=None,
         on_seeded=None,
-        seek_lap=None,
+        seek_time=None,
+        speed_holder=None,
     ):
-        seen.append((session_key, speed, seek_lap))
+        seen.append((session_key, speed, seek_time))
         if on_seeded is not None:
             on_seeded()
         started.set()
@@ -315,15 +319,97 @@ def test_replay_controller_seek_restarts_with_lap(monkeypatch):
     monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
 
     # Seek before any replay is active is a no-op.
-    controller.seek(50)
+    controller.seek(50.0)
     assert seen == []
 
     controller.start(9979, speed=20)
     assert started.wait(timeout=1.0)
     assert seen[0][2] is None
 
-    controller.seek(50)
-    assert seen[-1] == (9979, 20, 50)
+    controller.seek(50.0)
+    assert seen[-1] == (9979, 20, 50.0)
+
+    controller.stop()
+
+
+def test_replay_controller_set_speed(monkeypatch):
+    seeded = threading.Event()
+    captured_holder: dict[str, float] | None = None
+
+    def fake_replay(
+        session_key,
+        speed=10.0,
+        state=None,
+        *,
+        stop_event=None,
+        pause_event=None,
+        progress=None,
+        on_seeded=None,
+        seek_time=None,
+        speed_holder=None,
+    ):
+        nonlocal captured_holder
+        captured_holder = speed_holder
+        if on_seeded is not None:
+            on_seeded()
+        seeded.set()
+        if stop_event is not None:
+            stop_event.wait(timeout=2.0)
+
+    controller = replay_mod.ReplayController()
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+
+    controller.start(9979, speed=10)
+    assert seeded.wait(timeout=1.0)
+    assert controller.snapshot()["speed"] == 10
+
+    assert controller.set_speed(50.0) is True
+    assert controller.snapshot()["speed"] == 50
+    assert captured_holder is not None and captured_holder["value"] == 50
+
+    controller.stop()
+    # Speed can only change while running or paused.
+    assert controller.set_speed(20.0) is False
+
+
+def test_replay_controller_seek_preserves_pause(monkeypatch):
+    captured: list[tuple[threading.Event | None, float | None]] = []
+    seeded = threading.Event()
+
+    def fake_replay(
+        session_key,
+        speed=10.0,
+        state=None,
+        *,
+        stop_event=None,
+        pause_event=None,
+        progress=None,
+        on_seeded=None,
+        seek_time=None,
+        speed_holder=None,
+    ):
+        captured.append((pause_event, seek_time))
+        if on_seeded is not None:
+            on_seeded()
+        seeded.set()
+        if stop_event is not None:
+            stop_event.wait(timeout=2.0)
+
+    controller = replay_mod.ReplayController()
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+
+    controller.start(9979, speed=10)
+    assert seeded.wait(timeout=1.0)
+    controller.pause()
+    assert controller.snapshot()["status"] == "paused"
+
+    seeded.clear()
+    controller.seek(50.0)
+    assert seeded.wait(timeout=1.0)
+    # The new worker is paused and seeks to the requested time.
+    assert captured[-1][0] is not None and captured[-1][0].is_set()
+    assert captured[-1][1] == 50.0
+    assert controller.snapshot()["status"] == "paused"
 
     controller.stop()
 
@@ -591,16 +677,16 @@ def test_save_and_load_checkpoints_roundtrip(tmp_path):
     assert restored.snapshot_docs() == checkpoints[1]["state"]
 
 
-def test_nearest_checkpoint():
+def test_nearest_checkpoint_by_time():
     checkpoints = [
-        {"lap": 1, "cursor": 10},
-        {"lap": 5, "cursor": 50},
-        {"lap": 10, "cursor": 100},
+        {"time": 90.0, "cursor": 10},
+        {"time": 180.0, "cursor": 50},
+        {"time": 270.0, "cursor": 100},
     ]
-    assert nearest_checkpoint(checkpoints, 6)["lap"] == 5
-    assert nearest_checkpoint(checkpoints, 1)["lap"] == 1
-    assert nearest_checkpoint(checkpoints, 0) is None
-    assert nearest_checkpoint(checkpoints, 10)["lap"] == 10
+    assert nearest_checkpoint_by_time(checkpoints, 120.0)["cursor"] == 10
+    assert nearest_checkpoint_by_time(checkpoints, 90.0)["cursor"] == 10
+    assert nearest_checkpoint_by_time(checkpoints, 89.9) is None
+    assert nearest_checkpoint_by_time(checkpoints, 270.0)["cursor"] == 100
 
 
 def test_load_checkpoint_index_missing_returns_none(tmp_path):
@@ -631,20 +717,45 @@ def test_restore_seek_returns_checkpoint_cursor(tmp_path):
     save_checkpoints(tmp_path, checkpoints, data["session"]["session_key"])
 
     buffer = LiveState()
-    cursor, lap, time_ = replay_mod._restore_seek(
+    cursor, lap = replay_mod._restore_seek(
         tmp_path,
         data["session"]["session_key"],
         events,
         data["session"],
         data["meetings"],
         data["drivers"],
-        seek_lap=2,
+        seek_time=180.0,
         buffer=buffer,
     )
     assert lap == 2
-    assert time_ == checkpoints[1]["time"]
     assert cursor == checkpoints[1]["cursor"]
     assert buffer.snapshot_docs() == checkpoints[1]["state"]
+
+
+def test_restore_seek_fast_forwards_between_checkpoints(tmp_path):
+    data = _multi_driver_data()
+    events = build_timeline(data)
+    checkpoints = build_checkpoints(
+        events, data["session"], data["meetings"], data["drivers"]
+    )
+    save_checkpoints(tmp_path, checkpoints, data["session"]["session_key"])
+
+    buffer = LiveState()
+    # 91.0 is after the lap-1 checkpoint (90.0) but before lap 2 (180.0).
+    cursor, lap = replay_mod._restore_seek(
+        tmp_path,
+        data["session"]["session_key"],
+        events,
+        data["session"],
+        data["meetings"],
+        data["drivers"],
+        seek_time=91.0,
+        buffer=buffer,
+    )
+    assert lap == 1
+    assert cursor == checkpoints[1]["cursor"] - 1  # applied only the 91.0 event
+    laps = [row["lap_number"] for row in buffer.docs_for("v1/laps")]
+    assert laps == [1, 1]  # both drivers' lap 1, nothing from lap 2
 
 
 def test_restore_seek_builds_checkpoints_when_missing(tmp_path):
@@ -652,14 +763,14 @@ def test_restore_seek_builds_checkpoints_when_missing(tmp_path):
     events = build_timeline(data)
 
     buffer = LiveState()
-    cursor, lap, _ = replay_mod._restore_seek(
+    cursor, lap = replay_mod._restore_seek(
         tmp_path,
         data["session"]["session_key"],
         events,
         data["session"],
         data["meetings"],
         data["drivers"],
-        seek_lap=1,
+        seek_time=90.0,
         buffer=buffer,
     )
     assert lap == 1
@@ -674,17 +785,17 @@ def test_restore_seek_before_first_lap_seeds_identity(tmp_path):
     events = build_timeline(data)
 
     buffer = LiveState()
-    cursor, lap, time_ = replay_mod._restore_seek(
+    cursor, lap = replay_mod._restore_seek(
         tmp_path,
         data["session"]["session_key"],
         events,
         data["session"],
         data["meetings"],
         data["drivers"],
-        seek_lap=0,
+        seek_time=0.0,
         buffer=buffer,
     )
-    assert (cursor, lap, time_) == (0, 0, 0.0)
+    assert (cursor, lap) == (0, 0)
     assert buffer.docs_for("v1/sessions")[0]["session_key"] == 7
     assert len(buffer.docs_for("v1/drivers")) == 2
 
@@ -700,7 +811,7 @@ def test_replay_session_seek_reaches_same_final_state(monkeypatch, tmp_path):
     buffer = LiveState()
     progress: dict = {}
     replay_mod.replay_session(
-        7, speed=100000, state=buffer, progress=progress, seek_lap=2
+        7, speed=100000, state=buffer, progress=progress, seek_time=91.0
     )
 
     expected = LiveState()

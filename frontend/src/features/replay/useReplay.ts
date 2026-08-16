@@ -5,25 +5,24 @@ import {
   pauseReplay,
   resumeReplay,
   seekReplay,
+  setReplaySpeed,
   startReplay,
   stopReplay,
 } from "../../api/replay";
 import type { ReplaySessionOption, ReplayStatusValue } from "../../api/replay";
 
-export const SPEED_OPTIONS = [
-  { value: "1", label: "1×" },
-  { value: "2", label: "2×" },
-  { value: "5", label: "5×" },
-  { value: "10", label: "10×" },
-  { value: "20", label: "20×" },
-] as const;
+export const SPEED_PRESETS = [1, 2, 5, 10, 20, 50, 100] as const;
+export const MIN_SPEED = 0.25;
+export const MAX_SPEED = 100;
 
-export type ReplaySpeedValue = (typeof SPEED_OPTIONS)[number]["value"];
+function clampSpeed(value: number): number {
+  if (!Number.isFinite(value)) return 10;
+  return Math.min(MAX_SPEED, Math.max(MIN_SPEED, value));
+}
 
-function defaultSpeed(): ReplaySpeedValue {
-  const env = import.meta.env.VITE_REPLAY_SPEED;
-  const found = SPEED_OPTIONS.find((option) => option.value === String(env));
-  return found ? found.value : "10";
+function defaultSpeed(): number {
+  const env = Number(import.meta.env.VITE_REPLAY_SPEED);
+  return (SPEED_PRESETS as readonly number[]).includes(env) ? env : 10;
 }
 
 export type ReplayProgress = {
@@ -56,24 +55,34 @@ export function grandPrixName(session: ReplaySessionOption): string {
 }
 
 export function speedHelperText(speed: number): string {
-  if (speed <= 1) {
+  if (speed <= 0) {
+    return "";
+  }
+  if (speed === 1) {
     return "1× — real time. One minute of race time plays in one minute.";
   }
-  return `${speed}× means 1 minute of race time plays in about ${Math.round(
-    60 / speed,
-  )} seconds.`;
+  const seconds = 60 / speed;
+  const span =
+    seconds >= 60
+      ? `${(seconds / 60).toFixed(1)} minutes`
+      : seconds >= 1
+        ? `about ${Math.round(seconds)} second${Math.round(seconds) === 1 ? "" : "s"}`
+        : "under a second";
+  return `${speed}× means 1 minute of race time plays in ${span}.`;
 }
 
 export function useReplay(onSeeded: () => void) {
   const [sessions, setSessions] = useState<ReplaySessionOption[]>([]);
   const [year, setYear] = useState<string>("");
   const [sessionKey, setSessionKey] = useState<string>("");
-  const [speed, setSpeed] = useState<ReplaySpeedValue>(defaultSpeed);
+  const [speed, setSpeedState] = useState<number>(defaultSpeed);
   const [status, setStatus] = useState<ReplayStatusValue>("idle");
   const [progress, setProgress] = useState<ReplayProgress>(EMPTY_PROGRESS);
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingSessions, setLoadingSessions] = useState<boolean>(true);
+  const [sessionIdInput, setSessionIdInput] = useState<string>("");
+  const [sessionIdError, setSessionIdError] = useState<string | null>(null);
   const seededRef = useRef(false);
 
   const years = useMemo(
@@ -171,6 +180,40 @@ export function useReplay(onSeeded: () => void) {
     setSessionKey(key);
   }, []);
 
+  const setSpeed = useCallback(
+    (nextSpeed: number) => {
+      const clamped = clampSpeed(nextSpeed);
+      setSpeedState(clamped);
+      if (status === "running" || status === "paused") {
+        void setReplaySpeed(clamped)
+          .then((result) => setStatus(result.status))
+          .catch(() => setError("Failed to change replay speed"));
+      }
+    },
+    [status],
+  );
+
+  const submitSessionId = useCallback(() => {
+    const trimmed = sessionIdInput.trim();
+    if (trimmed === "") {
+      setSessionIdError("Enter a session ID");
+      return;
+    }
+    const id = Number(trimmed);
+    if (!Number.isInteger(id) || id <= 0) {
+      setSessionIdError("Session ID must be a positive whole number");
+      return;
+    }
+    const found = sessions.find((session) => session.session_key === id);
+    if (!found) {
+      setSessionIdError(`Session ${id} is not in the replay library`);
+      return;
+    }
+    setSessionIdError(null);
+    setSessionKey(String(id));
+    setYear(String(found.year));
+  }, [sessions, sessionIdInput]);
+
   const start = useCallback(async () => {
     const key = Number(sessionKey);
     if (!Number.isInteger(key) || key <= 0) {
@@ -239,16 +282,16 @@ export function useReplay(onSeeded: () => void) {
     }
   }, []);
 
-  const seek = useCallback(async (lap: number) => {
-    if (!Number.isInteger(lap) || lap < 0) {
-      setError("Pick a lap to seek to");
+  const seek = useCallback(async (time: number) => {
+    if (!Number.isFinite(time) || time < 0) {
+      setError("Pick a time to seek to");
       return;
     }
     setBusy(true);
     setError(null);
     seededRef.current = false;
     try {
-      const next = await seekReplay(lap);
+      const next = await seekReplay(time);
       setStatus(next.status);
     } catch (requestError) {
       setError(
@@ -273,6 +316,10 @@ export function useReplay(onSeeded: () => void) {
     busy,
     error,
     loadingSessions,
+    sessionIdInput,
+    setSessionIdInput,
+    sessionIdError,
+    submitSessionId,
     selectYear,
     selectRace,
     start,

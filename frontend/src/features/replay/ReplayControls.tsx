@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { Panel } from "../../components/Panel";
 import { StatusChip } from "../../components/StatusChip";
 import {
-  SPEED_OPTIONS,
+  MAX_SPEED,
+  MIN_SPEED,
+  SPEED_PRESETS,
   grandPrixName,
   sessionLabel,
   speedHelperText,
@@ -42,6 +45,64 @@ const READINESS_TONES: Record<string, "neutral" | "green" | "amber" | "red"> = {
   unknown: "neutral",
 };
 
+type CustomSpeedInputProps = {
+  speed: number;
+  disabled: boolean;
+  onCommit: (speed: number) => void;
+};
+
+function CustomSpeedInput({ speed, disabled, onCommit }: CustomSpeedInputProps) {
+  const [text, setText] = useState(String(speed));
+  const [invalid, setInvalid] = useState(false);
+
+  useEffect(() => {
+    setText(String(speed));
+    setInvalid(false);
+  }, [speed]);
+
+  const commit = () => {
+    const value = Number(text);
+    if (!Number.isFinite(value) || value < MIN_SPEED || value > MAX_SPEED) {
+      setInvalid(true);
+      return;
+    }
+    setInvalid(false);
+    onCommit(value);
+  };
+
+  return (
+    <div className="replay-speed-custom">
+      <label className="replay-speed-label" htmlFor="replay-speed-custom">
+        Custom speed
+      </label>
+      <input
+        id="replay-speed-custom"
+        className={`replay-speed-input ${invalid ? "replay-speed-input--invalid" : ""}`}
+        type="number"
+        min={MIN_SPEED}
+        max={MAX_SPEED}
+        step={0.25}
+        value={text}
+        disabled={disabled}
+        onChange={(event) => {
+          setText(event.target.value);
+          setInvalid(false);
+        }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") commit();
+        }}
+        aria-label="Custom replay speed"
+      />
+      {invalid ? (
+        <div className="replay-speed-error">
+          Enter a speed from {MIN_SPEED}× to {MAX_SPEED}×
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ReplayControls(replay: ReplayControlsProps) {
   const {
     years,
@@ -55,6 +116,10 @@ export function ReplayControls(replay: ReplayControlsProps) {
     busy,
     error,
     loadingSessions,
+    sessionIdInput,
+    setSessionIdInput,
+    sessionIdError,
+    submitSessionId,
     selectYear,
     selectRace,
     start,
@@ -73,6 +138,7 @@ export function ReplayControls(replay: ReplayControlsProps) {
   const canStart =
     (isIdle || isFinished) && !busy && !loadingSessions && selectedSession !== null && isReady;
   const canStop = (isRunning || isPaused || isFinished || isDownloading) && !busy;
+  const speedEditable = isIdle || isRunning || isPaused;
   const playLabel = isFinished ? "Replay" : "Play";
   const idleHint = !selectedSession
     ? "Select a race and press Play."
@@ -141,6 +207,38 @@ export function ReplayControls(replay: ReplayControlsProps) {
               )}
             </select>
           </div>
+          <div className="replay-field">
+            <label className="replay-field-label" htmlFor="replay-session-id">
+              Session ID
+            </label>
+            <div className="replay-session-id-row">
+              <input
+                id="replay-session-id"
+                className="replay-session-id-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="e.g. 9963"
+                value={sessionIdInput}
+                onChange={(event) => setSessionIdInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") submitSessionId();
+                }}
+                disabled={!isIdle}
+                aria-label="Session ID"
+              />
+              <button
+                type="button"
+                className="replay-session-id-button"
+                onClick={submitSessionId}
+                disabled={!isIdle}
+              >
+                Go
+              </button>
+            </div>
+            {sessionIdError ? (
+              <div className="replay-session-id-error">{sessionIdError}</div>
+            ) : null}
+          </div>
         </div>
 
         {selectedSession ? (
@@ -154,6 +252,7 @@ export function ReplayControls(replay: ReplayControlsProps) {
               {selectedSession.circuit_short_name ? (
                 <span className="replay-selected-chip">{selectedSession.circuit_short_name}</span>
               ) : null}
+              <span className="replay-selected-chip">Session {selectedSession.session_key}</span>
               <StatusChip
                 label={READINESS_LABELS[readiness] ?? readiness}
                 tone={READINESS_TONES[readiness] ?? "neutral"}
@@ -165,27 +264,28 @@ export function ReplayControls(replay: ReplayControlsProps) {
         <div className="replay-speed" role="radiogroup" aria-label="Replay Speed">
           <div className="replay-speed-label">Replay Speed</div>
           <div className="replay-speed-options">
-            {SPEED_OPTIONS.map((option) => {
-              const selected = option.value === speed;
+            {SPEED_PRESETS.map((value) => {
+              const selected = value === speed;
               return (
                 <button
-                  key={option.value}
+                  key={value}
                   type="button"
                   role="radio"
                   aria-checked={selected}
                   className={`replay-speed-option ${selected ? "replay-speed-option--selected" : ""}`}
-                  onClick={() => setSpeed(option.value)}
-                  disabled={!isIdle}
+                  onClick={() => setSpeed(value)}
+                  disabled={!speedEditable}
                 >
-                  {option.label}
+                  {value}×
                 </button>
               );
             })}
           </div>
+          <CustomSpeedInput speed={speed} disabled={!speedEditable} onCommit={setSpeed} />
           <div className="replay-speed-readout" aria-live="polite">
             Replay Speed: {speed}×
           </div>
-          <div className="replay-speed-helper">{speedHelperText(Number(speed))}</div>
+          <div className="replay-speed-helper">{speedHelperText(speed)}</div>
         </div>
 
         <div className="replay-transport">

@@ -599,13 +599,13 @@ def load_checkpoint_state(cache: Path, entry: dict[str, Any]) -> dict[str, Any] 
     return checkpoint
 
 
-def nearest_checkpoint(
-    checkpoints: Sequence[dict[str, Any]], lap: int
+def nearest_checkpoint_by_time(
+    checkpoints: Sequence[dict[str, Any]], time_: float
 ) -> dict[str, Any] | None:
-    """Last checkpoint at or before ``lap`` (index is lap-ascending)."""
+    """Last checkpoint at or before ``time_`` (index is time-ascending)."""
     chosen: dict[str, Any] | None = None
     for checkpoint in checkpoints:
-        if int(checkpoint["lap"]) <= lap:
+        if float(checkpoint["time"]) <= time_:
             chosen = checkpoint
         else:
             break
@@ -625,14 +625,15 @@ def _restore_seek(
     session: dict[str, Any],
     meetings: list[dict[str, Any]],
     drivers: list[dict[str, Any]],
-    seek_lap: int,
+    seek_time: float,
     buffer: LiveState,
-) -> tuple[int, int, float]:
-    """Restore the nearest checkpoint <= ``seek_lap``; return (cursor, lap, time).
+) -> tuple[int, int]:
+    """Restore nearest checkpoint <= ``seek_time`` and fast-forward to it.
 
-    Builds checkpoints from the loaded timeline when they are missing (e.g. an
-    older cache prepared before checkpoints existed), then falls back to the
-    identity seed when there is no checkpoint before ``seek_lap``.
+    Returns ``(cursor, current_lap)``. Builds checkpoints from the loaded
+    timeline when they are missing (e.g. an older cache), then falls back to
+    the identity seed when there is no checkpoint before ``seek_time``. Only
+    events at or before ``seek_time`` are applied, so no future data leaks in.
     """
     index = load_checkpoint_index(cache, session_key)
     if index is None:
@@ -640,7 +641,7 @@ def _restore_seek(
         save_checkpoints(cache, checkpoints, session_key)
         index = load_checkpoint_index(cache, session_key)
 
-    entry = nearest_checkpoint(index or [], seek_lap)
+    entry = nearest_checkpoint_by_time(index or [], seek_time)
     checkpoint = load_checkpoint_state(cache, entry) if entry is not None else None
     if checkpoint is None:
         buffer.update("v1/sessions", session)
@@ -648,10 +649,20 @@ def _restore_seek(
             buffer.update("v1/meetings", meeting)
         for driver in drivers:
             buffer.update("v1/drivers", driver)
-        return 0, 0, 0.0
+        cursor = 0
+        current_lap = 0
+    else:
+        cursor = restore_checkpoint(buffer, checkpoint)
+        current_lap = int(checkpoint["lap"])
 
-    cursor = restore_checkpoint(buffer, checkpoint)
-    return cursor, int(checkpoint["lap"]), float(checkpoint["time"])
+    total = len(events)
+    while cursor < total and events[cursor][0] <= seek_time:
+        _, topic, payload = events[cursor]
+        buffer.update(topic, payload)
+        if topic == "v1/laps":
+            current_lap = max(current_lap, int(payload.get("lap_number") or 0))
+        cursor += 1
+    return cursor, current_lap
 
 
 def replay_session(
@@ -663,7 +674,8 @@ def replay_session(
     pause_event: threading.Event | None = None,
     progress: dict[str, Any] | None = None,
     on_seeded: Callable[[], None] | None = None,
-    seek_lap: int | None = None,
+    seek_time: float | None = None,
+    speed_holder: dict[str, float] | None = None,
 ) -> None:
     """
     Download/cache one session, clear the buffer, then feed it chronologically.
@@ -674,9 +686,11 @@ def replay_session(
     ``progress`` (when provided) is updated in place with the authoritative
     replay clock, total duration, and lap progress. ``on_seeded`` fires right
     after identity + the first data are written, so the API can mark the replay
-    as actively running. ``seek_lap`` (when set) restores the nearest prepared
-    checkpoint at or before that lap and resumes from its cursor instead of
-    replaying from the start.
+    as actively running. ``seek_time`` (when set) restores the nearest prepared
+    checkpoint at or before that clock time and fast-forwards to it instead of
+    replaying from the start. ``speed_holder`` (when provided) is a mutable
+    ``{"value": float}`` the clock reads each tick so the speed can change
+    without restarting the worker.
     """
     if speed <= 0:
         raise ValueError("speed must be positive")
@@ -704,10 +718,12 @@ def replay_session(
 
     # Clear stale live/test data, then seed identity or restore a checkpoint.
     buffer.clear()
-    if seek_lap is not None and seek_lap > 0:
-        cursor, current_lap, base_offset = _restore_seek(
-            cache, session_key, events, session, meetings, drivers, seek_lap, buffer
+    if seek_time is not None:
+        target = min(max(seek_time, 0.0), total_duration)
+        cursor, current_lap = _restore_seek(
+            cache, session_key, events, session, meetings, drivers, target, buffer
         )
+        base_offset = target
     else:
         buffer.update("v1/sessions", session)
         for meeting in meetings:
@@ -723,30 +739,31 @@ def replay_session(
     if on_seeded is not None:
         on_seeded()
 
+    def current_speed() -> float:
+        return speed_holder["value"] if speed_holder is not None else speed
+
     print(f"replay: session_key={session_key} events={len(events)} speed={speed}x")
 
-    start = time.monotonic()
-    paused_since: float | None = None
-    paused_total = 0.0
     total = len(events)
+    replay_time = base_offset
+    last_wall = time.monotonic()
     while cursor < total:
         if stop_event is not None and stop_event.is_set():
             print("replay: stopped early")
             return
-        if pause_event is not None:
-            if pause_event.is_set():
-                if paused_since is None:
-                    paused_since = time.monotonic()
-                pause_event.wait(timeout=0.1)
-                continue
-            if paused_since is not None:
-                paused_total += time.monotonic() - paused_since
-                paused_since = None
-        elapsed = base_offset + (time.monotonic() - start - paused_total) * speed
+        if pause_event is not None and pause_event.is_set():
+            pause_event.wait(timeout=0.1)
+            last_wall = time.monotonic()
+            continue
+        now = time.monotonic()
+        replay_time += (now - last_wall) * current_speed()
+        last_wall = now
+        if replay_time > total_duration:
+            replay_time = total_duration
         if progress is not None:
-            progress["current_time"] = min(elapsed, total_duration)
+            progress["current_time"] = replay_time
             progress["current_lap"] = current_lap
-        while cursor < total and events[cursor][0] <= elapsed:
+        while cursor < total and events[cursor][0] <= replay_time:
             _, topic, payload = events[cursor]
             buffer.update(topic, payload)
             if topic == "v1/laps":
@@ -754,7 +771,7 @@ def replay_session(
             cursor += 1
         if cursor >= total:
             break
-        wait = (events[cursor][0] - elapsed) / speed
+        wait = (events[cursor][0] - replay_time) / current_speed()
         time.sleep(max(0.0, min(wait, 0.1)))
 
     if progress is not None:
@@ -783,6 +800,7 @@ class ReplayController:
         self.status = "idle"
         self.session_key: int | None = None
         self.speed: float | None = None
+        self._speed_holder: dict[str, float] = {"value": 10.0}
         self.error: str | None = None
         self.on_before_start: Callable[[], None] | None = None
         self.on_after_stop: Callable[[], None] | None = None
@@ -798,30 +816,54 @@ class ReplayController:
         with self._lock:
             if self.on_before_start is not None:
                 self.on_before_start()
-            self._launch(session_key, speed, seek_lap=None)
+            self._launch(session_key, speed, seek_time=None)
 
-    def seek(self, lap: int) -> None:
-        """Restart the active replay at the nearest checkpoint <= ``lap``.
+    def seek(self, time_: float) -> None:
+        """Restart the active replay at the nearest checkpoint <= ``time_``.
 
         Only valid while a replay is running/paused/finished. The live MQTT
         hooks are not re-fired: the listener is already stopped, and this must
-        not restore live mode.
+        not restore live mode. Paused state is preserved across the seek.
         """
         with self._lock:
             if self.status not in {"running", "paused", "finished"}:
                 return
             if self.session_key is None or self.speed is None:
                 return
-            self._launch(self.session_key, self.speed, seek_lap=lap)
+            was_paused = self.status == "paused"
+            self._launch(
+                self.session_key, self.speed, seek_time=time_, paused=was_paused
+            )
+
+    def set_speed(self, speed: float) -> bool:
+        """Change the active replay speed in place; False when not runnable."""
+        with self._lock:
+            if self.status not in {"running", "paused"}:
+                return False
+            if speed <= 0:
+                return False
+            self.speed = speed
+            self._speed_holder["value"] = speed
+            return True
 
     def _launch(
-        self, session_key: int, speed: float, *, seek_lap: int | None
+        self,
+        session_key: int,
+        speed: float,
+        *,
+        seek_time: float | None,
+        paused: bool = False,
     ) -> None:
         """Swap in a fresh stop/pause pair and start a new producer thread."""
         self._stop.set()
         stop_event = threading.Event()
         self._stop = stop_event
-        self._pause = threading.Event()
+        pause_event = threading.Event()
+        if paused:
+            pause_event.set()
+        self._pause = pause_event
+        holder = {"value": speed}
+        self._speed_holder = holder
         self.status = "downloading"
         self.session_key = session_key
         self.speed = speed
@@ -840,7 +882,8 @@ class ReplayController:
                 stop_event,
                 self._pause,
                 self.progress,
-                seek_lap,
+                holder,
+                seek_time,
             ),
             name="openf1-replay",
             daemon=True,
@@ -882,7 +925,8 @@ class ReplayController:
         stop_event: threading.Event,
         pause_event: threading.Event,
         progress: dict[str, Any],
-        seek_lap: int | None = None,
+        speed_holder: dict[str, float],
+        seek_time: float | None = None,
     ) -> None:
         try:
             replay_session(
@@ -892,7 +936,8 @@ class ReplayController:
                 pause_event=pause_event,
                 progress=progress,
                 on_seeded=self._on_seeded,
-                seek_lap=seek_lap,
+                seek_time=seek_time,
+                speed_holder=speed_holder,
             )
         except Exception as exc:  # noqa: BLE001 — keep API up if replay dies
             self.error = str(exc)
@@ -903,9 +948,9 @@ class ReplayController:
             self.status = "finished"
 
     def _on_seeded(self) -> None:
-        """Mark the replay as actively running once data is in LIVE_STATE."""
+        """Mark the replay as running (or paused) once data is in LIVE_STATE."""
         with self._lock:
-            self.status = "running"
+            self.status = "paused" if self._pause.is_set() else "running"
 
     def snapshot(self) -> dict[str, Any]:
         """Current controller state for the /api/replay/status endpoint."""

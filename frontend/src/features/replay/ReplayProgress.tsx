@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Panel } from "../../components/Panel";
 import type { ReplayProgress as ReplayProgressState } from "./useReplay";
 
 type ReplayProgressProps = {
   progress: ReplayProgressState;
-  onSeek: (lap: number) => void;
+  onSeek: (time: number) => void;
   canSeek: boolean;
 };
 
@@ -24,39 +24,40 @@ function formatDuration(seconds: number | null): string {
 
 export function ReplayProgress({ progress, onSeek, canSeek }: ReplayProgressProps) {
   const { currentTime, totalDuration, currentLap, totalLaps } = progress;
-  const [seekTarget, setSeekTarget] = useState(0);
+  const [previewTime, setPreviewTime] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (totalLaps !== null && totalLaps > 0) {
-      setSeekTarget((value) => Math.min(value, totalLaps));
+  const max = totalDuration && totalDuration > 0 ? totalDuration : 0;
+  const displayed = Math.min(max, previewTime ?? currentTime ?? 0);
+  const disabled = !canSeek || max <= 0;
+
+  const commit = (value: number) => {
+    setPreviewTime(null);
+    if (!disabled && Number.isFinite(value)) {
+      onSeek(Math.min(max, Math.max(0, value)));
     }
-  }, [totalLaps]);
-
-  const percent =
-    totalDuration && totalDuration > 0 && currentTime !== null
-      ? Math.min(100, Math.max(0, (currentTime / totalDuration) * 100))
-      : 0;
-
-  const seekDisabled = !canSeek || totalLaps === null || totalLaps <= 0;
+  };
 
   return (
     <Panel label="Replay Progress" className="replay-progress-panel">
       <div className="replay-progress-body">
-        <div
-          className="replay-progress-track"
-          role="progressbar"
-          aria-label="Replay progress"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(percent)}
-        >
-          <div className="replay-progress-fill" style={{ width: `${percent}%` }} />
-        </div>
+        <input
+          type="range"
+          className="replay-timeline"
+          aria-label="Replay timeline"
+          min={0}
+          max={max}
+          step={0.1}
+          value={displayed}
+          disabled={disabled}
+          onChange={(event) => setPreviewTime(Number(event.target.value))}
+          onPointerUp={(event) => commit(Number((event.target as HTMLInputElement).value))}
+          onKeyUp={(event) => commit(Number((event.target as HTMLInputElement).value))}
+        />
         <div className="replay-progress-readouts">
           <div className="replay-progress-time">
-            <span className="replay-progress-value">{formatDuration(currentTime)}</span>
+            <span className="replay-progress-value">{formatDuration(displayed)}</span>
             <span className="replay-progress-divider">/</span>
-            <span className="replay-progress-value">{formatDuration(totalDuration)}</span>
+            <span className="replay-progress-value">{formatDuration(max)}</span>
           </div>
           {totalLaps !== null && totalLaps > 0 ? (
             <div className="replay-progress-laps">
@@ -65,32 +66,6 @@ export function ReplayProgress({ progress, onSeek, canSeek }: ReplayProgressProp
               <span className="replay-progress-value">{totalLaps}</span>
             </div>
           ) : null}
-        </div>
-
-        <div className="replay-seek">
-          <label className="replay-seek-label" htmlFor="replay-seek">
-            Seek to lap
-          </label>
-          <input
-            id="replay-seek"
-            className="replay-seek-slider"
-            type="range"
-            min={0}
-            max={totalLaps ?? 0}
-            step={1}
-            value={seekTarget}
-            onChange={(event) => setSeekTarget(Number(event.target.value))}
-            disabled={seekDisabled}
-          />
-          <button
-            type="button"
-            className="replay-seek-button"
-            onClick={() => onSeek(seekTarget)}
-            disabled={seekDisabled}
-          >
-            <span className="replay-seek-button-value">{seekTarget}</span>
-            <span className="replay-seek-button-label">Seek</span>
-          </button>
         </div>
       </div>
     </Panel>

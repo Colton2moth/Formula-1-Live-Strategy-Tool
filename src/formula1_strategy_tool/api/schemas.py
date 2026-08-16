@@ -146,13 +146,19 @@ class ReplayStartRequest(BaseModel):
     """Body for POST /api/replay/start. session_key falls back to env when omitted."""
 
     session_key: int | None = None
-    speed: float = 10.0
+    speed: float = Field(default=10.0, ge=0.25, le=100.0)
 
 
 class ReplaySeekRequest(BaseModel):
-    """Body for POST /api/replay/seek. ``lap`` is a completed-lap target."""
+    """Body for POST /api/replay/seek. ``time`` is replay-clock seconds."""
 
-    lap: int = Field(ge=0)
+    time: float = Field(ge=0)
+
+
+class ReplaySpeedRequest(BaseModel):
+    """Body for POST /api/replay/speed. Same valid range as start."""
+
+    speed: float = Field(ge=0.25, le=100.0)
 
 
 class ReplayStatus(BaseModel):

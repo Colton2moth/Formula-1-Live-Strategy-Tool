@@ -150,6 +150,16 @@ def test_replay_sessions_include_readiness(monkeypatch):
     assert response.json()[0]["readiness"] == "ready"
 
 
+def test_replay_speed_requires_active_replay():
+    response = client.post("/api/replay/speed", json={"speed": 50.0})
+    assert response.status_code == 409
+
+
+def test_replay_speed_validates_range():
+    response = client.post("/api/replay/speed", json={"speed": 0.1})
+    assert response.status_code == 422
+
+
 def test_locations_endpoint_compact_shape():
     LIVE_STATE.update(
         "v1/location",
