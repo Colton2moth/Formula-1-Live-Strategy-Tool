@@ -6,8 +6,8 @@ Normal developer/user workflows. For the terminal command cheat sheet, see
 
 ## Replay page
 
-1. Start the backend **without** `REPLAY_SESSION_KEY` set (see
-   [CONFIGURATION.md](./CONFIGURATION.md)), then run the frontend.
+1. Start the backend (see [CONFIGURATION.md](./CONFIGURATION.md)), then run the
+   frontend.
 2. Open the **Race Replay** link in the header to navigate to `/replay`.
 3. Pick a **year**, then a **race** (by country / Grand Prix) from the
    dropdowns. The dropdowns are backed by `GET /api/replay/sessions`, which
@@ -36,9 +36,10 @@ Seek is available through the progress panel: a seekable timeline accepts a
 replay-clock time, and an editable lap readout accepts a completed lap number
 (see [API.md](./API.md#post-apireplayseek)).
 
-Pressing **Play** stops the live MQTT listener so live pushes cannot mix with
-the replay. **Stop** (or leaving the page while a replay is active) restarts
-it, so returning to Live mode works without a backend restart.
+Pressing **Play** runs a historical race in the replay controller's own state;
+the live MQTT listener and live REST endpoints are unaffected. **Stop** (or
+leaving the page while a replay is active) halts only the replay, so Live mode
+continues uninterrupted.
 
 Optionally prefill the replay speed with `frontend/.env`:
 
@@ -55,8 +56,9 @@ REPLAY_SESSION_KEY=<key>
 REPLAY_SPEED=20
 ```
 
-Then start the backend normally. When `REPLAY_SESSION_KEY` is set, the MQTT
-listener and REST bootstrap are disabled and replay starts automatically:
+Then start the backend normally. When `REPLAY_SESSION_KEY` is set, the backend
+also starts the replay controller's private state at startup, alongside live
+bootstrap and MQTT (used for automated end-to-end checks):
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn formula1_strategy_tool.main:app --host 127.0.0.1 --port 8000

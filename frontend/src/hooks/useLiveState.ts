@@ -1,12 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { openLiveSocket } from "../api/liveSocket";
+import { openSocket } from "../api/liveSocket";
 import type { LiveEvent, LiveSocketStatus } from "../api/liveSocket";
-import { fetchRaceState } from "../api/raceState";
-import type { ApiDriver, ApiPrediction, ApiSession, RaceState } from "../types/race";
+import {
+  fetchRaceState,
+  fetchReplayRaceState,
+  fetchReplayTrack,
+  fetchTrack,
+} from "../api/raceState";
+import type { ApiDriver, ApiPrediction, ApiSession, RaceState, TrackState } from "../types/race";
 
 export type DriverLocation = { x: number; y: number };
 
-export type LiveStateResult = {
+export type DashboardSource = {
+  socketPath: string;
+  fetchRaceState: () => Promise<RaceState>;
+  fetchTrack: () => Promise<TrackState>;
+};
+
+export const liveSource: DashboardSource = {
+  socketPath: "/ws/live",
+  fetchRaceState,
+  fetchTrack,
+};
+
+export const replaySource: DashboardSource = {
+  socketPath: "/ws/replay",
+  fetchRaceState: fetchReplayRaceState,
+  fetchTrack: fetchReplayTrack,
+};
+
+export type RaceStreamResult = {
   status: LiveSocketStatus;
   session: ApiSession | null;
   drivers: ApiDriver[];
@@ -18,7 +41,10 @@ function toPredictionMap(snapshot: RaceState | null): ReadonlyMap<number, ApiPre
   return new Map((snapshot?.predictions ?? []).map((prediction) => [prediction.driver_number, prediction]));
 }
 
-export function useLiveState(snapshot: RaceState | null): LiveStateResult {
+export function useRaceStream(
+  snapshot: RaceState | null,
+  source: DashboardSource,
+): RaceStreamResult {
   const [session, setSession] = useState<ApiSession | null>(snapshot?.session ?? null);
   const [drivers, setDrivers] = useState<ApiDriver[]>(snapshot?.drivers ?? []);
   const [predictions, setPredictions] = useState<ReadonlyMap<number, ApiPrediction>>(() => toPredictionMap(snapshot));
@@ -120,7 +146,7 @@ export function useLiveState(snapshot: RaceState | null): LiveStateResult {
 
     const recoverSnapshot = async () => {
       try {
-        const fresh = await fetchRaceState();
+        const fresh = await source.fetchRaceState();
         setSession(fresh.session);
         setDrivers(fresh.drivers);
         setPredictions(toPredictionMap(fresh));
@@ -130,7 +156,7 @@ export function useLiveState(snapshot: RaceState | null): LiveStateResult {
       }
     };
 
-    const socket = openLiveSocket({
+    const socket = openSocket(source.socketPath, {
       onEvent: applyEvent,
       onStatus: (next) => {
         setStatus(next);
@@ -148,7 +174,7 @@ export function useLiveState(snapshot: RaceState | null): LiveStateResult {
       hasConnectedRef.current = false;
       socket.close();
     };
-  }, [snapshot]);
+  }, [snapshot, source]);
 
   const liveSession = useMemo<ApiSession | null>(() => {
     if (!session) {

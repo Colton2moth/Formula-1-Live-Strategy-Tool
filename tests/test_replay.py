@@ -296,6 +296,49 @@ def test_replay_controller_stop_fires_restore_hook(monkeypatch):
     assert restored.wait(timeout=1.0)
 
 
+def test_replay_controller_uses_private_state(monkeypatch):
+    captured_state: dict[str, object] = {}
+    seeded = threading.Event()
+
+    def fake_replay(
+        session_key,
+        speed=10.0,
+        state=None,
+        *,
+        stop_event=None,
+        pause_event=None,
+        progress=None,
+        on_seeded=None,
+        seek_time=None,
+        seek_lap=None,
+        speed_holder=None,
+    ):
+        captured_state["state"] = state
+        if state is not None:
+            state.update("v1/sessions", {"session_key": session_key})
+        if on_seeded is not None:
+            on_seeded()
+        seeded.set()
+        if stop_event is not None:
+            stop_event.wait(timeout=2.0)
+
+    controller = replay_mod.ReplayController()
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+
+    controller.start(9979, speed=10)
+    assert seeded.wait(timeout=1.0)
+
+    state = captured_state["state"]
+    assert state is controller.state
+    assert state is not replay_mod.LIVE_STATE
+
+    # Advancing the replay filled the controller's own state, not the live one.
+    assert state.docs_for("v1/sessions")
+    assert replay_mod.LIVE_STATE.docs_for("v1/sessions") == []
+
+    controller.stop()
+
+
 def test_replay_controller_seek_restarts_with_time(monkeypatch):
     seen: list[tuple[int, float, float | None, int | None]] = []
     started = threading.Event()

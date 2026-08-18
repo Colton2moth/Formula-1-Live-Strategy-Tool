@@ -1,29 +1,33 @@
 """
-WebSocket live-update endpoint and broadcaster.
+WebSocket live-update endpoints and broadcasters.
 
-The browser connects to ``/ws/live`` and receives incremental JSON events as
-the LIVE_STATE buffer changes. REST (``/api/*``) stays the source of full
-snapshots; the WebSocket only pushes deltas.
+The browser connects to ``/ws/live`` to receive incremental JSON events as the
+live ``LIVE_STATE`` buffer changes, or to ``/ws/replay`` to receive the same
+event types as ``replay_controller.state`` changes. REST (``/api/*``) stays the
+source of full snapshots; the WebSockets only push deltas.
 
 Event types match docs/api/CONTRACT.md: ``location_update``,
 ``driver_update``, ``weather_update``, ``race_control_update``, and
 ``prediction_update``.
 
-A background async loop drains LIVE_STATE's dirty-topic flags every ~50 ms and
+A background async loop drains each state's dirty-topic flags every ~50 ms and
 broadcasts only the values that actually changed, so obsolete location samples
-are never queued and unrelated UI is not re-rendered.
+are never queued and unrelated UI is not re-rendered. Live and replay keep
+separate connection managers and broadcasters so their events never cross.
 """
 
 from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from formula1_strategy_tool.acquisition.live_drivers import drivers_from_live
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
+from formula1_strategy_tool.acquisition.replay import replay_controller
 
 LOCATION_TOPIC = "v1/location"
 DRIVER_TOPICS = frozenset(
@@ -124,13 +128,17 @@ def _prediction_event(prediction: Any) -> dict[str, Any]:
 
 
 class Broadcaster:
-    """Diff LIVE_STATE against last-sent values and push only the changes."""
+    """Diff one LiveState against last-sent values and push only the changes."""
 
     def __init__(
-        self, manager: ConnectionManager, state: LiveState = LIVE_STATE
+        self,
+        manager: ConnectionManager,
+        state: LiveState = LIVE_STATE,
+        prediction_source: Callable[[], list[Any]] | None = None,
     ) -> None:
         self.manager = manager
         self.state = state
+        self._prediction_source = prediction_source
         self._last_locations: dict[int, tuple] = {}
         self._last_drivers: dict[int, tuple] = {}
         self._last_weather: dict[str, Any] | None = None
@@ -214,16 +222,16 @@ class Broadcaster:
         )
 
     async def _flush_predictions(self) -> None:
+        if self._prediction_source is None:
+            return
         now = time.monotonic()
         if now - self._last_prediction_run < PREDICTION_INTERVAL_SECONDS:
             return
         self._last_prediction_run = now
-        # Import lazily: model inference is expensive and must not run on the
-        # event loop, so it is dispatched to a worker thread below.
-        from formula1_strategy_tool.api.routes import _model_predictions
-
+        # Model inference is expensive and must not run on the event loop, so
+        # it is dispatched to a worker thread below.
         try:
-            predictions = await asyncio.to_thread(_model_predictions)
+            predictions = await asyncio.to_thread(self._prediction_source)
         except Exception:  # noqa: BLE001 — keep other events flowing
             return
         for prediction in predictions:
@@ -250,8 +258,30 @@ async def broadcaster_loop(broadcaster: Broadcaster) -> None:
             print(f"broadcast tick failed: {exc}")
 
 
+def _live_prediction_source() -> list[Any]:
+    from formula1_strategy_tool.api.routes import _model_predictions
+
+    return _model_predictions()
+
+
+def _replay_prediction_source() -> list[Any]:
+    from formula1_strategy_tool.api.routes import _replay_predictions
+
+    return _replay_predictions()
+
+
 manager = ConnectionManager()
-broadcaster = Broadcaster(manager)
+broadcaster = Broadcaster(manager, prediction_source=_live_prediction_source)
+
+replay_manager = ConnectionManager()
+replay_broadcaster = Broadcaster(
+    replay_manager,
+    state=replay_controller.state,
+    prediction_source=_replay_prediction_source,
+)
+# A new replay (or seek) reseeds the controller's state from scratch; reset the
+# replay broadcaster so clients receive the fresh data instead of stale diffs.
+replay_controller.on_reset = replay_broadcaster.reset
 
 router = APIRouter()
 
@@ -267,3 +297,16 @@ async def websocket_live(websocket: WebSocket) -> None:
         pass
     finally:
         manager.disconnect(websocket)
+
+
+@router.websocket("/ws/replay")
+async def websocket_replay(websocket: WebSocket) -> None:
+    """Stream incremental replay events from ``replay_controller.state``."""
+    await replay_manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        replay_manager.disconnect(websocket)

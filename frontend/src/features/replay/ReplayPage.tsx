@@ -5,6 +5,7 @@ import { Footer } from "../../components/Footer";
 import { Panel } from "../../components/Panel";
 import { RaceDashboard } from "../dashboard/RaceDashboard";
 import { useRaceData } from "../dashboard/useRaceData";
+import { replaySource } from "../../hooks/useLiveState";
 import { ReplayControls } from "./ReplayControls";
 import { ReplayProgress } from "./ReplayProgress";
 import { grandPrixName, useReplay } from "./useReplay";
@@ -13,7 +14,7 @@ export function ReplayPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const onSeeded = useCallback(() => setReloadKey((key) => key + 1), []);
   const replay = useReplay(onSeeded);
-  const { raceState, track, error } = useRaceData(reloadKey);
+  const { raceState, track, error } = useRaceData(reloadKey, replaySource);
 
   const activeRef = useRef(false);
   useEffect(() => {
@@ -77,7 +78,7 @@ export function ReplayPage() {
             </div>
           </Panel>
         ) : (
-          <RaceDashboard raceState={raceState} track={track} />
+          <RaceDashboard raceState={raceState} track={track} source={replaySource} />
         )}
       </div>
       <Footer />

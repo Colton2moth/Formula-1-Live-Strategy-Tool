@@ -12,9 +12,9 @@ Environment variables and known limits for Replay Mode.
 
 ### `REPLAY_SESSION_KEY`
 
-When set, the backend starts in replay mode at startup: the MQTT listener and
-REST bootstrap are disabled and the replay begins automatically. Set it in
-`.env` and start the backend normally. See
+When set, the backend also starts the replay controller's private state at
+startup (running the given historical session alongside live bootstrap and
+MQTT). Set it in `.env` and start the backend normally. See
 [USAGE.md](./USAGE.md#startup-replay-using-environment-variables).
 
 ### `REPLAY_SPEED`

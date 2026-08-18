@@ -1,14 +1,17 @@
 """
-Developer replay harness: replay one completed session through LIVE_STATE.
+Developer replay harness: replay one completed session into a LiveState.
 
 Input:  session_key (required), replay speed (default 10x)
-Output: fills LIVE_STATE chronologically so the existing /ws/live broadcaster
-        and frontend advance exactly as they would during a live race.
+Output: fills the supplied LiveState chronologically so a replay-aware
+        frontend advances exactly as it would during a live race.
 
-This is the smallest useful end-to-end test: it reuses the real OpenF1 REST
-acquisition, LIVE_STATE, WebSocket broadcaster, and prediction path. The only
-new code is the replay producer itself — nothing in TrackMap, Leaderboard,
-RaceHeader, or StrategyPanel changes.
+This reuses the real OpenF1 REST acquisition, the shared LiveState store, and
+the prediction path. The only new code is the replay producer itself — nothing
+in TrackMap, Leaderboard, RaceHeader, or StrategyPanel changes.
+
+The user-facing ReplayController owns a private LiveState and always passes it
+to this engine, so replay never clears or seeds the live-only module-level
+``LIVE_STATE``. The CLI harness may still rely on the ``state`` default.
 
 No-future-leakage rule:
     A completed race contains data that was not known at an earlier lap, so the
@@ -742,6 +745,10 @@ def replay_session(
     """
     Download/cache one session, clear the buffer, then feed it chronologically.
 
+    ``state`` is the buffer to fill; it defaults to ``LIVE_STATE`` for the CLI
+    harness, but the ``ReplayController`` always passes its own private
+    ``LiveState`` so replay never clears or seeds live data.
+
     Blocks until the replay reaches race end; the final state is left visible.
     When ``stop_event`` is set, replay exits early (without clearing state if it
     has not started yet). ``pause_event`` suspends the replay clock while set.
@@ -858,10 +865,11 @@ class ReplayController:
     Runtime start/stop wrapper around the blocking replay producer.
 
     One controller is shared by the FastAPI replay endpoints and the startup
-    path. ``on_before_start`` is an optional hook (wired by main.py) used to
-    stop the live MQTT listener so its pushes cannot mix with replay data;
-    ``on_after_stop`` is its counterpart, restoring live mode once the user
-    deliberately leaves replay.
+    path. The controller owns a private ``LiveState`` (``self.state``) that the
+    producer fills, so replay never touches the live-only ``LIVE_STATE``.
+    ``on_before_start`` / ``on_after_stop`` are optional lifecycle hooks, and
+    ``on_reset`` fires when a new replay starts or seeks (wired by the replay
+    broadcaster so it forgets its diff state).
     """
 
     def __init__(self) -> None:
@@ -874,8 +882,13 @@ class ReplayController:
         self.speed: float | None = None
         self._speed_holder: dict[str, float] = {"value": 10.0}
         self.error: str | None = None
+        # Private buffer the replay producer fills; live data stays in LIVE_STATE.
+        self.state = LiveState()
         self.on_before_start: Callable[[], None] | None = None
         self.on_after_stop: Callable[[], None] | None = None
+        # Fired when a new replay starts or seeks, so the replay broadcaster can
+        # forget its diff state and push the fresh replay data cleanly.
+        self.on_reset: Callable[[], None] | None = None
         self.progress: dict[str, Any] = {
             "current_time": 0.0,
             "total_duration": None,
@@ -893,9 +906,8 @@ class ReplayController:
     def seek(self, time_: float) -> None:
         """Restart the active replay at the nearest checkpoint <= ``time_``.
 
-        Only valid while a replay is running/paused/finished. The live MQTT
-        hooks are not re-fired: the listener is already stopped, and this must
-        not restore live mode. Paused state is preserved across the seek.
+        Only valid while a replay is running/paused/finished. Paused state is
+        preserved across the seek.
         """
         with self._lock:
             if self.status not in {"running", "paused", "finished"}:
@@ -966,6 +978,8 @@ class ReplayController:
             "current_lap": 0,
             "total_laps": None,
         }
+        if self.on_reset is not None:
+            self.on_reset()
         self._thread = threading.Thread(
             target=self._run,
             args=(
@@ -998,7 +1012,7 @@ class ReplayController:
                 self.status = "running"
 
     def stop(self) -> None:
-        """Stop the replay and restore live mode via the on_after_stop hook."""
+        """Stop the replay; fire the optional on_after_stop hook."""
         with self._lock:
             was_active = self.status in {
                 "downloading",
@@ -1026,6 +1040,7 @@ class ReplayController:
             replay_session(
                 session_key,
                 speed=speed,
+                state=self.state,
                 stop_event=stop_event,
                 pause_event=pause_event,
                 progress=progress,
@@ -1043,7 +1058,7 @@ class ReplayController:
             self.status = "finished"
 
     def _on_seeded(self) -> None:
-        """Mark the replay as running (or paused) once data is in LIVE_STATE."""
+        """Mark the replay as running (or paused) once its own state is seeded."""
         with self._lock:
             self.status = "paused" if self._pause.is_set() else "running"
 
@@ -1071,7 +1086,7 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Replay one completed OpenF1 session through LIVE_STATE."
+        description="Replay one completed OpenF1 session (CLI default: LIVE_STATE)."
     )
     parser.add_argument("--session-key", type=int, required=True)
     parser.add_argument("--speed", type=float, default=10.0)

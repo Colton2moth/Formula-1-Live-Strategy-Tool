@@ -4,9 +4,10 @@ import { Footer } from "./components/Footer";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { RaceDashboard } from "./features/dashboard/RaceDashboard";
 import { classifyError, useRaceData } from "./features/dashboard/useRaceData";
+import { liveSource } from "./hooks/useLiveState";
 
 function App() {
-  const { raceState, track, error } = useRaceData(0);
+  const { raceState, track, error } = useRaceData(0, liveSource);
 
   if (error) {
     return <ErrorScreen variant={classifyError(error)} message={error} />;
@@ -20,7 +21,7 @@ function App() {
     <main className="dashboard-shell">
       <div className="dashboard-container">
         <BrandBar />
-        <RaceDashboard raceState={raceState} track={track} />
+        <RaceDashboard raceState={raceState} track={track} source={liveSource} />
       </div>
       <Footer />
     </main>

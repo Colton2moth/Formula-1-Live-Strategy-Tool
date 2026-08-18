@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { fetchRaceState, fetchTrack, isApiRequestError } from "../../api/raceState";
+import { isApiRequestError } from "../../api/raceState";
+import { liveSource } from "../../hooks/useLiveState";
+import type { DashboardSource } from "../../hooks/useLiveState";
 import type { RaceState, TrackState } from "../../types/race";
 
 export type RaceDataErrorVariant = "unavailable" | "server-error" | "invalid-data";
@@ -17,7 +19,11 @@ export function classifyError(message: string): RaceDataErrorVariant {
   return "server-error";
 }
 
-export function useRaceData(reloadKey: number) {
+// 503 = no live session yet; 409 = no replay started yet. Both mean "data not
+// available right now", so keep polling until the source is seeded.
+const RETRYABLE_STATUSES = new Set([503, 409]);
+
+export function useRaceData(reloadKey: number, source: DashboardSource = liveSource) {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [track, setTrack] = useState<TrackState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,8 +37,8 @@ export function useRaceData(reloadKey: number) {
       for (let attempt = 0; active; attempt += 1) {
         try {
           const [raceStateResponse, trackResponse] = await Promise.all([
-            fetchRaceState(),
-            fetchTrack(),
+            source.fetchRaceState(),
+            source.fetchTrack(),
           ]);
           if (!active) return;
           setRaceState(raceStateResponse);
@@ -40,7 +46,7 @@ export function useRaceData(reloadKey: number) {
           return;
         } catch (requestError: unknown) {
           if (!active) return;
-          if (isApiRequestError(requestError) && requestError.status === 503) {
+          if (isApiRequestError(requestError) && RETRYABLE_STATUSES.has(requestError.status)) {
             await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt)));
             continue;
           }
@@ -58,7 +64,7 @@ export function useRaceData(reloadKey: number) {
     return () => {
       active = false;
     };
-  }, [reloadKey]);
+  }, [reloadKey, source]);
 
   return { raceState, track, error };
 }

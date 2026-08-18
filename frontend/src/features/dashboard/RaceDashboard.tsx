@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useLiveState } from "../../hooks/useLiveState";
+import { useRaceStream } from "../../hooks/useLiveState";
+import type { DashboardSource } from "../../hooks/useLiveState";
 import type { ApiDriver, RaceState, TrackState } from "../../types/race";
 import { Leaderboard } from "../leaderboard/Leaderboard";
 import { RaceHeader } from "../race-header/RaceHeader";
@@ -9,34 +10,35 @@ import { TrackMap } from "../track-map/TrackMap";
 type RaceDashboardProps = {
   raceState: RaceState;
   track: TrackState;
+  source: DashboardSource;
 };
 
-export function RaceDashboard({ raceState, track }: RaceDashboardProps) {
+export function RaceDashboard({ raceState, track, source }: RaceDashboardProps) {
   const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
 
-  const live = useLiveState(raceState);
+  const stream = useRaceStream(raceState, source);
 
-  const selectedDriver = live.drivers.find((driver) => driver.driver_number === selectedDriverNumber) ?? null;
+  const selectedDriver = stream.drivers.find((driver) => driver.driver_number === selectedDriverNumber) ?? null;
   const selectedPrediction = selectedDriver
-    ? live.predictions.get(selectedDriver.driver_number) ?? null
+    ? stream.predictions.get(selectedDriver.driver_number) ?? null
     : null;
   const sortedDrivers = useMemo(
-    () => [...live.drivers].sort((a, b) => a.position - b.position),
-    [live.drivers],
+    () => [...stream.drivers].sort((a, b) => a.position - b.position),
+    [stream.drivers],
   );
   const mapDrivers = useMemo<ApiDriver[]>(
     () =>
       sortedDrivers.map((driver) => {
-        const location = live.locations.get(driver.driver_number);
+        const location = stream.locations.get(driver.driver_number);
         return location ? { ...driver, x: location.x, y: location.y } : driver;
       }),
-    [sortedDrivers, live.locations],
+    [sortedDrivers, stream.locations],
   );
   const toggleSelectedDriver = (driverNumber: number) => {
     setSelectedDriverNumber((currentDriverNumber) => (currentDriverNumber === driverNumber ? null : driverNumber));
   };
 
-  const session = live.session ?? raceState.session;
+  const session = stream.session ?? raceState.session;
 
   return (
     <>
@@ -50,7 +52,7 @@ export function RaceDashboard({ raceState, track }: RaceDashboardProps) {
           />
         </div>
         <div className="dashboard-stack">
-          <RaceHeader session={session} connectionStatus={live.status} />
+          <RaceHeader session={session} connectionStatus={stream.status} />
           <TrackMap
             track={track}
             session={session}

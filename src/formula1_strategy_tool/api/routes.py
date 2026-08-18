@@ -21,7 +21,7 @@ from formula1_strategy_tool.acquisition.live_features import (
     latest_lap_rows,
 )
 from formula1_strategy_tool.acquisition.live_session import session_from_live
-from formula1_strategy_tool.acquisition.live_state import LIVE_STATE
+from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
 from formula1_strategy_tool.acquisition.replay import replay_controller
 from formula1_strategy_tool.api.circuits import CIRCUITS, track_for_circuit
 from formula1_strategy_tool.api.countries import COUNTRY_NAMES
@@ -52,19 +52,19 @@ router = APIRouter(prefix="/api", tags=["strategy-api"])
 _prediction_cache: list[PredictionState] | None = None
 
 
-def _active_drivers() -> list[DriverState]:
-    """Live MQTT-derived drivers; empty list when no live data yet."""
+def _drivers(state: LiveState) -> list[DriverState]:
+    """DriverState rows from a state; empty list when no data yet."""
     try:
-        live = drivers_from_live(LIVE_STATE)
+        rows = drivers_from_live(state)
     except Exception:  # noqa: BLE001 — partial buffer must not 500 the API
-        live = None
-    return live if live is not None else []
+        rows = None
+    return rows if rows is not None else []
 
 
-def _active_session() -> SessionState:
-    """Live/bootstrap session; 503 when no session has been ingested yet."""
+def _session(state: LiveState) -> SessionState:
+    """SessionState from a state; 503 when no session has been ingested yet."""
     try:
-        live = session_from_live(LIVE_STATE)
+        live = session_from_live(state)
     except Exception:  # noqa: BLE001 — treat partial buffer as "not ready"
         live = None
     if live is None:
@@ -72,13 +72,28 @@ def _active_session() -> SessionState:
     return live
 
 
-def _live_circuit_key() -> int | None:
+def _circuit_key(state: LiveState) -> int | None:
     """circuit_key of the ingested session, or None before data arrives."""
-    sessions = LIVE_STATE.docs_for("v1/sessions")
+    sessions = state.docs_for("v1/sessions")
     if not sessions:
         return None
     key = sessions[0].get("circuit_key")
     return int(key) if key is not None else None
+
+
+def _active_drivers() -> list[DriverState]:
+    """Live MQTT-derived drivers; empty list when no live data yet."""
+    return _drivers(LIVE_STATE)
+
+
+def _active_session() -> SessionState:
+    """Live/bootstrap session; 503 when no session has been ingested yet."""
+    return _session(LIVE_STATE)
+
+
+def _live_circuit_key() -> int | None:
+    """circuit_key of the ingested live session, or None before data arrives."""
+    return _circuit_key(LIVE_STATE)
 
 
 def _drivers_by_number() -> dict[int, DriverState]:
@@ -110,25 +125,44 @@ def _csv_predictions() -> list[PredictionState]:
     return _prediction_cache
 
 
-def _model_predictions() -> list[PredictionState]:
+def _predictions_from_state(state: LiveState) -> list[PredictionState] | None:
     """
-    Prefer live-buffer features + models; fall back to CSV snapshot.
+    Score the latest lap features from ``state``; None when unusable.
 
-    Live path rebuilds features from LIVE_STATE on each call (buffer is small
-    enough for now). CSV path stays cached.
+    Shared scoring path for live and replay: both build features from a
+    supplied LiveState so replay never reads live data.
     """
     model_dir = Path(os.getenv("INFERENCE_MODEL_DIR", "data/models"))
     try:
-        feat = features_from_live(LIVE_STATE)
+        feat = features_from_live(state)
         if feat is not None and not feat.empty:
             latest = latest_lap_rows(feat)
             raw = predict_feature_rows(latest, model_dir)
             if raw:
                 return [PredictionState.model_validate(row) for row in raw]
-    except Exception as exc:  # noqa: BLE001 — keep API up; log and fall back
-        print(f"live predictions failed, using CSV fallback: {exc}")
+    except Exception as exc:  # noqa: BLE001 — keep API up; caller decides fallback
+        print(f"predictions from state failed: {exc}")
+    return None
 
+
+def _model_predictions() -> list[PredictionState]:
+    """
+    Live predictions: prefer live-buffer features + models; fall back to CSV.
+    """
+    from_state = _predictions_from_state(LIVE_STATE)
+    if from_state:
+        return from_state
     return _csv_predictions()
+
+
+def _replay_predictions() -> list[PredictionState]:
+    """
+    Replay predictions: score replay state only.
+
+    Deliberately no CSV fallback (that snapshot is unrelated to the replay
+    session) and no live-feature read.
+    """
+    return _predictions_from_state(replay_controller.state) or []
 
 
 @router.get("/session", response_model=SessionState)
@@ -276,13 +310,48 @@ def get_replay_sessions() -> list[ReplaySessionOption]:
     ]
 
 
+def _replay_session() -> SessionState:
+    """Session from replay_controller.state; 409 when no replay is started."""
+    try:
+        session = session_from_live(replay_controller.state)
+    except Exception:  # noqa: BLE001 — treat an unseeded replay as "not ready"
+        session = None
+    if session is None:
+        raise HTTPException(status_code=409, detail="No replay has been started")
+    return session
+
+
+@router.get("/replay/race-state", response_model=RaceStateSnapshot)
+def get_replay_race_state() -> RaceStateSnapshot:
+    """Replay-owned bootstrap snapshot, sourced from replay_controller.state."""
+    return RaceStateSnapshot(
+        session=_replay_session(),
+        drivers=_drivers(replay_controller.state),
+        predictions=_replay_predictions(),
+    )
+
+
+@router.get("/replay/track", response_model=TrackState)
+def get_replay_track() -> TrackState:
+    """Static circuit path for the replay session's circuit_key."""
+    circuit_key = _circuit_key(replay_controller.state)
+    if circuit_key is None:
+        raise HTTPException(status_code=409, detail="No replay has been started")
+    track = track_for_circuit(circuit_key)
+    if track is None:
+        raise HTTPException(
+            status_code=404, detail=f"No circuit map for circuit_key {circuit_key}"
+        )
+    return _with_country(track)
+
+
 @router.post("/replay/start", response_model=ReplayStatus)
 def start_replay(request: ReplayStartRequest) -> ReplayStatus:
     """
-    Start replaying a completed session through LIVE_STATE.
+    Start replaying a completed session into the controller's own state.
 
     ``session_key`` defaults to REPLAY_SESSION_KEY, then INFERENCE_SESSION_KEY.
-    Starting a replay stops the live MQTT listener so live pushes cannot mix.
+    Live ingestion (bootstrap + MQTT) is unaffected.
     """
     session_key = request.session_key
     if session_key is None:
@@ -340,6 +409,6 @@ def resume_replay() -> ReplayStatus:
 
 @router.post("/replay/stop", response_model=ReplayStatus)
 def stop_replay() -> ReplayStatus:
-    """Stop the running replay and restore the live MQTT listener."""
+    """Stop the running replay (live MQTT is unaffected)."""
     replay_controller.stop()
     return _replay_status()

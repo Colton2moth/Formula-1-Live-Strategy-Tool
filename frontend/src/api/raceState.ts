@@ -70,8 +70,16 @@ export function fetchRaceState() {
   return fetchJson("/api/race-state", assertRaceState);
 }
 
+export function fetchReplayRaceState() {
+  return fetchJson("/api/replay/race-state", assertRaceState);
+}
+
 export function fetchTrack() {
   return fetchJson("/api/track", assertTrackState);
+}
+
+export function fetchReplayTrack() {
+  return fetchJson("/api/replay/track", assertTrackState);
 }
 
 export function fetchTracks() {

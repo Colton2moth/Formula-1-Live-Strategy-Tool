@@ -74,7 +74,7 @@ your OpenF1 API limits allow it.
 ```
 
 Use when: you need the API up so the `Invoke-RestMethod` commands below (and
-the Replay page) work. Start it without `REPLAY_SESSION_KEY` to drive replay
+the Replay page) work. Live ingestion and replay run side by side; drive replay
 from the page or the control endpoints below.
 
 ## Inspect race readiness

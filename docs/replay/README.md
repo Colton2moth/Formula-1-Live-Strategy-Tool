@@ -16,15 +16,15 @@ events and replaying it chronologically.
 OpenF1 historical REST
     → replay cache
     → chronological timeline
-    → LIVE_STATE
-    → WebSocket broadcaster
-    → normal frontend dashboard
+    → replay controller's private LiveState
+    → /api/replay/* + /ws/replay
+    → normal frontend dashboard (replay page)
 ```
 
 The key idea: replay does **not** build a separate fake frontend. It feeds the
-same shared `LIVE_STATE` topics that MQTT feeds during a real race, so the
-dashboard advances exactly as it would live. No frontend component knows about
-replay.
+same `LiveState` topics that MQTT feeds during a real race, but into the replay
+controller's own state, so the dashboard advances exactly as it would live. No
+frontend component knows about replay beyond selecting the replay data source.
 
 ## Where do I go?
 

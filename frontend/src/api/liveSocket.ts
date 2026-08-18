@@ -192,22 +192,25 @@ export function parseLiveEvent(data: unknown): LiveEvent | null {
   }
 }
 
-export function liveSocketUrl(): string {
+export function socketUrl(path: string): string {
   const base = apiBaseUrl.trim();
   if (base) {
     try {
       const url = new URL(base);
       const protocol = url.protocol === "https:" ? "wss:" : "ws:";
-      return `${protocol}//${url.host}/ws/live`;
+      return `${protocol}//${url.host}${path}`;
     } catch {
       // Fall through to the same-origin dev proxy.
     }
   }
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}/ws/live`;
+  return `${protocol}//${window.location.host}${path}`;
 }
 
-export function openLiveSocket(handlers: LiveSocketHandlers): { close: () => void } {
+export function openSocket(
+  path: string,
+  handlers: LiveSocketHandlers,
+): { close: () => void } {
   let socket: WebSocket | null = null;
   let closed = false;
   let attempt = 0;
@@ -225,7 +228,7 @@ export function openLiveSocket(handlers: LiveSocketHandlers): { close: () => voi
     if (closed) {
       return;
     }
-    socket = new WebSocket(liveSocketUrl());
+    socket = new WebSocket(socketUrl(path));
 
     socket.onopen = () => {
       attempt = 0;

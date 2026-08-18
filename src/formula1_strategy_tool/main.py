@@ -34,6 +34,7 @@ from formula1_strategy_tool.api.routes import router as api_router
 from formula1_strategy_tool.api.websocket import (
     broadcaster,
     broadcaster_loop,
+    replay_broadcaster,
 )
 from formula1_strategy_tool.api.websocket import (
     router as ws_router,
@@ -42,8 +43,8 @@ from formula1_strategy_tool.api.websocket import (
 # Read .env before FRONTEND_URL / LIVE_MQTT checks.
 load_dotenv()
 
-# Stop event for the current MQTT listener thread. Replaced with a fresh event
-# each time the listener is (re)started so it can resume after a replay stops.
+# Stop event for the live MQTT listener thread. Live ingestion is independent
+# of replay and runs for the process lifetime once started.
 _mqtt_stop = threading.Event()
 
 
@@ -65,13 +66,8 @@ def _mqtt_worker(stop_event: threading.Event) -> None:
         print(f"MQTT listener exited: {exc}")
 
 
-def _stop_mqtt() -> None:
-    """Signal the current MQTT listener to exit (used before replay starts)."""
-    _mqtt_stop.set()
-
-
 def _start_mqtt() -> None:
-    """Start (or restart) the MQTT listener with a fresh stop event."""
+    """Start the MQTT listener with a fresh stop event (idempotent per process)."""
     global _mqtt_stop
     if not _mqtt_enabled():
         print("OpenF1 MQTT listener disabled (LIVE_MQTT=0)")
@@ -101,41 +97,40 @@ def _run_bootstrap() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start replay, or bootstrap + MQTT (replay mode disables both)."""
-    # A runtime replay (via the API) stops the MQTT listener first and restarts
-    # it once the user deliberately stops/leaves replay mode.
-    replay_controller.on_before_start = _stop_mqtt
-    replay_controller.on_after_stop = _start_mqtt
+    """Start live bootstrap + MQTT; replay runs alongside in its own state."""
+    # Live ingestion is independent of replay: it starts once and stays up for
+    # the process lifetime, regardless of replay start/pause/seek/stop.
+    boot_flag = os.getenv("LIVE_BOOTSTRAP", "1").strip().lower()
+    if boot_flag not in {"0", "false", "no", "off"}:
+        # Run in a thread so slow OpenF1 calls do not block startup forever
+        # without still sequencing before we serve traffic... We join briefly.
+        boot = threading.Thread(
+            target=_run_bootstrap, name="openf1-bootstrap", daemon=True
+        )
+        boot.start()
+        boot.join(timeout=120.0)
 
+    _start_mqtt()
+
+    # Optional developer replay: run a historical race in the controller's own
+    # state alongside live ingestion (used for automated end-to-end checks).
     replay_key = os.getenv("REPLAY_SESSION_KEY", "").strip()
-
     if replay_key:
-        # Replay mode: a developer-controlled historical race drives LIVE_STATE.
         speed = float(os.getenv("REPLAY_SPEED", "10").strip())
         replay_controller.start(int(replay_key), speed)
         print(
-            f"Replay mode: session_key={replay_key} speed={speed}x "
-            "(bootstrap + MQTT disabled)"
+            f"Developer replay mode: session_key={replay_key} speed={speed}x "
+            "(live bootstrap + MQTT stay on)"
         )
-    else:
-        # LIVE_BOOTSTRAP default on — disable with LIVE_BOOTSTRAP=0 for MQTT-only.
-        boot_flag = os.getenv("LIVE_BOOTSTRAP", "1").strip().lower()
-        if boot_flag not in {"0", "false", "no", "off"}:
-            # Run in a thread so slow OpenF1 calls do not block startup forever
-            # without still sequencing before we serve traffic... We join briefly.
-            boot = threading.Thread(
-                target=_run_bootstrap, name="openf1-bootstrap", daemon=True
-            )
-            boot.start()
-            boot.join(timeout=120.0)
 
-        _start_mqtt()
-
-    # WebSocket broadcaster: flushes changed live values to /ws/live clients.
+    # WebSocket broadcasters: live + replay, each flushing its own state.
     broadcast_task = asyncio.create_task(broadcaster_loop(broadcaster))
     print("WebSocket broadcaster started (/ws/live)")
+    replay_broadcast_task = asyncio.create_task(broadcaster_loop(replay_broadcaster))
+    print("Replay WebSocket broadcaster started (/ws/replay)")
     yield
     broadcast_task.cancel()
+    replay_broadcast_task.cancel()
     # Daemon threads are abandoned on shutdown; good enough for v1.
 
 
