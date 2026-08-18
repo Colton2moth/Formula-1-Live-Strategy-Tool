@@ -33,6 +33,8 @@ const STATUS_TONES: Record<string, "neutral" | "green" | "amber" | "red"> = {
 
 const READINESS_LABELS: Record<string, string> = {
   ready: "Ready",
+  partial: "Partial location data",
+  cancelled: "Cancelled",
   not_ready: "Not ready",
   failed: "Preparation failed",
   unknown: "Unknown",
@@ -40,6 +42,8 @@ const READINESS_LABELS: Record<string, string> = {
 
 const READINESS_TONES: Record<string, "neutral" | "green" | "amber" | "red"> = {
   ready: "green",
+  partial: "amber",
+  cancelled: "neutral",
   not_ready: "amber",
   failed: "red",
   unknown: "neutral",
@@ -134,21 +138,25 @@ export function ReplayControls(replay: ReplayControlsProps) {
   const isPaused = status === "paused";
   const isDownloading = status === "downloading";
   const readiness = selectedSession?.readiness ?? "unknown";
-  const isReady = readiness === "ready";
+  const isPlayable = readiness === "ready" || readiness === "partial";
   const canStart =
-    (isIdle || isFinished) && !busy && !loadingSessions && selectedSession !== null && isReady;
+    (isIdle || isFinished) && !busy && !loadingSessions && selectedSession !== null && isPlayable;
   const canStop = (isRunning || isPaused || isFinished || isDownloading) && !busy;
   const speedEditable = isIdle || isRunning || isPaused;
   const playLabel = isFinished ? "Replay" : "Play";
   const idleHint = !selectedSession
     ? "Select a race and press Play."
-    : isReady
-      ? "Ready — press Play."
-      : readiness === "failed"
-        ? "Replay preparation failed for this race."
-        : readiness === "not_ready"
-          ? "This race has not been prepared for replay yet."
-          : "Readiness could not be determined.";
+    : readiness === "partial"
+      ? "Replay is available, but some map location data is missing."
+      : isPlayable
+        ? "Ready — press Play."
+        : readiness === "cancelled"
+          ? "This race was cancelled and has no replay."
+          : readiness === "failed"
+            ? "Replay preparation failed for this race."
+            : readiness === "not_ready"
+              ? "This race has not been prepared for replay yet."
+              : "Readiness could not be determined.";
 
   return (
     <Panel
@@ -199,11 +207,15 @@ export function ReplayControls(replay: ReplayControlsProps) {
                 races.map((session) => (
                   <option key={session.session_key} value={session.session_key}>
                     {sessionLabel(session)}
-                    {session.readiness === "not_ready"
-                      ? " (not ready)"
-                      : session.readiness === "failed"
-                        ? " (failed)"
-                        : ""}
+                    {session.readiness === "cancelled"
+                      ? " (cancelled)"
+                      : session.readiness === "partial"
+                        ? " (partial)"
+                        : session.readiness === "not_ready"
+                          ? " (not ready)"
+                          : session.readiness === "failed"
+                            ? " (failed)"
+                            : ""}
                   </option>
                 ))
               )}

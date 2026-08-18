@@ -97,8 +97,11 @@ Invoke-RestMethod http://127.0.0.1:8000/api/replay/sessions |
   Format-Table year, country_name, session_key, readiness
 ```
 
-Use when: you want a short list of what still needs to be prepared. See
-[CACHE.md](./CACHE.md#readiness-states) for what each state means.
+Use when: you want a short list of everything that is not a clean `ready` —
+including `partial` (playable but incomplete map data), `cancelled` (never
+ran), `not_ready` (not yet prepared), and `failed` (blocking preparation
+failure). See [CACHE.md](./CACHE.md#readiness-states) for what each state
+means.
 
 ## Inspect replay status
 

@@ -23,6 +23,9 @@ from typing import Any
 from formula1_strategy_tool.acquisition.client import OpenF1Client, load_json
 from formula1_strategy_tool.acquisition.replay import (
     _ENDPOINTS,
+    CANCELLED_SESSION_KEYS,
+    cached_location_windows,
+    classify_location_gaps,
     download_replay_data,
     fetch_replay_sessions,
     load_checkpoint_index,
@@ -39,18 +42,42 @@ def replay_readiness(session_key: int) -> str:
     """
     Return the replay readiness state for one session.
 
-    - ``ready``: the prepared timeline and checkpoint/index data load successfully.
+    - ``cancelled``: the race never took place (see ``CANCELLED_SESSION_KEYS``).
+    - ``ready``: the prepared timeline and checkpoint/index data load and
+      location data is complete or only has a harmless trailing gap.
+    - ``partial``: timeline/checkpoints load but location has an internal gap
+      (or is entirely absent), so the map is incomplete while replay works.
     - ``failed``: not ready and a recorded preparation failure exists.
     - ``not_ready``: not ready and no recorded failure (not prepared yet).
     """
+    if session_key in CANCELLED_SESSION_KEYS:
+        return "cancelled"
     cache = replay_dir(session_key)
     if (cache / "timeline.json").exists() and load_checkpoint_index(
         cache, session_key
     ) is not None:
-        return "ready"
+        gap = _location_gap_status(cache)
+        return "partial" if gap in ("internal", "absent") else "ready"
     if _session_in_failures(session_key):
         return "failed"
     return "not_ready"
+
+
+def _location_gap_status(cache: Path) -> str:
+    """Classify one cached session's location windows from its stored data."""
+    sessions_path = cache / "sessions.json"
+    if not sessions_path.exists():
+        # Without session metadata the expected window count is unknowable;
+        # location is optional polish, so treat this as complete rather than
+        # penalising an otherwise playable replay.
+        return "complete"
+    sessions = load_json(sessions_path)
+    session = sessions[0] if sessions else {}
+    laps_path = cache / "laps.json"
+    laps = load_json(laps_path) if laps_path.exists() else []
+    return classify_location_gaps(
+        location_window_count(session, laps), cached_location_windows(cache)
+    )
 
 
 def _session_in_failures(session_key: int) -> bool:
@@ -58,7 +85,8 @@ def _session_in_failures(session_key: int) -> bool:
         return False
     needle = f"| {session_key} |"
     return any(
-        needle in line for line in FAILURES_PATH.read_text(encoding="utf-8").splitlines()
+        needle in line
+        for line in FAILURES_PATH.read_text(encoding="utf-8").splitlines()
     )
 
 
@@ -124,9 +152,21 @@ def _format_windows(windows: list[int]) -> str:
     return " ".join(f"{i:04d}" for i in windows)
 
 
-def cache_session(client: OpenF1Client, session: dict[str, Any]) -> list[str]:
-    """Download (or reuse) every replay file for one session; return failures."""
+def cache_session(
+    client: OpenF1Client, session: dict[str, Any]
+) -> tuple[str, list[str]]:
+    """
+    Download (or reuse) every replay file for one session.
+
+    Returns ``(readiness, failures)`` where ``readiness`` is one of ``ready``,
+    ``partial``, ``cancelled``, or ``failed``, and ``failures`` holds only
+    blocking preparation failures (download errors) to record.
+    """
     session_key = session["session_key"]
+    if session_key in CANCELLED_SESSION_KEYS:
+        print("  cancelled: race never took place, skipping", flush=True)
+        return "cancelled", []
+
     cache = replay_dir(session_key)
 
     before = {name: path.exists() for name, path in _endpoint_files(cache).items()}
@@ -137,7 +177,7 @@ def cache_session(client: OpenF1Client, session: dict[str, Any]) -> list[str]:
         data = download_replay_data(client, session_key)
     except Exception as exc:  # noqa: BLE001 — one race must not stop the bulk run
         print(f"  FAILED: {exc}", flush=True)
-        return [f"download: {exc}"]
+        return "failed", [f"download: {exc}"]
 
     downloaded = [
         name
@@ -150,12 +190,10 @@ def cache_session(client: OpenF1Client, session: dict[str, Any]) -> list[str]:
         flush=True,
     )
 
-    failures: list[str] = []
     total = location_window_count(data["session"], data["laps"])
+    existing = cached_location_windows(cache)
+    gap = classify_location_gaps(total, existing)
     if total:
-        missing = [
-            i for i in range(total) if not (location_dir / f"{i:04d}.json").exists()
-        ]
         newly = [
             i
             for i in range(total)
@@ -164,18 +202,23 @@ def cache_session(client: OpenF1Client, session: dict[str, Any]) -> list[str]:
         ]
         reused = [i for i in range(total) if f"{i:04d}.json" in before_windows]
         status = f"  location: {len(reused)} cached, {len(newly)} downloaded"
-        if missing:
-            status += f", {len(missing)} missing {_format_windows(missing)}"
+        missing = sorted(set(range(total)) - existing)
+        if gap == "trailing":
+            status += (
+                f", {len(missing)} trailing window unavailable "
+                f"{_format_windows(missing)}"
+            )
+        elif gap == "internal":
+            status += f", {len(missing)} internal gap {_format_windows(missing)}"
+        elif gap == "absent":
+            status += ", no location data cached"
         print(status, flush=True)
-        failures.extend(f"location window {i:04d} missing" for i in missing)
     else:
         print("  location: none required", flush=True)
 
-    # Location is optional polish: a window that 404s (cars parked, red flag,
-    # race ended early) leaves a gap but must not block preparation. Build the
-    # timeline + checkpoints whenever the core endpoints downloaded and they
-    # are not already current, so missing location windows stay a report-only
-    # concern.
+    # Location is optional polish: a missing window must not block preparation.
+    # Build the timeline + checkpoints whenever the core endpoints downloaded
+    # and they are not already current.
     if (
         load_timeline(cache, session_key) is None
         or load_checkpoint_index(cache, session_key) is None
@@ -185,7 +228,7 @@ def cache_session(client: OpenF1Client, session: dict[str, Any]) -> list[str]:
     else:
         print("  timeline + checkpoints: up to date", flush=True)
 
-    return failures
+    return "partial" if gap in ("internal", "absent") else "ready", []
 
 
 def record_failures(session: dict[str, Any], failures: list[str]) -> None:
@@ -215,6 +258,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         print(f"Found {len(sessions)} completed races.\n", flush=True)
 
     failed_sessions: list[tuple[dict[str, Any], list[str]]] = []
+    counts: dict[str, int] = {"ready": 0, "partial": 0, "cancelled": 0}
 
     try:
         for index, session in enumerate(sessions, start=1):
@@ -223,18 +267,22 @@ def main(argv: Sequence[str] | None = None) -> None:
                 f"[{index}/{len(sessions)}] {_label(session)} ({session_key})",
                 flush=True,
             )
-            failures = cache_session(client, session)
-            if failures:
+            readiness, failures = cache_session(client, session)
+            if readiness == "failed":
                 failed_sessions.append((session, failures))
                 record_failures(session, failures)
             else:
-                print("  OK", flush=True)
+                counts[readiness] += 1
+                if readiness == "ready":
+                    print("  READY", flush=True)
+                elif readiness == "partial":
+                    print("  PARTIAL", flush=True)
     except KeyboardInterrupt:
         print("\nInterrupted. Cached files are intact; re-run to resume.", flush=True)
 
-    succeeded = len(sessions) - len(failed_sessions)
     print(
-        f"\nFinished: {succeeded} succeeded, {len(failed_sessions)} had failures.",
+        f"\nFinished: {counts['ready']} ready, {counts['partial']} partial, "
+        f"{counts['cancelled']} cancelled, {len(failed_sessions)} failed.",
         flush=True,
     )
     if failed_sessions:

@@ -53,7 +53,7 @@ Returns a list where each entry has:
 | `location`          | string \| null   | location                       |
 | `circuit_short_name`| string \| null   | short circuit name             |
 | `date_start`        | string \| null   | session start (ISO-8601)       |
-| `readiness`         | string           | `ready` \| `not_ready` \| `failed` \| `unknown` |
+| `readiness`         | string           | `ready` \| `partial` \| `cancelled` \| `not_ready` \| `failed` \| `unknown` |
 
 Readiness is documented in [CACHE.md](./CACHE.md#readiness-states). Returns
 `503` when the OpenF1 session list cannot be fetched.

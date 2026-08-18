@@ -57,6 +57,15 @@ _TIMELINE_FORMAT_VERSION = 3
 # Download window for the paginated location endpoint (whole-session returns 422).
 _LOCATION_WINDOW_SECONDS = 300
 
+# Races that never took place. OpenF1 still returns session metadata for these
+# but no usable timing data, so they must never be replayed. They are marked
+# explicitly rather than inferred from 404s because some legitimate historical
+# races also have incomplete endpoint coverage (e.g. missing ``pit``).
+#   9086  — 2023 Emilia-Romagna (Italy), cancelled due to flooding
+#   11261 — 2026 Bahrain, cancelled
+#   11269 — 2026 Saudi Arabia, cancelled
+CANCELLED_SESSION_KEYS = frozenset({9086, 11261, 11269})
+
 
 def replay_dir(session_key: int) -> Path:
     """Cache directory for one session's replay data (separate from data/raw)."""
@@ -188,6 +197,45 @@ def location_window_count(
     window = timedelta(seconds=_LOCATION_WINDOW_SECONDS)
     delta = end - start
     return int(delta // window) + (1 if delta % window else 0)
+
+
+def classify_location_gaps(expected_count: int, existing: Sequence[int]) -> str:
+    """
+    Classify a session's cached location windows by their index layout.
+
+    Returns one of:
+
+    - ``complete`` — every expected window is present.
+    - ``trailing`` — every missing window is after the last present window, i.e.
+      harmless end-of-race truncation (cars parked / race ended early).
+    - ``internal`` — some window is missing before a later present window, so
+      map data disappears and then resumes.
+    - ``absent`` — expected windows exist but none are present.
+
+    The result is derived from window indices only, never from log strings, so
+    the bulk-cache command and the API readiness calculation agree.
+    """
+    if expected_count <= 0:
+        return "complete"
+    present = {index for index in existing if 0 <= index < expected_count}
+    missing = set(range(expected_count)) - present
+    if not missing:
+        return "complete"
+    if not present:
+        return "absent"
+    if all(index > max(present) for index in missing):
+        return "trailing"
+    return "internal"
+
+
+def cached_location_windows(cache: Path) -> set[int]:
+    """Indices of location windows already stored under ``cache/location``."""
+    location_dir = cache / "location"
+    if not location_dir.exists():
+        return set()
+    return {
+        int(path.stem) for path in location_dir.glob("*.json") if path.stem.isdigit()
+    }
 
 
 def _download_location(

@@ -20,7 +20,13 @@ export type ReplayStatus = {
   total_laps: number | null;
 };
 
-export type ReplayReadiness = "ready" | "not_ready" | "failed" | "unknown";
+export type ReplayReadiness =
+  | "ready"
+  | "partial"
+  | "cancelled"
+  | "not_ready"
+  | "failed"
+  | "unknown";
 
 export type ReplaySessionOption = {
   session_key: number;
@@ -67,6 +73,8 @@ function assertReplaySessions(value: unknown): ReplaySessionOption[] {
     }
     const readiness =
       session.readiness === "ready" ||
+      session.readiness === "partial" ||
+      session.readiness === "cancelled" ||
       session.readiness === "not_ready" ||
       session.readiness === "failed"
         ? session.readiness

@@ -193,5 +193,6 @@ class ReplaySessionOption(BaseModel):
     location: str | None = None
     circuit_short_name: str | None = None
     date_start: str | None = None
-    # Replay readiness: "ready" | "not_ready" | "failed" | "unknown".
+    # Replay readiness: "ready" | "partial" | "cancelled" | "not_ready" |
+    # "failed" | "unknown".
     readiness: str = "unknown"

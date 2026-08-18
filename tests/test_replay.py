@@ -855,7 +855,7 @@ def test_replay_session_seek_reaches_same_final_state(monkeypatch, tmp_path):
     assert progress["total_laps"] == 2
 
 
-def test_cache_session_reports_missing_location_window(monkeypatch, tmp_path):
+def test_cache_session_trailing_location_gap_is_ready(monkeypatch, tmp_path):
     session = {
         "session_key": 5,
         "year": 2025,
@@ -887,12 +887,13 @@ def test_cache_session_reports_missing_location_window(monkeypatch, tmp_path):
 
     location_dir = tmp_path / "5" / "location"
     location_dir.mkdir(parents=True)
-    for index in range(11):  # 12 windows needed, only 11 present
+    for index in range(11):  # 12 windows needed, only 11 present → trailing gap
         atomic_write_json(location_dir / f"{index:04d}.json", [])
 
-    failures = cache_replays.cache_session(object(), session)
-    assert failures == ["location window 0011 missing"]
-    # A location gap is report-only: the prepared representation still builds.
+    readiness, failures = cache_replays.cache_session(object(), session)
+    assert readiness == "ready"
+    assert failures == []
+    # A trailing location gap is report-only: the prepared representation builds.
     assert load_timeline(tmp_path / "5", 5) is not None
     assert load_checkpoint_index(tmp_path / "5", 5) is not None
 
@@ -938,3 +939,151 @@ def test_replay_readiness_failed(monkeypatch, tmp_path):
     monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
     monkeypatch.setattr(cache_replays, "FAILURES_PATH", failures)
     assert cache_replays.replay_readiness(42) == "failed"
+
+
+def test_classify_location_gaps_complete():
+    assert replay_mod.classify_location_gaps(4, [0, 1, 2, 3]) == "complete"
+
+
+def test_classify_location_gaps_one_trailing_missing():
+    # 21 windows expected, 20 present → the single missing window is trailing.
+    assert replay_mod.classify_location_gaps(21, range(20)) == "trailing"
+
+
+def test_classify_location_gaps_multiple_trailing_missing():
+    # 22 windows expected, 18 present → 0018–0021 missing, all trailing.
+    assert replay_mod.classify_location_gaps(22, range(18)) == "trailing"
+
+
+def test_classify_location_gaps_internal():
+    # 0002–0003 missing but 0004+ present → location resumes after a gap.
+    assert replay_mod.classify_location_gaps(6, [0, 1, 4, 5]) == "internal"
+
+
+def test_classify_location_gaps_multiple_internal():
+    assert replay_mod.classify_location_gaps(8, [0, 1, 4, 7]) == "internal"
+
+
+def test_classify_location_gaps_absent():
+    assert replay_mod.classify_location_gaps(4, []) == "absent"
+
+
+def test_classify_location_gaps_none_expected():
+    assert replay_mod.classify_location_gaps(0, []) == "complete"
+
+
+def _write_readiness_cache(
+    tmp_path, session_key, windows, *, date_end="2026-07-26T14:00:00+00:00"
+):
+    cache = tmp_path / str(session_key)
+    cache.mkdir(parents=True, exist_ok=True)
+    atomic_write_json(
+        cache / "sessions.json",
+        [
+            {
+                "session_key": session_key,
+                "date_start": "2026-07-26T13:00:00+00:00",
+                "date_end": date_end,
+            }
+        ],
+    )
+    atomic_write_json(cache / "laps.json", [])
+    location_dir = cache / "location"
+    location_dir.mkdir(parents=True, exist_ok=True)
+    for index in windows:
+        atomic_write_json(location_dir / f"{index:04d}.json", [])
+    atomic_write_json(cache / "timeline.json", {})
+    checkpoints_dir = cache / "checkpoints"
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+    atomic_write_json(
+        checkpoints_dir / "index.json",
+        {
+            "format_version": replay_mod._TIMELINE_FORMAT_VERSION,
+            "session_key": session_key,
+            "checkpoints": [],
+        },
+    )
+    return cache
+
+
+def test_readiness_complete_location_is_ready(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "no-failures.txt")
+    _write_readiness_cache(tmp_path, 1, range(12))
+    assert cache_replays.replay_readiness(1) == "ready"
+
+
+def test_readiness_one_trailing_missing_window_is_ready(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "no-failures.txt")
+    _write_readiness_cache(tmp_path, 1, range(11))  # 0011 missing, trailing
+    assert cache_replays.replay_readiness(1) == "ready"
+
+
+def test_readiness_multiple_trailing_missing_windows_is_ready(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "no-failures.txt")
+    _write_readiness_cache(tmp_path, 1, range(9))  # 0009–0011 missing, trailing
+    assert cache_replays.replay_readiness(1) == "ready"
+
+
+def test_readiness_internal_location_gap_is_partial(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "no-failures.txt")
+    windows = [0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # 0002 missing, later data
+    _write_readiness_cache(tmp_path, 1, windows)
+    assert cache_replays.replay_readiness(1) == "partial"
+
+
+def test_readiness_multiple_internal_gaps_is_partial(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "no-failures.txt")
+    windows = [0, 1, 4, 7, 8, 9, 10, 11]  # 0002–0003 and 0005–0006 internal
+    _write_readiness_cache(tmp_path, 1, windows)
+    assert cache_replays.replay_readiness(1) == "partial"
+
+
+def test_readiness_absent_location_is_partial(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "no-failures.txt")
+    _write_readiness_cache(tmp_path, 1, [])  # 12 expected, none present
+    assert cache_replays.replay_readiness(1) == "partial"
+
+
+def test_readiness_cancelled_sessions(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "no-failures.txt")
+    assert cache_replays.replay_readiness(9086) == "cancelled"
+    assert cache_replays.replay_readiness(11261) == "cancelled"
+    assert cache_replays.replay_readiness(11269) == "cancelled"
+
+
+def test_cache_session_skips_cancelled_sessions():
+    session = {
+        "session_key": 9086,
+        "year": 2023,
+        "country_name": "Italy",
+        "location": "Imola",
+    }
+
+    class ExplodingClient:
+        def get(self, endpoint, params):
+            raise AssertionError("cancelled session must not be downloaded")
+
+    readiness, failures = cache_replays.cache_session(ExplodingClient(), session)
+    assert readiness == "cancelled"
+    assert failures == []
+
+
+def test_readiness_stale_failure_entries_do_not_override_valid_cache(
+    monkeypatch, tmp_path
+):
+    failures = tmp_path / "cache_failures.txt"
+    failures.write_text(
+        "2026-01-01T00:00:00+00:00 | 1 | 2026 Test | location window 0011 missing\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", failures)
+    _write_readiness_cache(tmp_path, 1, range(11))  # trailing gap, still ready
+    assert cache_replays.replay_readiness(1) == "ready"
