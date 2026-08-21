@@ -17,6 +17,7 @@ move to a shared service or sticky routing.
 
 from __future__ import annotations
 
+import os
 import secrets
 import threading
 import time
@@ -89,6 +90,19 @@ class ReplayRegistry:
         if runtime is not None:
             runtime.controller.stop()
 
+    def stop_all(self) -> None:
+        """Stop and remove every runtime (used by tests and shutdown)."""
+        with self._lock:
+            runtimes = list(self._runtimes.values())
+            self._runtimes.clear()
+        for runtime in runtimes:
+            runtime.controller.stop()
+
+    def exists(self, replay_id: str) -> bool:
+        """True when the runtime exists, without recording activity."""
+        with self._lock:
+            return replay_id in self._runtimes
+
     def cleanup_expired(self) -> int:
         """Stop and remove runtimes idle past the inactivity TTL."""
         now = self._now()
@@ -105,4 +119,16 @@ class ReplayRegistry:
         return len(expired)
 
 
-registry = ReplayRegistry()
+def _inactivity_ttl_from_env() -> float:
+    """Inactivity TTL from REPLAY_INACTIVITY_TTL_SECONDS, else the default."""
+    raw = os.getenv("REPLAY_INACTIVITY_TTL_SECONDS", "").strip()
+    try:
+        value = float(raw)
+        if value > 0:
+            return value
+    except ValueError:
+        pass
+    return DEFAULT_INACTIVITY_TTL_SECONDS
+
+
+registry = ReplayRegistry(inactivity_ttl=_inactivity_ttl_from_env())

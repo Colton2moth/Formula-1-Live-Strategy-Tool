@@ -147,15 +147,15 @@ class LiveStatus(BaseModel):
     topics: dict[str, LiveTopicStats]
 
 
-class ReplayStartRequest(BaseModel):
-    """Body for POST /api/replay/start. session_key falls back to env when omitted."""
+class ReplayCreateRequest(BaseModel):
+    """Body for POST /api/replays."""
 
-    session_key: int | None = None
+    session_key: int
     speed: float = Field(default=10.0, ge=0.25, le=100.0)
 
 
 class ReplaySeekRequest(BaseModel):
-    """Body for POST /api/replay/seek with one clock-time or lap target."""
+    """Body for POST /api/replays/{replay_id}/seek with one clock-time or lap target."""
 
     time: float | None = Field(default=None, ge=0)
     lap: int | None = Field(default=None, ge=1)
@@ -168,13 +168,13 @@ class ReplaySeekRequest(BaseModel):
 
 
 class ReplaySpeedRequest(BaseModel):
-    """Body for POST /api/replay/speed. Same valid range as start."""
+    """Body for POST /api/replays/{replay_id}/speed. Same valid range as create."""
 
     speed: float = Field(ge=0.25, le=100.0)
 
 
 class ReplayStatus(BaseModel):
-    """Runtime replay controller state returned by the /api/replay endpoints."""
+    """Runtime replay controller state returned by the /api/replays endpoints."""
 
     status: str  # idle | downloading | running | paused | finished | error
     running: bool
@@ -185,6 +185,12 @@ class ReplayStatus(BaseModel):
     total_duration: float | None = None
     current_lap: int | None = None
     total_laps: int | None = None
+
+
+class ReplayCreated(ReplayStatus):
+    """ReplayStatus plus the opaque replay_id returned by POST /api/replays."""
+
+    replay_id: str
 
 
 class ReplaySessionOption(BaseModel):

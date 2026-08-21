@@ -1063,7 +1063,7 @@ class ReplayController:
             self.status = "paused" if self._pause.is_set() else "running"
 
     def snapshot(self) -> dict[str, Any]:
-        """Current controller state for the /api/replay/status endpoint."""
+        """Current controller state for /api/replays/{replay_id}/status."""
         with self._lock:
             return {
                 "status": self.status,
@@ -1076,9 +1076,6 @@ class ReplayController:
                 "current_lap": self.progress["current_lap"],
                 "total_laps": self.progress["total_laps"],
             }
-
-
-replay_controller = ReplayController()
 
 
 def main() -> None:

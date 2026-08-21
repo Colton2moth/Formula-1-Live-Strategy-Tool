@@ -22,7 +22,7 @@ from formula1_strategy_tool.acquisition.live_features import (
 )
 from formula1_strategy_tool.acquisition.live_session import session_from_live
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
-from formula1_strategy_tool.acquisition.replay import replay_controller
+from formula1_strategy_tool.acquisition.replay_registry import ReplayRuntime, registry
 from formula1_strategy_tool.api.circuits import CIRCUITS, track_for_circuit
 from formula1_strategy_tool.api.countries import COUNTRY_NAMES
 from formula1_strategy_tool.api.schemas import (
@@ -32,10 +32,11 @@ from formula1_strategy_tool.api.schemas import (
     LocationState,
     PredictionState,
     RaceStateSnapshot,
+    ReplayCreated,
+    ReplayCreateRequest,
     ReplaySeekRequest,
     ReplaySessionOption,
     ReplaySpeedRequest,
-    ReplayStartRequest,
     ReplayStatus,
     SessionState,
     TrackState,
@@ -155,14 +156,14 @@ def _model_predictions() -> list[PredictionState]:
     return _csv_predictions()
 
 
-def _replay_predictions() -> list[PredictionState]:
+def replay_predictions(state: LiveState) -> list[PredictionState]:
     """
-    Replay predictions: score replay state only.
+    Score the latest lap features from a replay runtime's state.
 
     Deliberately no CSV fallback (that snapshot is unrelated to the replay
     session) and no live-feature read.
     """
-    return _predictions_from_state(replay_controller.state) or []
+    return _predictions_from_state(state) or []
 
 
 @router.get("/session", response_model=SessionState)
@@ -281,15 +282,17 @@ def get_live_status() -> LiveStatus:
     return LiveStatus(mqtt_enabled=mqtt_enabled, topics=topics)
 
 
-def _replay_status() -> ReplayStatus:
-    """Map the replay controller snapshot into the response model."""
-    return ReplayStatus(**replay_controller.snapshot())
+def _replay_status(runtime: ReplayRuntime) -> ReplayStatus:
+    """Map a runtime's controller snapshot into the response model."""
+    return ReplayStatus(**runtime.controller.snapshot())
 
 
-@router.get("/replay/status", response_model=ReplayStatus)
-def get_replay_status() -> ReplayStatus:
-    """Current replay controller state (idle/running/finished/error)."""
-    return _replay_status()
+def _runtime(replay_id: str) -> ReplayRuntime:
+    """Return the runtime for ``replay_id``; generic 404 when unknown/expired."""
+    runtime = registry.get(replay_id)
+    if runtime is None:
+        raise HTTPException(status_code=404, detail="Replay not found")
+    return runtime
 
 
 @router.get("/replay/sessions", response_model=list[ReplaySessionOption])
@@ -310,33 +313,44 @@ def get_replay_sessions() -> list[ReplaySessionOption]:
     ]
 
 
-def _replay_session() -> SessionState:
-    """Session from replay_controller.state; 409 when no replay is started."""
+@router.post("/replays", response_model=ReplayCreated)
+def create_replay(request: ReplayCreateRequest) -> ReplayCreated:
+    """Start a new isolated replay runtime and return its opaque replay_id."""
+    runtime = registry.create(request.session_key, request.speed)
+    return ReplayCreated(replay_id=runtime.replay_id, **runtime.controller.snapshot())
+
+
+@router.get("/replays/{replay_id}/status", response_model=ReplayStatus)
+def get_replay_status(replay_id: str) -> ReplayStatus:
+    """Current state of one replay runtime (idle/running/finished/error)."""
+    return _replay_status(_runtime(replay_id))
+
+
+@router.get("/replays/{replay_id}/race-state", response_model=RaceStateSnapshot)
+def get_replay_race_state(replay_id: str) -> RaceStateSnapshot:
+    """Replay-owned bootstrap snapshot for the given replay runtime."""
+    runtime = _runtime(replay_id)
+    state = runtime.controller.state
     try:
-        session = session_from_live(replay_controller.state)
+        session = session_from_live(state)
     except Exception:  # noqa: BLE001 — treat an unseeded replay as "not ready"
         session = None
     if session is None:
-        raise HTTPException(status_code=409, detail="No replay has been started")
-    return session
-
-
-@router.get("/replay/race-state", response_model=RaceStateSnapshot)
-def get_replay_race_state() -> RaceStateSnapshot:
-    """Replay-owned bootstrap snapshot, sourced from replay_controller.state."""
+        raise HTTPException(status_code=409, detail="Replay has not seeded yet")
     return RaceStateSnapshot(
-        session=_replay_session(),
-        drivers=_drivers(replay_controller.state),
-        predictions=_replay_predictions(),
+        session=session,
+        drivers=_drivers(state),
+        predictions=replay_predictions(state),
     )
 
 
-@router.get("/replay/track", response_model=TrackState)
-def get_replay_track() -> TrackState:
-    """Static circuit path for the replay session's circuit_key."""
-    circuit_key = _circuit_key(replay_controller.state)
+@router.get("/replays/{replay_id}/track", response_model=TrackState)
+def get_replay_track(replay_id: str) -> TrackState:
+    """Static circuit path for the replay runtime's circuit_key."""
+    runtime = _runtime(replay_id)
+    circuit_key = _circuit_key(runtime.controller.state)
     if circuit_key is None:
-        raise HTTPException(status_code=409, detail="No replay has been started")
+        raise HTTPException(status_code=409, detail="Replay has not seeded yet")
     track = track_for_circuit(circuit_key)
     if track is None:
         raise HTTPException(
@@ -345,70 +359,52 @@ def get_replay_track() -> TrackState:
     return _with_country(track)
 
 
-@router.post("/replay/start", response_model=ReplayStatus)
-def start_replay(request: ReplayStartRequest) -> ReplayStatus:
-    """
-    Start replaying a completed session into the controller's own state.
-
-    ``session_key`` defaults to REPLAY_SESSION_KEY, then INFERENCE_SESSION_KEY.
-    Live ingestion (bootstrap + MQTT) is unaffected.
-    """
-    session_key = request.session_key
-    if session_key is None:
-        env_key = os.getenv("REPLAY_SESSION_KEY") or os.getenv(
-            "INFERENCE_SESSION_KEY"
-        )
-        if env_key:
-            session_key = int(env_key)
-        else:
-            raise HTTPException(
-                status_code=400, detail="session_key is required"
-            )
-    replay_controller.start(session_key, request.speed)
-    return _replay_status()
-
-
-@router.post("/replay/pause", response_model=ReplayStatus)
-def pause_replay() -> ReplayStatus:
+@router.post("/replays/{replay_id}/pause", response_model=ReplayStatus)
+def pause_replay(replay_id: str) -> ReplayStatus:
     """Suspend the running replay clock; resume from the same position."""
-    replay_controller.pause()
-    return _replay_status()
+    runtime = _runtime(replay_id)
+    runtime.controller.pause()
+    return _replay_status(runtime)
 
 
-@router.post("/replay/seek", response_model=ReplayStatus)
-def seek_replay(request: ReplaySeekRequest) -> ReplayStatus:
+@router.post("/replays/{replay_id}/resume", response_model=ReplayStatus)
+def resume_replay(replay_id: str) -> ReplayStatus:
+    """Continue a paused replay from where it left off."""
+    runtime = _runtime(replay_id)
+    runtime.controller.resume()
+    return _replay_status(runtime)
+
+
+@router.post("/replays/{replay_id}/seek", response_model=ReplayStatus)
+def seek_replay(replay_id: str, request: ReplaySeekRequest) -> ReplayStatus:
     """
     Jump the active replay to a replay-clock time or completed-lap checkpoint.
 
     The producer restores the nearest checkpoint at or before the requested
     target, then resumes without exposing future events.
     """
+    runtime = _runtime(replay_id)
     if request.lap is not None:
-        replay_controller.seek_lap(request.lap)
+        runtime.controller.seek_lap(request.lap)
     elif request.time is not None:
-        replay_controller.seek(request.time)
-    return _replay_status()
+        runtime.controller.seek(request.time)
+    return _replay_status(runtime)
 
 
-@router.post("/replay/speed", response_model=ReplayStatus)
-def set_replay_speed(request: ReplaySpeedRequest) -> ReplayStatus:
+@router.post("/replays/{replay_id}/speed", response_model=ReplayStatus)
+def set_replay_speed(replay_id: str, request: ReplaySpeedRequest) -> ReplayStatus:
     """Change the active replay speed in place, without restarting it."""
-    if not replay_controller.set_speed(request.speed):
+    runtime = _runtime(replay_id)
+    if not runtime.controller.set_speed(request.speed):
         raise HTTPException(
             status_code=409, detail="Replay is not running or paused"
         )
-    return _replay_status()
+    return _replay_status(runtime)
 
 
-@router.post("/replay/resume", response_model=ReplayStatus)
-def resume_replay() -> ReplayStatus:
-    """Continue a paused replay from where it left off."""
-    replay_controller.resume()
-    return _replay_status()
-
-
-@router.post("/replay/stop", response_model=ReplayStatus)
-def stop_replay() -> ReplayStatus:
-    """Stop the running replay (live MQTT is unaffected)."""
-    replay_controller.stop()
-    return _replay_status()
+@router.post("/replays/{replay_id}/stop", response_model=ReplayStatus)
+def stop_replay(replay_id: str) -> ReplayStatus:
+    """Stop and remove only the named replay runtime (live is unaffected)."""
+    runtime = _runtime(replay_id)
+    registry.stop(replay_id)
+    return _replay_status(runtime)

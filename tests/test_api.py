@@ -173,30 +173,60 @@ def test_replay_sessions_include_readiness(monkeypatch):
     assert response.json()[0]["readiness"] == "ready"
 
 
-def test_replay_speed_requires_active_replay():
-    response = client.post("/api/replay/speed", json={"speed": 50.0})
-    assert response.status_code == 409
+def test_replay_speed_requires_running_runtime(monkeypatch):
+    from formula1_strategy_tool.acquisition import replay as replay_mod
+    from formula1_strategy_tool.acquisition import replay_registry
+
+    monkeypatch.setattr(
+        replay_mod.ReplayController, "start", lambda self, *a, **k: None
+    )
+    runtime = replay_registry.registry.create(100, speed=10)
+    try:
+        response = client.post(
+            f"/api/replays/{runtime.replay_id}/speed", json={"speed": 50.0}
+        )
+        assert response.status_code == 409
+    finally:
+        replay_registry.registry.stop(runtime.replay_id)
 
 
 def test_replay_speed_validates_range():
-    response = client.post("/api/replay/speed", json={"speed": 0.1})
+    response = client.post("/api/replays/unknown/speed", json={"speed": 0.1})
     assert response.status_code == 422
 
 
 def test_replay_seek_accepts_exactly_one_lap_or_time(monkeypatch):
-    from formula1_strategy_tool.api import routes as routes_mod
+    from formula1_strategy_tool.acquisition import replay as replay_mod
+    from formula1_strategy_tool.acquisition import replay_registry
 
-    laps: list[int] = []
-    monkeypatch.setattr(routes_mod.replay_controller, "seek_lap", laps.append)
-
-    response = client.post("/api/replay/seek", json={"lap": 12})
-    assert response.status_code == 200
-    assert laps == [12]
-    assert client.post("/api/replay/seek", json={}).status_code == 422
-    assert (
-        client.post("/api/replay/seek", json={"lap": 12, "time": 50}).status_code
-        == 422
+    monkeypatch.setattr(
+        replay_mod.ReplayController, "start", lambda self, *a, **k: None
     )
+    runtime = replay_registry.registry.create(100, speed=10)
+    try:
+        laps: list[object] = []
+        monkeypatch.setattr(runtime.controller, "seek_lap", laps.append)
+
+        assert (
+            client.post(
+                f"/api/replays/{runtime.replay_id}/seek", json={"lap": 12}
+            ).status_code
+            == 200
+        )
+        assert laps == [12]
+        assert (
+            client.post(f"/api/replays/{runtime.replay_id}/seek", json={}).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                f"/api/replays/{runtime.replay_id}/seek",
+                json={"lap": 12, "time": 50},
+            ).status_code
+            == 422
+        )
+    finally:
+        replay_registry.registry.stop(runtime.replay_id)
 
 
 def test_locations_endpoint_compact_shape():

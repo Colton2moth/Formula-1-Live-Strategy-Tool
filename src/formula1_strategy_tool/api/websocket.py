@@ -2,9 +2,9 @@
 WebSocket live-update endpoints and broadcasters.
 
 The browser connects to ``/ws/live`` to receive incremental JSON events as the
-live ``LIVE_STATE`` buffer changes, or to ``/ws/replay`` to receive the same
-event types as ``replay_controller.state`` changes. REST (``/api/*``) stays the
-source of full snapshots; the WebSockets only push deltas.
+live ``LIVE_STATE`` buffer changes, or to ``/ws/replays/{replay_id}`` to receive
+the same event types as one replay runtime's ``LiveState`` changes. REST stays
+the source of full snapshots; the WebSockets only push deltas.
 
 Event types match docs/api/CONTRACT.md: ``location_update``,
 ``driver_update``, ``weather_update``, ``race_control_update``, and
@@ -14,6 +14,8 @@ A background async loop drains each state's dirty-topic flags every ~50 ms and
 broadcasts only the values that actually changed, so obsolete location samples
 are never queued and unrelated UI is not re-rendered. Live and replay keep
 separate connection managers and broadcasters so their events never cross.
+Each replay runtime gets its own broadcaster (and diff state) so one user's
+events never reach another user's socket.
 """
 
 from __future__ import annotations
@@ -27,7 +29,6 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from formula1_strategy_tool.acquisition.live_drivers import drivers_from_live
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
-from formula1_strategy_tool.acquisition.replay import replay_controller
 
 LOCATION_TOPIC = "v1/location"
 DRIVER_TOPICS = frozenset(
@@ -63,6 +64,15 @@ class ConnectionManager:
                 stale.append(websocket)
         for websocket in stale:
             self.disconnect(websocket)
+
+    async def close_all(self) -> None:
+        """Close every connected client (used when a replay runtime ends)."""
+        for websocket in list(self.active):
+            try:
+                await websocket.close()
+            except Exception:  # noqa: BLE001 — client may already be gone
+                pass
+        self.active.clear()
 
 
 def _rainfall_flag(value: Any) -> bool:
@@ -264,24 +274,74 @@ def _live_prediction_source() -> list[Any]:
     return _model_predictions()
 
 
-def _replay_prediction_source() -> list[Any]:
-    from formula1_strategy_tool.api.routes import _replay_predictions
+def _replay_prediction_source(controller: Any) -> Callable[[], list[Any]]:
+    def source() -> list[Any]:
+        from formula1_strategy_tool.api.routes import replay_predictions
 
-    return _replay_predictions()
+        return replay_predictions(controller.state)
+
+    return source
 
 
 manager = ConnectionManager()
 broadcaster = Broadcaster(manager, prediction_source=_live_prediction_source)
 
-replay_manager = ConnectionManager()
-replay_broadcaster = Broadcaster(
-    replay_manager,
-    state=replay_controller.state,
-    prediction_source=_replay_prediction_source,
-)
-# A new replay (or seek) reseeds the controller's state from scratch; reset the
-# replay broadcaster so clients receive the fresh data instead of stale diffs.
-replay_controller.on_reset = replay_broadcaster.reset
+
+class ReplayChannel:
+    """One replay runtime's connection manager and diff broadcaster."""
+
+    def __init__(self, replay_id: str, controller: Any) -> None:
+        self.replay_id = replay_id
+        self.manager = ConnectionManager()
+        self.broadcaster = Broadcaster(
+            self.manager,
+            state=controller.state,
+            prediction_source=_replay_prediction_source(controller),
+        )
+        # A seek reseeds the runtime's state from scratch; reset this channel's
+        # diff state so clients receive the fresh data instead of stale diffs.
+        controller.on_reset = self.broadcaster.reset
+
+
+# replay_id -> channel. Accessed only from the event loop (WS endpoints and the
+# replay broadcaster loop), so no extra lock is needed.
+_replay_channels: dict[str, ReplayChannel] = {}
+
+
+def _get_or_create_channel(replay_id: str) -> ReplayChannel | None:
+    from formula1_strategy_tool.acquisition.replay_registry import registry
+
+    runtime = registry.get(replay_id)
+    if runtime is None:
+        return None
+    channel = _replay_channels.get(replay_id)
+    if channel is None:
+        channel = ReplayChannel(replay_id, runtime.controller)
+        _replay_channels[replay_id] = channel
+    return channel
+
+
+async def _remove_channel(replay_id: str) -> None:
+    channel = _replay_channels.pop(replay_id, None)
+    if channel is not None:
+        await channel.manager.close_all()
+
+
+async def replay_broadcaster_loop() -> None:
+    """Flush every replay channel and prune channels whose runtime ended."""
+    from formula1_strategy_tool.acquisition.replay_registry import registry
+
+    while True:
+        await asyncio.sleep(BROADCAST_INTERVAL_SECONDS)
+        for channel in list(_replay_channels.values()):
+            if not registry.exists(channel.replay_id):
+                await _remove_channel(channel.replay_id)
+                continue
+            try:
+                await channel.broadcaster.flush()
+            except Exception as exc:  # noqa: BLE001 — a bad tick must not kill the loop
+                print(f"replay broadcast tick failed: {exc}")
+
 
 router = APIRouter()
 
@@ -299,14 +359,18 @@ async def websocket_live(websocket: WebSocket) -> None:
         manager.disconnect(websocket)
 
 
-@router.websocket("/ws/replay")
-async def websocket_replay(websocket: WebSocket) -> None:
-    """Stream incremental replay events from ``replay_controller.state``."""
-    await replay_manager.connect(websocket)
+@router.websocket("/ws/replays/{replay_id}")
+async def websocket_replay(websocket: WebSocket, replay_id: str) -> None:
+    """Stream incremental replay events for exactly one replay runtime."""
+    channel = _get_or_create_channel(replay_id)
+    if channel is None:
+        await websocket.close(code=1008)
+        return
+    await channel.manager.connect(websocket)
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass
     finally:
-        replay_manager.disconnect(websocket)
+        channel.manager.disconnect(websocket)

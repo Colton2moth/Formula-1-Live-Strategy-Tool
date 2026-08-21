@@ -13,42 +13,58 @@ import pytest
 from fastapi.testclient import TestClient
 
 from formula1_strategy_tool.acquisition import replay as replay_mod
+from formula1_strategy_tool.acquisition import replay_registry
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE
-from formula1_strategy_tool.acquisition.replay import replay_controller
 from formula1_strategy_tool.api.websocket import (
     broadcaster,
     manager,
-    replay_broadcaster,
-    replay_manager,
 )
 from formula1_strategy_tool.main import app
 
 
 @pytest.fixture(autouse=True)
 def reset_state():
+    from formula1_strategy_tool.api import websocket as websocket_mod
+
     LIVE_STATE.clear()
-    replay_controller.state.clear()
+    replay_registry.registry.stop_all()
+    websocket_mod._replay_channels.clear()
     broadcaster.reset()
-    replay_broadcaster.reset()
     manager.active.clear()
-    replay_manager.active.clear()
     yield
 
 
-def _seed_replay_session(circuit_key: int = 23) -> None:
-    replay_controller.state.update(
-        "v1/sessions",
-        {
-            "circuit_key": circuit_key,
-            "circuit_short_name": "Montreal",
-            "session_name": "Race",
-            "session_type": "Race",
-            "location": "Montreal",
-            "date_start": "2025-06-15T18:00:00+00:00",
-            "date_end": "2025-06-15T20:00:00+00:00",
-            "is_cancelled": False,
-        },
-    )
+def _make_runtime(monkeypatch, *, session_key=9999, circuit_key=23):
+    """Create a registry runtime whose worker seeds one replay session."""
+    seeded = threading.Event()
+
+    def fake_replay(session_key, speed=10.0, state=None, **kwargs):
+        if state is not None:
+            state.update(
+                "v1/sessions",
+                {
+                    "session_key": session_key,
+                    "circuit_key": circuit_key,
+                    "circuit_short_name": "Montreal",
+                    "session_name": "Race",
+                    "session_type": "Race",
+                    "location": "Montreal",
+                    "date_start": "2025-06-15T18:00:00+00:00",
+                    "date_end": "2025-06-15T20:00:00+00:00",
+                    "is_cancelled": False,
+                },
+            )
+        if kwargs.get("on_seeded") is not None:
+            kwargs["on_seeded"]()
+        seeded.set()
+        stop = kwargs.get("stop_event")
+        if stop is not None:
+            stop.wait(timeout=2.0)
+
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+    runtime = replay_registry.registry.create(session_key, speed=10)
+    assert seeded.wait(timeout=1.0)
+    return runtime
 
 
 def _seed_live_session() -> None:
@@ -67,61 +83,47 @@ def _seed_live_session() -> None:
     )
 
 
-def test_replay_race_state_reads_replay_state_not_live():
+def test_replay_race_state_reads_replay_state_not_live(monkeypatch):
     _seed_live_session()
-    _seed_replay_session(circuit_key=23)
+    runtime = _make_runtime(monkeypatch, circuit_key=23)
     with TestClient(app) as client:
         live = client.get("/api/race-state").json()
-        replay = client.get("/api/replay/race-state").json()
+        replay = client.get(f"/api/replays/{runtime.replay_id}/race-state").json()
     assert live["session"]["meeting_name"] == "Hungaroring"
     assert replay["session"]["meeting_name"] == "Montreal"
 
 
-def test_replay_track_differs_from_live_track():
+def test_replay_track_differs_from_live_track(monkeypatch):
     _seed_live_session()
-    _seed_replay_session(circuit_key=23)
+    runtime = _make_runtime(monkeypatch, circuit_key=23)
     with TestClient(app) as client:
         live = client.get("/api/track").json()
-        replay = client.get("/api/replay/track").json()
+        replay = client.get(f"/api/replays/{runtime.replay_id}/track").json()
     assert live["circuit_key"] == 4
     assert replay["circuit_key"] == 23
 
 
-def test_replay_race_state_conflicts_without_replay():
+def test_replay_race_state_404_unknown_id():
     with TestClient(app) as client:
-        assert client.get("/api/replay/race-state").status_code == 409
+        assert client.get("/api/replays/unknown/race-state").status_code == 404
 
 
-def test_replay_track_conflicts_without_replay():
+def test_replay_track_404_unknown_id():
     with TestClient(app) as client:
-        assert client.get("/api/replay/track").status_code == 409
+        assert client.get("/api/replays/unknown/track").status_code == 404
 
 
-def test_replay_start_does_not_modify_live_state(monkeypatch):
-    seeded = threading.Event()
-
-    def fake_replay(session_key, speed=10.0, state=None, **kwargs):
-        if state is not None:
-            state.update(
-                "v1/sessions",
-                {"session_key": session_key, "circuit_key": 23},
-            )
-        seeded.set()
-
-    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
-
-    with TestClient(app) as client:
-        client.post("/api/replay/start", json={"session_key": 9999})
-        assert seeded.wait(timeout=1.0)
-
+def test_replay_create_does_not_modify_live_state(monkeypatch):
+    runtime = _make_runtime(monkeypatch, session_key=9999, circuit_key=23)
     assert LIVE_STATE.docs_for("v1/sessions") == []
-    assert replay_controller.state.docs_for("v1/sessions")
+    assert runtime.controller.state.docs_for("v1/sessions")
 
 
-def test_websocket_replay_receives_replay_updates():
+def test_websocket_replay_receives_replay_updates(monkeypatch):
+    runtime = _make_runtime(monkeypatch)
     with TestClient(app) as client:
-        with client.websocket_connect("/ws/replay") as websocket:
-            replay_controller.state.update(
+        with client.websocket_connect(f"/ws/replays/{runtime.replay_id}") as websocket:
+            runtime.controller.state.update(
                 "v1/weather",
                 {
                     "track_temperature": 25.0,
@@ -137,10 +139,11 @@ def test_websocket_replay_receives_replay_updates():
             assert event["track_temperature"] == 25.0
 
 
-def test_websocket_live_ignores_replay_updates():
+def test_websocket_live_ignores_replay_updates(monkeypatch):
+    runtime = _make_runtime(monkeypatch)
     with TestClient(app) as client:
         with client.websocket_connect("/ws/live") as websocket:
-            replay_controller.state.update(
+            runtime.controller.state.update(
                 "v1/weather",
                 {
                     "track_temperature": 99.0,
@@ -167,9 +170,10 @@ def test_websocket_live_ignores_replay_updates():
             assert event["track_temperature"] == 20.0
 
 
-def test_websocket_replay_ignores_live_updates():
+def test_websocket_replay_ignores_live_updates(monkeypatch):
+    runtime = _make_runtime(monkeypatch)
     with TestClient(app) as client:
-        with client.websocket_connect("/ws/replay") as websocket:
+        with client.websocket_connect(f"/ws/replays/{runtime.replay_id}") as websocket:
             LIVE_STATE.update(
                 "v1/weather",
                 {
@@ -181,7 +185,7 @@ def test_websocket_replay_ignores_live_updates():
             )
             time.sleep(1.0)
 
-            replay_controller.state.update(
+            runtime.controller.state.update(
                 "v1/weather",
                 {
                     "track_temperature": 30.0,
@@ -209,7 +213,6 @@ def test_live_predictions_use_live_state(monkeypatch):
     routes_mod._model_predictions()
 
     assert supplied == [LIVE_STATE]
-    assert replay_controller.state not in supplied
 
 
 def test_replay_predictions_use_replay_state_not_live(monkeypatch):
@@ -219,11 +222,12 @@ def test_replay_predictions_use_replay_state_not_live(monkeypatch):
     monkeypatch.setattr(
         routes_mod, "features_from_live", lambda state: supplied.append(state) or None
     )
+    runtime = _make_runtime(monkeypatch, circuit_key=23)
 
-    result = routes_mod._replay_predictions()
+    result = routes_mod.replay_predictions(runtime.controller.state)
 
     assert result == []
-    assert supplied == [replay_controller.state]
+    assert supplied == [runtime.controller.state]
     assert LIVE_STATE not in supplied
 
 
@@ -237,13 +241,13 @@ def test_race_state_endpoints_score_their_own_state(monkeypatch):
     monkeypatch.setattr(routes_mod, "_csv_predictions", lambda: [])
 
     _seed_live_session()
-    _seed_replay_session(circuit_key=23)
+    runtime = _make_runtime(monkeypatch, circuit_key=23)
 
     with TestClient(app) as client:
         client.get("/api/race-state")
-        client.get("/api/replay/race-state")
+        client.get(f"/api/replays/{runtime.replay_id}/race-state")
 
-    assert supplied == [LIVE_STATE, replay_controller.state]
+    assert supplied == [LIVE_STATE, runtime.controller.state]
 
 
 def _mqtt_lifecycle_guard(monkeypatch) -> list[str]:
@@ -399,21 +403,17 @@ def test_live_and_replay_state_hold_distinct_data(monkeypatch):
             stop_event.wait(timeout=2.0)
 
     monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
-    replay_controller.start(9999, speed=10)
+    controller = replay_mod.ReplayController()
+    controller.start(9999, speed=10)
     assert seeded.wait(timeout=1.0)
 
     # Both states hold their own session, weather, and driver data.
     assert LIVE_STATE.docs_for("v1/sessions")[0]["circuit_key"] == 4
-    assert replay_controller.state.docs_for("v1/sessions")[0]["circuit_key"] == 23
+    assert controller.state.docs_for("v1/sessions")[0]["circuit_key"] == 23
     assert LIVE_STATE.docs_for("v1/weather")[0]["track_temperature"] == 20.0
-    assert (
-        replay_controller.state.docs_for("v1/weather")[0]["track_temperature"] == 30.0
-    )
+    assert controller.state.docs_for("v1/weather")[0]["track_temperature"] == 30.0
     assert LIVE_STATE.docs_for("v1/drivers")[0]["full_name"] == "Live Driver"
-    assert (
-        replay_controller.state.docs_for("v1/drivers")[0]["full_name"]
-        == "Replay Driver"
-    )
+    assert controller.state.docs_for("v1/drivers")[0]["full_name"] == "Replay Driver"
 
     # A live update must not overwrite or clear the replay state.
     LIVE_STATE.update(
@@ -425,12 +425,10 @@ def test_live_and_replay_state_hold_distinct_data(monkeypatch):
             "date": "2026-07-26T14:00:00",
         },
     )
-    assert (
-        replay_controller.state.docs_for("v1/weather")[0]["track_temperature"] == 30.0
-    )
+    assert controller.state.docs_for("v1/weather")[0]["track_temperature"] == 30.0
 
     # A replay update must not overwrite or clear the live state.
-    replay_controller.state.update(
+    controller.state.update(
         "v1/weather",
         {
             "track_temperature": 31.0,
@@ -441,4 +439,4 @@ def test_live_and_replay_state_hold_distinct_data(monkeypatch):
     )
     assert LIVE_STATE.docs_for("v1/weather")[0]["track_temperature"] == 21.0
 
-    replay_controller.stop()
+    controller.stop()

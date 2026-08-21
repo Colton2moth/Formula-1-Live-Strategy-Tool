@@ -29,12 +29,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from formula1_strategy_tool.acquisition.replay import replay_controller
 from formula1_strategy_tool.api.routes import router as api_router
 from formula1_strategy_tool.api.websocket import (
     broadcaster,
     broadcaster_loop,
-    replay_broadcaster,
+    replay_broadcaster_loop,
 )
 from formula1_strategy_tool.api.websocket import (
     router as ws_router,
@@ -95,9 +94,25 @@ def _run_bootstrap() -> None:
         print(f"OpenF1 REST bootstrap skipped: {exc}")
 
 
+# How often abandoned replay runtimes are checked (TTL set by the registry).
+_REPLAY_CLEANUP_INTERVAL_SECONDS = 60.0
+
+
+async def _replay_cleanup_loop() -> None:
+    """Periodically reap abandoned replay runtimes past the inactivity TTL."""
+    from formula1_strategy_tool.acquisition.replay_registry import registry
+
+    while True:
+        await asyncio.sleep(_REPLAY_CLEANUP_INTERVAL_SECONDS)
+        try:
+            registry.cleanup_expired()
+        except Exception as exc:  # noqa: BLE001 — a bad cleanup must not kill the loop
+            print(f"replay cleanup failed: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start live bootstrap + MQTT; replay runs alongside in its own state."""
+    """Start live bootstrap + MQTT; replay runs in per-user registry runtimes."""
     # Live ingestion is independent of replay: it starts once and stays up for
     # the process lifetime, regardless of replay start/pause/seek/stop.
     boot_flag = os.getenv("LIVE_BOOTSTRAP", "1").strip().lower()
@@ -112,25 +127,16 @@ async def lifespan(app: FastAPI):
 
     _start_mqtt()
 
-    # Optional developer replay: run a historical race in the controller's own
-    # state alongside live ingestion (used for automated end-to-end checks).
-    replay_key = os.getenv("REPLAY_SESSION_KEY", "").strip()
-    if replay_key:
-        speed = float(os.getenv("REPLAY_SPEED", "10").strip())
-        replay_controller.start(int(replay_key), speed)
-        print(
-            f"Developer replay mode: session_key={replay_key} speed={speed}x "
-            "(live bootstrap + MQTT stay on)"
-        )
-
-    # WebSocket broadcasters: live + replay, each flushing its own state.
+    # WebSocket broadcasters: live, plus one channel per replay runtime.
     broadcast_task = asyncio.create_task(broadcaster_loop(broadcaster))
     print("WebSocket broadcaster started (/ws/live)")
-    replay_broadcast_task = asyncio.create_task(broadcaster_loop(replay_broadcaster))
-    print("Replay WebSocket broadcaster started (/ws/replay)")
+    replay_broadcast_task = asyncio.create_task(replay_broadcaster_loop())
+    print("Replay WebSocket broadcaster started (/ws/replays/{replay_id})")
+    cleanup_task = asyncio.create_task(_replay_cleanup_loop())
     yield
     broadcast_task.cancel()
     replay_broadcast_task.cancel()
+    cleanup_task.cancel()
     # Daemon threads are abandoned on shutdown; good enough for v1.
 
 
