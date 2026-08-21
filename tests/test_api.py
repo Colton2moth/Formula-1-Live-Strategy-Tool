@@ -61,9 +61,10 @@ def test_race_state_503_without_live_data():
     assert response.status_code == 503
 
 
-def test_track_503_without_live_data():
+def test_track_unavailable_without_live_data():
     response = client.get("/api/track")
-    assert response.status_code == 503
+    assert response.status_code == 404
+    assert "unavailable" in response.json()["detail"].lower()
 
 
 def test_session_from_live_data():
@@ -75,77 +76,15 @@ def test_session_from_live_data():
     assert data["session_name"] == "Race"
 
 
-def test_track_resolves_hungaroring():
+def test_track_unavailable_with_live_data():
     seed_hungarian_session()
-    response = client.get("/api/track")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["circuit_name"] == "Hungaroring"
-    assert data["circuit_key"] == 4
-    assert len(data["path"]) > 2
-    assert data["path"][0] == data["path"][-1]
-
-
-def test_track_404_unknown_circuit():
-    LIVE_STATE.update(
-        "v1/sessions", {"circuit_key": 999, "session_name": "Race"}
-    )
     response = client.get("/api/track")
     assert response.status_code == 404
 
 
-def seed_montreal_session() -> None:
-    LIVE_STATE.update(
-        "v1/sessions",
-        {"circuit_key": 23, "circuit_short_name": "Montreal", "session_name": "Race"},
-    )
-
-
-def test_track_includes_pit_lane_for_montreal():
-    seed_montreal_session()
-    response = client.get("/api/track")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["circuit_key"] == 23
-    assert data["pit_lane"] is not None
-    assert len(data["pit_lane"]) > 2
-
-
-def seed_interlagos_session() -> None:
-    LIVE_STATE.update(
-        "v1/sessions",
-        {"circuit_key": 14, "circuit_short_name": "Interlagos", "session_name": "Race"},
-    )
-
-
-def test_track_no_pit_lane_for_interlagos():
-    seed_interlagos_session()
-    response = client.get("/api/track")
-    assert response.status_code == 200
-    assert response.json().get("pit_lane") is None
-
-
-def test_tracks_lists_every_circuit_with_pit_lanes():
-    from formula1_strategy_tool.api.circuits import CIRCUITS
-    from formula1_strategy_tool.api.pit_lanes import PIT_LANES
-
+def test_tracks_unavailable():
     response = client.get("/api/tracks")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) == len(CIRCUITS)
-
-    by_key = {track["circuit_key"]: track for track in data}
-    assert set(by_key) == set(CIRCUITS)
-
-    for key, track in by_key.items():
-        assert len(track["path"]) > 2
-        assert track["path"][0] == track["path"][-1]
-        assert track["country_name"]
-        if key in PIT_LANES:
-            assert track["pit_lane"] is not None
-            assert len(track["pit_lane"]) > 2
-        else:
-            assert track["pit_lane"] is None
+    assert response.status_code == 404
 
 
 def test_replay_sessions_include_readiness(monkeypatch):

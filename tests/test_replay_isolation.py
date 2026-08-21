@@ -93,14 +93,14 @@ def test_replay_race_state_reads_replay_state_not_live(monkeypatch):
     assert replay["session"]["meeting_name"] == "Montreal"
 
 
-def test_replay_track_differs_from_live_track(monkeypatch):
+def test_replay_track_unavailable_during_rebuild(monkeypatch):
     _seed_live_session()
     runtime = _make_runtime(monkeypatch, circuit_key=23)
     with TestClient(app) as client:
-        live = client.get("/api/track").json()
-        replay = client.get(f"/api/replays/{runtime.replay_id}/track").json()
-    assert live["circuit_key"] == 4
-    assert replay["circuit_key"] == 23
+        live = client.get("/api/track")
+        replay = client.get(f"/api/replays/{runtime.replay_id}/track")
+    assert live.status_code == 404
+    assert replay.status_code == 404
 
 
 def test_replay_race_state_404_unknown_id():

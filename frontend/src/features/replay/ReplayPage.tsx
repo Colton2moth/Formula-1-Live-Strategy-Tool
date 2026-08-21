@@ -67,7 +67,7 @@ export function ReplayPage() {
               <div className="mt-1 text-sm font-medium leading-6 text-app-muted">{error}</div>
             </div>
           </Panel>
-        ) : !raceState || !track || !source ? (
+        ) : !raceState || !source ? (
           <Panel label="Race data">
             <div className="p-4">
               <div className="text-base font-black uppercase tracking-wide text-white">

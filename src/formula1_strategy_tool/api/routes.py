@@ -1,10 +1,10 @@
 """
 REST route handlers for the strategy API contract.
 
-Session and drivers are served from the live OpenF1 buffer. The track map is
-resolved from a static circuit library keyed by the live session's
-circuit_key. Predictions are scored from the trained models against a
-historical CSV snapshot (see inference.py).
+Session and drivers are served from the live OpenF1 buffer. Predictions are
+scored from the trained models against a historical CSV snapshot (see
+inference.py). Circuit-map endpoints are temporarily unavailable while track
+geometry is rebuilt from cached OpenF1 location data.
 """
 
 from __future__ import annotations
@@ -23,8 +23,6 @@ from formula1_strategy_tool.acquisition.live_features import (
 from formula1_strategy_tool.acquisition.live_session import session_from_live
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
 from formula1_strategy_tool.acquisition.replay_registry import ReplayRuntime, registry
-from formula1_strategy_tool.api.circuits import CIRCUITS, track_for_circuit
-from formula1_strategy_tool.api.countries import COUNTRY_NAMES
 from formula1_strategy_tool.api.schemas import (
     DriverState,
     LiveStatus,
@@ -73,15 +71,6 @@ def _session(state: LiveState) -> SessionState:
     return live
 
 
-def _circuit_key(state: LiveState) -> int | None:
-    """circuit_key of the ingested session, or None before data arrives."""
-    sessions = state.docs_for("v1/sessions")
-    if not sessions:
-        return None
-    key = sessions[0].get("circuit_key")
-    return int(key) if key is not None else None
-
-
 def _active_drivers() -> list[DriverState]:
     """Live MQTT-derived drivers; empty list when no live data yet."""
     return _drivers(LIVE_STATE)
@@ -90,11 +79,6 @@ def _active_drivers() -> list[DriverState]:
 def _active_session() -> SessionState:
     """Live/bootstrap session; 503 when no session has been ingested yet."""
     return _session(LIVE_STATE)
-
-
-def _live_circuit_key() -> int | None:
-    """circuit_key of the ingested live session, or None before data arrives."""
-    return _circuit_key(LIVE_STATE)
 
 
 def _drivers_by_number() -> dict[int, DriverState]:
@@ -236,29 +220,17 @@ def get_race_state() -> RaceStateSnapshot:
 
 @router.get("/track", response_model=TrackState)
 def get_track() -> TrackState:
-    """Static circuit path for the live session's circuit_key."""
-    circuit_key = _live_circuit_key()
-    if circuit_key is None:
-        raise HTTPException(status_code=503, detail="No live session available")
-    track = track_for_circuit(circuit_key)
-    if track is None:
-        raise HTTPException(
-            status_code=404, detail=f"No circuit map for circuit_key {circuit_key}"
-        )
-    return _with_country(track)
+    """Circuit map. Unavailable while the track geometry is being rebuilt."""
+    raise HTTPException(
+        status_code=404, detail="Circuit map unavailable (being rebuilt)"
+    )
 
 
 @router.get("/tracks", response_model=list[TrackState])
 def get_tracks() -> list[TrackState]:
-    """Every static circuit map (with pit lane when available)."""
-    tracks = (track_for_circuit(key) for key in sorted(CIRCUITS))
-    return [_with_country(track) for track in tracks if track is not None]
-
-
-def _with_country(track: TrackState) -> TrackState:
-    """Attach the circuit's country name to a TrackState."""
-    return track.model_copy(
-        update={"country_name": COUNTRY_NAMES.get(track.circuit_key)}
+    """All circuit maps. Unavailable while the track geometry is being rebuilt."""
+    raise HTTPException(
+        status_code=404, detail="Circuit maps unavailable (being rebuilt)"
     )
 
 
@@ -346,17 +318,11 @@ def get_replay_race_state(replay_id: str) -> RaceStateSnapshot:
 
 @router.get("/replays/{replay_id}/track", response_model=TrackState)
 def get_replay_track(replay_id: str) -> TrackState:
-    """Static circuit path for the replay runtime's circuit_key."""
-    runtime = _runtime(replay_id)
-    circuit_key = _circuit_key(runtime.controller.state)
-    if circuit_key is None:
-        raise HTTPException(status_code=409, detail="Replay has not seeded yet")
-    track = track_for_circuit(circuit_key)
-    if track is None:
-        raise HTTPException(
-            status_code=404, detail=f"No circuit map for circuit_key {circuit_key}"
-        )
-    return _with_country(track)
+    """Circuit map. Unavailable while the track geometry is being rebuilt."""
+    _runtime(replay_id)
+    raise HTTPException(
+        status_code=404, detail="Circuit map unavailable (being rebuilt)"
+    )
 
 
 @router.post("/replays/{replay_id}/pause", response_model=ReplayStatus)

@@ -73,12 +73,16 @@ def main() -> None:
             continue
         cache = REPLAY_DIR / str(session_key)
         laps_path = cache / "laps.json"
-        laps = json.loads(laps_path.read_text(encoding="utf-8")) if laps_path.exists() else []
+        laps = (
+            json.loads(laps_path.read_text(encoding="utf-8"))
+            if laps_path.exists()
+            else []
+        )
         expected = location_window_count(session, laps)
         gap = classify_location_gaps(expected, cached_location_windows(cache))
         by_circuit.setdefault(circuit_key, []).append((str(session_key), session, gap))
 
-    print("\ncircuit_key  circuit_name                  sessions (complete=loc windows full)")
+    print("\ncircuit_key  circuit_name              sessions (complete=loc windows)")
     for key, track in sorted(CIRCUITS.items()):
         sessions = by_circuit.get(key, [])
         ready = sum(1 for _, _, gap in sessions if gap == "complete")
