@@ -24,6 +24,7 @@ from formula1_strategy_tool.acquisition.live_session import session_from_live
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
 from formula1_strategy_tool.acquisition.replay_registry import ReplayRuntime, registry
 from formula1_strategy_tool.api.schemas import (
+    DisplayPitLane,
     DriverState,
     LiveStatus,
     LiveTopicStats,
@@ -37,9 +38,12 @@ from formula1_strategy_tool.api.schemas import (
     ReplaySpeedRequest,
     ReplayStatus,
     SessionState,
+    StartFinishState,
+    TrackPoint,
     TrackState,
 )
 from formula1_strategy_tool.inference import predict_feature_rows, predict_snapshot
+from formula1_strategy_tool.track.models import CircuitLayout, layouts_dir, load_layout
 
 # Load .env from the project root when the API process starts.
 load_dotenv()
@@ -71,6 +75,15 @@ def _session(state: LiveState) -> SessionState:
     return live
 
 
+def _circuit_key(state: LiveState) -> int | None:
+    """circuit_key of the ingested session, or None before data arrives."""
+    sessions = state.docs_for("v1/sessions")
+    if not sessions:
+        return None
+    key = sessions[0].get("circuit_key")
+    return int(key) if key is not None else None
+
+
 def _active_drivers() -> list[DriverState]:
     """Live MQTT-derived drivers; empty list when no live data yet."""
     return _drivers(LIVE_STATE)
@@ -79,6 +92,11 @@ def _active_drivers() -> list[DriverState]:
 def _active_session() -> SessionState:
     """Live/bootstrap session; 503 when no session has been ingested yet."""
     return _session(LIVE_STATE)
+
+
+def _live_circuit_key() -> int | None:
+    """circuit_key of the ingested live session, or None before data arrives."""
+    return _circuit_key(LIVE_STATE)
 
 
 def _drivers_by_number() -> dict[int, DriverState]:
@@ -218,20 +236,56 @@ def get_race_state() -> RaceStateSnapshot:
     )
 
 
+def _display_track(layout: CircuitLayout) -> TrackState:
+    """Map a CircuitLayout to the display-ready TrackState contract."""
+    pit_lane = None
+    if layout.pit_lane is not None and layout.pit_lane.display:
+        pit_lane = DisplayPitLane(
+            path=[TrackPoint(x=p.x, y=p.y) for p in layout.pit_lane.display],
+            entry_progress=layout.pit_lane.entry_progress,
+            exit_progress=layout.pit_lane.exit_progress,
+        )
+    start = layout.start_finish.display
+    return TrackState(
+        circuit_name=layout.name,
+        circuit_key=layout.circuit_key,
+        rotation=layout.rotation,
+        country_name=layout.country,
+        display_path=[TrackPoint(x=p.x, y=p.y) for p in layout.display_path],
+        start_finish=StartFinishState(
+            x=start.x, y=start.y, angle_deg=layout.start_finish.angle_deg
+        ),
+        pit_lane=pit_lane,
+    )
+
+
 @router.get("/track", response_model=TrackState)
 def get_track() -> TrackState:
-    """Circuit map. Unavailable while the track geometry is being rebuilt."""
-    raise HTTPException(
-        status_code=404, detail="Circuit map unavailable (being rebuilt)"
-    )
+    """Display-ready circuit map for the live session's circuit_key."""
+    circuit_key = _live_circuit_key()
+    if circuit_key is None:
+        raise HTTPException(status_code=503, detail="No live session available")
+    layout = load_layout(circuit_key)
+    if layout is None:
+        raise HTTPException(
+            status_code=404, detail=f"No circuit map for circuit_key {circuit_key}"
+        )
+    return _display_track(layout)
 
 
 @router.get("/tracks", response_model=list[TrackState])
 def get_tracks() -> list[TrackState]:
-    """All circuit maps. Unavailable while the track geometry is being rebuilt."""
-    raise HTTPException(
-        status_code=404, detail="Circuit maps unavailable (being rebuilt)"
-    )
+    """Every generated circuit map (display-ready)."""
+    tracks: list[TrackState] = []
+    for path in sorted(layouts_dir().glob("*.json")):
+        try:
+            layout = CircuitLayout.model_validate_json(
+                path.read_text(encoding="utf-8")
+            )
+        except Exception:  # noqa: BLE001 — skip malformed layouts
+            continue
+        tracks.append(_display_track(layout))
+    return tracks
 
 
 @router.get("/live-status", response_model=LiveStatus)
@@ -318,11 +372,17 @@ def get_replay_race_state(replay_id: str) -> RaceStateSnapshot:
 
 @router.get("/replays/{replay_id}/track", response_model=TrackState)
 def get_replay_track(replay_id: str) -> TrackState:
-    """Circuit map. Unavailable while the track geometry is being rebuilt."""
-    _runtime(replay_id)
-    raise HTTPException(
-        status_code=404, detail="Circuit map unavailable (being rebuilt)"
-    )
+    """Display-ready circuit map for the replay runtime's circuit_key."""
+    runtime = _runtime(replay_id)
+    circuit_key = _circuit_key(runtime.controller.state)
+    if circuit_key is None:
+        raise HTTPException(status_code=409, detail="Replay has not seeded yet")
+    layout = load_layout(circuit_key)
+    if layout is None:
+        raise HTTPException(
+            status_code=404, detail=f"No circuit map for circuit_key {circuit_key}"
+        )
+    return _display_track(layout)
 
 
 @router.post("/replays/{replay_id}/pause", response_model=ReplayStatus)

@@ -105,28 +105,42 @@ class RaceStateSnapshot(BaseModel):
 
 
 class TrackPoint(BaseModel):
-    """One normalized coordinate on the circuit outline (0.0–1.0)."""
+    """One display-space coordinate (already rotated, scaled, and centred)."""
 
     x: float
     y: float
 
 
+class StartFinishState(BaseModel):
+    """Start/finish marker position and angle in display space."""
+
+    x: float
+    y: float
+    angle_deg: float
+
+
+class DisplayPitLane(BaseModel):
+    """Pit-lane centreline in display space plus entry/exit progress."""
+
+    path: list[TrackPoint]
+    entry_progress: float | None = None
+    exit_progress: float | None = None
+
+
 class TrackState(BaseModel):
-    """Circuit metadata and drawable path for the track map."""
+    """Display-ready circuit geometry for the track map."""
 
     circuit_name: str
     circuit_key: int
-    # FastF1 circuit rotation in degrees, used to orient the raw coordinates
-    # to the official F1 track map. Defaults to 0 when unavailable.
+    # FastF1 circuit rotation in degrees, used to orient the raw coordinates.
     rotation: float = 0.0
     # Country/event identifier for the circuit; None when unknown.
     country_name: str | None = None
-    # FE map draws a start/finish marker; default to first path point if omitted.
-    start_finish: TrackPoint
-    path: list[TrackPoint]
-    # Optional pit-lane centreline in the same raw coordinate space as ``path``.
-    # Null when no reviewed pit geometry exists for the circuit.
-    pit_lane: list[TrackPoint] | None = None
+    # 1000 progress-aligned display points; draw directly, no runtime transform.
+    display_path: list[TrackPoint]
+    start_finish: StartFinishState
+    # Optional pit-lane centreline in the same display space; None when absent.
+    pit_lane: DisplayPitLane | None = None
 
 
 class LiveTopicStats(BaseModel):

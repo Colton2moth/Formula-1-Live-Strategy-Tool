@@ -61,10 +61,9 @@ def test_race_state_503_without_live_data():
     assert response.status_code == 503
 
 
-def test_track_unavailable_without_live_data():
+def test_track_503_without_live_data():
     response = client.get("/api/track")
-    assert response.status_code == 404
-    assert "unavailable" in response.json()["detail"].lower()
+    assert response.status_code == 503
 
 
 def test_session_from_live_data():
@@ -76,15 +75,34 @@ def test_session_from_live_data():
     assert data["session_name"] == "Race"
 
 
-def test_track_unavailable_with_live_data():
+def seed_silverstone_session() -> None:
+    LIVE_STATE.update(
+        "v1/sessions",
+        {"circuit_key": 2, "circuit_short_name": "Silverstone", "session_name": "Race"},
+    )
+
+
+def test_track_returns_display_path_for_silverstone():
+    seed_silverstone_session()
+    response = client.get("/api/track")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["circuit_key"] == 2
+    assert len(data["display_path"]) == 1000
+    assert data["start_finish"]["angle_deg"] is not None
+
+
+def test_track_404_when_no_layout():
     seed_hungarian_session()
     response = client.get("/api/track")
     assert response.status_code == 404
 
 
-def test_tracks_unavailable():
+def test_tracks_lists_generated_layouts():
     response = client.get("/api/tracks")
-    assert response.status_code == 404
+    assert response.status_code == 200
+    keys = {track["circuit_key"] for track in response.json()}
+    assert 2 in keys
 
 
 def test_replay_sessions_include_readiness(monkeypatch):

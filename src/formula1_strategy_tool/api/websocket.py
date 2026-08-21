@@ -29,6 +29,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from formula1_strategy_tool.acquisition.live_drivers import drivers_from_live
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
+from formula1_strategy_tool.track.models import load_layout
+from formula1_strategy_tool.track.projection import LocationProjector
 
 LOCATION_TOPIC = "v1/location"
 DRIVER_TOPICS = frozenset(
@@ -155,6 +157,8 @@ class Broadcaster:
         self._last_race_control: dict[str, Any] | None = None
         self._last_predictions: dict[int, tuple] = {}
         self._last_prediction_run = 0.0
+        self._projector: LocationProjector | None = None
+        self._projector_circuit: int | None = None
 
     def reset(self) -> None:
         """Forget all last-sent state (used by tests)."""
@@ -164,6 +168,22 @@ class Broadcaster:
         self._last_race_control = None
         self._last_predictions.clear()
         self._last_prediction_run = 0.0
+        self._projector = None
+        self._projector_circuit = None
+
+    def _projector_for_state(self) -> LocationProjector | None:
+        sessions = self.state.docs_for("v1/sessions")
+        if not sessions:
+            return None
+        key = sessions[0].get("circuit_key")
+        circuit_key = int(key) if key is not None else None
+        if circuit_key is None:
+            return None
+        if self._projector_circuit != circuit_key:
+            layout = load_layout(circuit_key)
+            self._projector = LocationProjector(layout) if layout is not None else None
+            self._projector_circuit = circuit_key
+        return self._projector
 
     async def flush(self) -> None:
         dirty = self.state.drain_dirty()
@@ -181,17 +201,28 @@ class Broadcaster:
             await self._flush_predictions()
 
     async def _flush_locations(self) -> None:
+        projector = self._projector_for_state()
         for number, location in self.state.latest_locations().items():
             key = (location["x"], location["y"])
             if self._last_locations.get(number) == key:
                 continue
             self._last_locations[number] = key
+            map_x = map_y = None
+            x = location.get("x")
+            y = location.get("y")
+            if projector is not None and x is not None and y is not None:
+                result = projector.project_location(number, float(x), float(y))
+                if result is not None:
+                    _, _, display = result
+                    map_x, map_y = display
             await self.manager.broadcast(
                 {
                     "type": "location_update",
                     "driver_number": number,
                     "x": location["x"],
                     "y": location["y"],
+                    "map_x": map_x,
+                    "map_y": map_y,
                     "timestamp": location["date"],
                 }
             )
