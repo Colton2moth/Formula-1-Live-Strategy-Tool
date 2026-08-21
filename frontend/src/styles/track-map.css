@@ -24,7 +24,32 @@
 }
 
 .track-map-svg {
-  @apply h-full w-full;
+  @apply relative h-full w-full;
+  z-index: 2;
+}
+
+.track-map-info {
+  @apply pointer-events-none absolute inset-0 flex flex-col items-center justify-start gap-1 px-6 text-center;
+  z-index: 1;
+  opacity: .3;
+}
+
+.track-map-info-name {
+  @apply font-sans  uppercase tracking-widest text-app-text;
+  max-width: 100%;
+  font-size: 3rem;
+  font-weight: 800;
+  overflow-wrap: break-word;
+  line-height: 1.15;
+}
+
+.track-map-info-country {
+  @apply font-sans uppercase tracking-widest text-app-text;
+  max-width: 100%;
+  font-size: 1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
 }
 
 .track-map-road {

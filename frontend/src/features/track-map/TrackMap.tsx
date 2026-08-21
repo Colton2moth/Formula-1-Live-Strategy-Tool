@@ -14,7 +14,7 @@ type TrackMapProps = {
 };
 
 export function TrackMap({ track, session, drivers, locations, selectedDriver, onSelectDriver }: TrackMapProps) {
-  const label = `${session.meeting_name.toUpperCase()} | ${track ? track.circuit_name.toUpperCase() : "TRACK MAP"} | ${session.session_name.toUpperCase()}`;
+  const label = `${session.meeting_name.toUpperCase()} | ${session.session_name.toUpperCase()}`;
   const mapPath = track ? trackPath(track.display_path) : "";
   const pitLanePath = track?.pit_lane?.path?.length ? trackPath(track.pit_lane.path) : null;
   const squares = track ? startFinishSquares(track.start_finish) : [];
@@ -23,6 +23,12 @@ export function TrackMap({ track, session, drivers, locations, selectedDriver, o
     <Panel label={label} className="track-map-panel">
       {track ? (
         <div className="track-map-frame">
+          <div className="track-map-info" aria-hidden="true">
+            <div className="track-map-info-name">{track.circuit_name}</div>
+            {track.country_name && (
+              <div className="track-map-info-country">{track.country_name}</div>
+            )}
+          </div>
           <svg
             viewBox="0 0 100 85"
             className="track-map-svg"
