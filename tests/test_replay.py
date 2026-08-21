@@ -339,6 +339,63 @@ def test_replay_controller_uses_private_state(monkeypatch):
     controller.stop()
 
 
+def test_two_controllers_run_independently(monkeypatch):
+    seeded_a = threading.Event()
+    seeded_b = threading.Event()
+
+    def fake_replay(
+        session_key,
+        speed=10.0,
+        state=None,
+        *,
+        stop_event=None,
+        pause_event=None,
+        progress=None,
+        on_seeded=None,
+        seek_time=None,
+        seek_lap=None,
+        speed_holder=None,
+    ):
+        assert state is not None
+        circuit = 4 if session_key == 100 else 23
+        state.update(
+            "v1/sessions", {"session_key": session_key, "circuit_key": circuit}
+        )
+        if on_seeded is not None:
+            on_seeded()
+        (seeded_a if session_key == 100 else seeded_b).set()
+        if stop_event is not None:
+            stop_event.wait(timeout=2.0)
+
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+
+    controller_a = replay_mod.ReplayController()
+    controller_b = replay_mod.ReplayController()
+
+    controller_a.start(100, speed=10)
+    controller_b.start(200, speed=20)
+    assert seeded_a.wait(timeout=1.0)
+    assert seeded_b.wait(timeout=1.0)
+
+    assert controller_a.state is not controller_b.state
+    assert controller_a.state.docs_for("v1/sessions")[0]["circuit_key"] == 4
+    assert controller_b.state.docs_for("v1/sessions")[0]["circuit_key"] == 23
+
+    controller_a.pause()
+    assert controller_a.snapshot()["status"] == "paused"
+    assert controller_b.snapshot()["status"] == "running"
+
+    assert controller_a.set_speed(50.0) is True
+    assert controller_b.snapshot()["speed"] == 20
+
+    controller_a.stop()
+    assert controller_a.snapshot()["status"] == "idle"
+    assert controller_b.snapshot()["status"] == "running"
+    assert controller_b.snapshot()["running"] is True
+
+    controller_b.stop()
+
+
 def test_replay_controller_seek_restarts_with_time(monkeypatch):
     seen: list[tuple[int, float, float | None, int | None]] = []
     started = threading.Event()
