@@ -10,7 +10,7 @@ function App() {
   const { raceState, track, error } = useRaceData(0, liveSource);
 
   if (error) {
-    return <ErrorScreen variant={classifyError(error)} message={error} />;
+    return <ErrorScreen variant={classifyError(error)} error={error} />;
   }
 
   if (!raceState) {

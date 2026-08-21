@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchTracks } from "../../api/raceState";
+import { fetchTracks, toApiError } from "../../api/raceState";
 import { ErrorScreen } from "../../components/ErrorScreen";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { classifyError } from "../dashboard/useRaceData";
@@ -14,7 +14,7 @@ import {
 
 type PreviewState =
   | { status: "loading" }
-  | { status: "error"; message: string }
+  | { status: "error"; error: unknown }
   | { status: "ready"; tracks: TrackState[] };
 
 export function TrackMapPreviews() {
@@ -28,10 +28,7 @@ export function TrackMapPreviews() {
       })
       .catch((requestError: unknown) => {
         if (active) {
-          setState({
-            status: "error",
-            message: requestError instanceof Error ? requestError.message : "Unable to load tracks.",
-          });
+          setState({ status: "error", error: requestError });
         }
       });
     return () => {
@@ -44,7 +41,7 @@ export function TrackMapPreviews() {
   }
 
   if (state.status === "error") {
-    return <ErrorScreen variant={classifyError(state.message)} message={state.message} />;
+    return <ErrorScreen variant={classifyError(state.error)} error={toApiError(state.error)} />;
   }
 
   return (

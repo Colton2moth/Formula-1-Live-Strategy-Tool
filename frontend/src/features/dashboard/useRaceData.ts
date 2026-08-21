@@ -1,20 +1,34 @@
 import { useEffect, useState } from "react";
-import { isApiRequestError } from "../../api/raceState";
+import { isApiError, toApiError } from "../../api/raceState";
+import type { ApiError } from "../../api/raceState";
 import { liveSource } from "../../hooks/useLiveState";
 import type { DashboardSource } from "../../hooks/useLiveState";
 import type { RaceState, TrackState } from "../../types/race";
 
-export type RaceDataErrorVariant = "unavailable" | "server-error" | "invalid-data";
+export type RaceDataErrorVariant = "unavailable" | "server-error" | "invalid-data" | "timeout";
 
-export function classifyError(message: string): RaceDataErrorVariant {
-  if (message.includes("Failed to fetch") || message.includes("NetworkError")) {
-    return "unavailable";
+export function classifyError(error: unknown): RaceDataErrorVariant {
+  if (isApiError(error)) {
+    switch (error.type) {
+      case "network":
+        return "unavailable";
+      case "invalid-data":
+        return "invalid-data";
+      case "timeout":
+        return "timeout";
+      case "http":
+      case "unknown":
+      default:
+        return "server-error";
+    }
   }
-  if (message.startsWith("Request failed:")) {
-    return "server-error";
-  }
-  if (message.includes("did not match the expected shape")) {
-    return "invalid-data";
+  if (error instanceof Error) {
+    if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
+      return "unavailable";
+    }
+    if (error.message.includes("did not match the expected shape")) {
+      return "invalid-data";
+    }
   }
   return "server-error";
 }
@@ -26,7 +40,7 @@ const RETRYABLE_STATUSES = new Set([503, 409]);
 export function useRaceData(reloadKey: number, source: DashboardSource | null = liveSource) {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [track, setTrack] = useState<TrackState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
   useEffect(() => {
     if (!source) {
@@ -62,15 +76,13 @@ export function useRaceData(reloadKey: number, source: DashboardSource | null = 
           return;
         } catch (requestError: unknown) {
           if (!active) return;
-          if (isApiRequestError(requestError) && RETRYABLE_STATUSES.has(requestError.status)) {
+          const apiError = toApiError(requestError);
+          if (apiError.status !== null && RETRYABLE_STATUSES.has(apiError.status)) {
             await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt)));
             continue;
           }
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : "Unable to load race data.",
-          );
+          apiError.attempts = attempt + 1;
+          setError(apiError);
           return;
         }
       }

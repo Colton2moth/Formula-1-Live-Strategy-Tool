@@ -64,7 +64,7 @@ export function ReplayPage() {
               <div className="text-base font-black uppercase tracking-wide text-white">
                 Unable to load race data
               </div>
-              <div className="mt-1 text-sm font-medium leading-6 text-app-muted">{error}</div>
+              <div className="mt-1 text-sm font-medium leading-6 text-app-muted">{error.message}</div>
             </div>
           </Panel>
         ) : !raceState || !source ? (
