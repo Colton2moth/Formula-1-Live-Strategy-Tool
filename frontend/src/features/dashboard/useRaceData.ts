@@ -23,12 +23,20 @@ export function classifyError(message: string): RaceDataErrorVariant {
 // available right now", so keep polling until the source is seeded.
 const RETRYABLE_STATUSES = new Set([503, 409]);
 
-export function useRaceData(reloadKey: number, source: DashboardSource = liveSource) {
+export function useRaceData(reloadKey: number, source: DashboardSource | null = liveSource) {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [track, setTrack] = useState<TrackState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!source) {
+      setRaceState(null);
+      setTrack(null);
+      setError(null);
+      return;
+    }
+
+    const activeSource = source;
     let active = true;
 
     const retryDelay = (attempt: number) => Math.min(1000 * 2 ** attempt, 8000);
@@ -37,8 +45,8 @@ export function useRaceData(reloadKey: number, source: DashboardSource = liveSou
       for (let attempt = 0; active; attempt += 1) {
         try {
           const [raceStateResponse, trackResponse] = await Promise.all([
-            source.fetchRaceState(),
-            source.fetchTrack(),
+            activeSource.fetchRaceState(),
+            activeSource.fetchTrack(),
           ]);
           if (!active) return;
           setRaceState(raceStateResponse);

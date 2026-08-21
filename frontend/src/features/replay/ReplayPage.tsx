@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { stopReplay } from "../../api/replay";
 import { BrandBar } from "../../components/BrandBar";
 import { Footer } from "../../components/Footer";
 import { Panel } from "../../components/Panel";
 import { RaceDashboard } from "../dashboard/RaceDashboard";
 import { useRaceData } from "../dashboard/useRaceData";
-import { replaySource } from "../../hooks/useLiveState";
+import { replaySourceFor } from "../../hooks/useLiveState";
 import { ReplayControls } from "./ReplayControls";
 import { ReplayProgress } from "./ReplayProgress";
 import { grandPrixName, useReplay } from "./useReplay";
@@ -14,21 +14,22 @@ export function ReplayPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const onSeeded = useCallback(() => setReloadKey((key) => key + 1), []);
   const replay = useReplay(onSeeded);
-  const { raceState, track, error } = useRaceData(reloadKey, replaySource);
 
-  const activeRef = useRef(false);
+  const source = useMemo(
+    () => (replay.replayId ? replaySourceFor(replay.replayId) : null),
+    [replay.replayId],
+  );
+  const { raceState, track, error } = useRaceData(reloadKey, source);
+
+  const replayIdRef = useRef<string | null>(null);
   useEffect(() => {
-    activeRef.current =
-      replay.status === "downloading" ||
-      replay.status === "running" ||
-      replay.status === "paused" ||
-      replay.status === "finished";
-  }, [replay.status]);
+    replayIdRef.current = replay.replayId;
+  }, [replay.replayId]);
 
   useEffect(() => {
     return () => {
-      if (activeRef.current) {
-        void stopReplay();
+      if (replayIdRef.current) {
+        void stopReplay(replayIdRef.current);
       }
     };
   }, []);
@@ -66,7 +67,7 @@ export function ReplayPage() {
               <div className="mt-1 text-sm font-medium leading-6 text-app-muted">{error}</div>
             </div>
           </Panel>
-        ) : !raceState || !track ? (
+        ) : !raceState || !track || !source ? (
           <Panel label="Race data">
             <div className="p-4">
               <div className="text-base font-black uppercase tracking-wide text-white">
@@ -78,7 +79,7 @@ export function ReplayPage() {
             </div>
           </Panel>
         ) : (
-          <RaceDashboard raceState={raceState} track={track} source={replaySource} />
+          <RaceDashboard raceState={raceState} track={track} source={source} />
         )}
       </div>
       <Footer />

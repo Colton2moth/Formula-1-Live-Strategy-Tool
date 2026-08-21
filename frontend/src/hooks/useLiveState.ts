@@ -23,11 +23,13 @@ export const liveSource: DashboardSource = {
   fetchTrack,
 };
 
-export const replaySource: DashboardSource = {
-  socketPath: "/ws/replay",
-  fetchRaceState: fetchReplayRaceState,
-  fetchTrack: fetchReplayTrack,
-};
+export function replaySourceFor(replayId: string): DashboardSource {
+  return {
+    socketPath: `/ws/replays/${replayId}`,
+    fetchRaceState: () => fetchReplayRaceState(replayId),
+    fetchTrack: () => fetchReplayTrack(replayId),
+  };
+}
 
 export type RaceStreamResult = {
   status: LiveSocketStatus;
