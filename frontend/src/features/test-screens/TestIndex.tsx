@@ -22,11 +22,18 @@ export const TestIndex: FC = () => {
     <main className="dashboard-shell">
       <div className="test-index">
         <div role="heading" aria-level={1} className="test-index-heading">
-          State Screen Tests
+          Development Test Pages
         </div>
 
         <div className="test-index-group">
-          <div className="test-index-group-title">Loading States</div>
+          <div className="test-index-group-title">UI State Testing</div>
+          <div className="test-index-links">
+            <Link to="/test/states" className="test-index-link">
+              <span>UI State Workbench</span>
+              <span className="test-index-link-code">/test/states</span>
+            </Link>
+          </div>
+          <div className="test-index-subgroup-title">Loading states</div>
           <div className="test-index-links">
             {loadingStates.map(({ path, label, code }) => (
               <Link key={path} to={path} className="test-index-link">
@@ -35,10 +42,7 @@ export const TestIndex: FC = () => {
               </Link>
             ))}
           </div>
-        </div>
-
-        <div className="test-index-group">
-          <div className="test-index-group-title">Error States</div>
+          <div className="test-index-subgroup-title">Error states</div>
           <div className="test-index-links">
             {errorStates.map(({ path, label, code }) => (
               <Link key={path} to={path} className="test-index-link">
@@ -50,7 +54,7 @@ export const TestIndex: FC = () => {
         </div>
 
         <div className="test-index-group">
-          <div className="test-index-group-title">Utilities</div>
+          <div className="test-index-group-title">Visual Utilities</div>
           <div className="test-index-links">
             {utilityPages.map(({ path, label, code }) => (
               <Link key={path} to={path} className="test-index-link">

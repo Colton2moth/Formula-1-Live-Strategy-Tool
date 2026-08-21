@@ -96,6 +96,10 @@
   padding-bottom: 0.375rem;
 }
 
+.test-index-subgroup-title {
+  @apply mt-3 text-xs font-bold uppercase tracking-wide text-app-muted;
+}
+
 .test-index-links {
   @apply grid gap-1.5;
 }

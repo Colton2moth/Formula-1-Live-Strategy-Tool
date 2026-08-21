@@ -1,0 +1,109 @@
+.state-workbench {
+  @apply mx-auto grid w-full max-w-[90rem] gap-6;
+  padding-bottom: 4rem;
+}
+
+.state-workbench-header {
+  @apply flex flex-wrap items-start justify-between gap-4;
+}
+
+.state-workbench-heading {
+  @apply text-2xl font-black uppercase text-white;
+}
+
+.state-workbench-intro {
+  @apply mt-1 max-w-2xl text-sm font-medium leading-6 text-app-muted;
+}
+
+.state-workbench-back {
+  @apply inline-flex items-center gap-2 border border-app-line bg-app-panel px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-app-text no-underline;
+  border-radius: var(--radius-compact);
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.state-workbench-back:hover,
+.state-workbench-back:focus-visible {
+  @apply border-app-red text-white;
+}
+
+.state-workbench-section {
+  @apply grid gap-3;
+}
+
+.state-workbench-section-title {
+  @apply text-sm font-bold uppercase tracking-wide text-app-muted;
+  border-bottom: 1px solid var(--color-line);
+  padding-bottom: 0.375rem;
+}
+
+.state-workbench-note {
+  @apply text-xs font-medium leading-5 text-app-muted;
+}
+
+.state-workbench-controls {
+  @apply flex flex-wrap gap-2;
+}
+
+.state-workbench-button {
+  @apply inline-flex items-center gap-2 rounded-md border border-app-line bg-app-panel px-3 py-1.5 text-xs font-semibold text-app-text;
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.state-workbench-button:hover,
+.state-workbench-button:focus-visible {
+  @apply border-app-red text-white;
+}
+
+.state-workbench-button--active {
+  @apply border-app-red bg-app-panelAlt text-white;
+}
+
+.state-workbench-toggle {
+  @apply inline-flex items-center gap-2 text-xs font-semibold text-app-text;
+}
+
+.state-workbench-toggle input {
+  accent-color: var(--color-f1-red);
+}
+
+.state-workbench-tag {
+  @apply rounded-sm border px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide;
+}
+
+.state-workbench-tag--neutral {
+  @apply border-app-line text-app-muted;
+}
+
+.state-workbench-tag--amber {
+  @apply border-amber-300 text-amber-200;
+}
+
+.state-workbench-preview {
+  @apply rounded-md border border-app-line bg-app-panel p-4;
+}
+
+.state-workbench-grid {
+  @apply grid gap-4;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+}
+
+.state-workbench-preview .state-screen,
+.state-workbench-grid .state-screen {
+  margin-top: 0;
+}
+
+@media (max-width: 48rem) {
+  .state-workbench-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .state-workbench-header {
+    @apply flex-col;
+  }
+}

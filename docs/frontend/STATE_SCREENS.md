@@ -107,9 +107,41 @@ the expected shape"` → `invalid-data`, otherwise `server-error`).
 
 ## Test index
 
-All test routes are listed at `/test`. The `/test/error/*` routes render each
-error screen with realistic example diagnostic data so the details panel, copy
-action, and field formatting can be verified in isolation without affecting
-production requests.
+All development test routes are listed at `/test`:
+
+- **UI State Workbench** — `/test/states`
+- **Loading states** — `/test/loading/connecting`, `/test/loading/data`
+- **Error states** — `/test/error/unavailable`, `/test/error/server-error`, `/test/error/invalid-data`, `/test/error/timeout`
+- **Track map previews** — `/test/maps`
+
+These pages are only reachable by knowing the `/test` URL and are never linked
+from the public dashboard.
+
+## UI State Workbench
+
+The `/test/states` page is a small component playground for the real production
+state components. It is split into three sections:
+
+1. **Error screens** — select from every error example (network, HTTP 400/404/429/
+   500/502/503/504, invalid data, timeout, and the `unknown` type that maps to
+   the server-error UI) or press **Show all** to see the four visual variants at
+   once. A **Show retry button** toggle exercises the retry action with a dummy
+   handler.
+2. **Loading screens** — switch between the `connecting` and `loading` variants,
+   or show both.
+3. **Activity / loading toasts** — toggle every `ACTIVITY_MESSAGES` example,
+   show multiple toasts at once, show all, clear one or all, and replay the
+   entrance/exit animation. Toasts render in the real `ActivityToastStack` and
+   stay visible until explicitly cleared.
+
+The workbench reuses the real `ErrorScreen`, `LoadingScreen`, and
+`ActivityToastStack` components with controlled, test-only `ApiError` fixtures
+defined in `frontend/src/features/test-screens/errorExamples.ts`. It never calls
+the backend, performs failing requests, or alters production error handling.
+
+The page is intended to stay open while editing component styles: toasts and
+error/loading previews remain selected, so changes to
+`frontend/src/styles/activity-toasts.css` or `state-screens.css` update the
+previews through Vite HMR without reloading or recreating a real error.
 
 [Back to Documentation](../README.md)
