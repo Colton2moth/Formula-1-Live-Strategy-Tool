@@ -93,7 +93,7 @@ def test_track_returns_display_path_for_silverstone():
 
 
 def test_track_404_when_no_layout():
-    seed_hungarian_session()
+    LIVE_STATE.update("v1/sessions", {"circuit_key": 999, "session_name": "Race"})
     response = client.get("/api/track")
     assert response.status_code == 404
 
