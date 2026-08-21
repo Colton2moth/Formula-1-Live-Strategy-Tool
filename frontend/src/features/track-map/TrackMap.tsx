@@ -11,7 +11,7 @@ import {
 } from "./geometry";
 
 type TrackMapProps = {
-  track: TrackState;
+  track: TrackState | null;
   session: ApiSession;
   drivers: ApiDriver[];
   selectedDriver: ApiDriver | null;
@@ -19,12 +19,15 @@ type TrackMapProps = {
 };
 
 export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriver }: TrackMapProps) {
-  const geometry = useMemo(() => buildTrackGeometry(track), [track]);
+  const geometry = useMemo(() => (track ? buildTrackGeometry(track) : null), [track]);
+
+  const label = `${session.meeting_name.toUpperCase()} | ${track ? track.circuit_name.toUpperCase() : "TRACK MAP"} | ${session.session_name.toUpperCase()}`;
 
   return (
-    <Panel label={`${session.meeting_name.toUpperCase()} | ${track.circuit_name.toUpperCase()} | ${session.session_name.toUpperCase()}`} className="track-map-panel">
-      <div className="track-map-frame">
-        <svg
+    <Panel label={label} className="track-map-panel">
+      {track && geometry ? (
+        <div className="track-map-frame">
+          <svg
           viewBox="0 0 100 85"
           className="track-map-svg"
           role="img"
@@ -92,7 +95,15 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
             );
           })}
         </svg>
-      </div>
+        </div>
+      ) : (
+        <div className="track-map-frame track-map-frame--unavailable">
+          <div className="track-map-unavailable">
+            <span className="track-map-unavailable-title">Circuit map unavailable</span>
+            <span className="track-map-unavailable-copy">Track geometry is being rebuilt.</span>
+          </div>
+        </div>
+      )}
     </Panel>
   );
 }

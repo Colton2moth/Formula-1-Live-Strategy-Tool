@@ -7,6 +7,22 @@
   border-radius: 0.5rem;
 }
 
+.track-map-frame--unavailable {
+  @apply flex items-center justify-center;
+}
+
+.track-map-unavailable {
+  @apply flex flex-col items-center gap-2 text-center;
+}
+
+.track-map-unavailable-title {
+  @apply text-sm font-semibold uppercase tracking-widest text-app-muted;
+}
+
+.track-map-unavailable-copy {
+  @apply text-xs text-app-muted;
+}
+
 .track-map-svg {
   @apply h-full w-full;
 }

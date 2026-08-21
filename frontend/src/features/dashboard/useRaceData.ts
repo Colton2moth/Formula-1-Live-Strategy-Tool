@@ -41,16 +41,24 @@ export function useRaceData(reloadKey: number, source: DashboardSource | null = 
 
     const retryDelay = (attempt: number) => Math.min(1000 * 2 ** attempt, 8000);
 
+    async function loadTrack() {
+      try {
+        const trackResponse = await activeSource.fetchTrack();
+        if (active) setTrack(trackResponse);
+      } catch {
+        // A missing track map must not block the rest of the dashboard.
+        if (active) setTrack(null);
+      }
+    }
+
     async function load() {
       for (let attempt = 0; active; attempt += 1) {
         try {
-          const [raceStateResponse, trackResponse] = await Promise.all([
-            activeSource.fetchRaceState(),
-            activeSource.fetchTrack(),
-          ]);
+          const raceStateResponse = await activeSource.fetchRaceState();
           if (!active) return;
           setRaceState(raceStateResponse);
-          setTrack(trackResponse);
+          setError(null);
+          await loadTrack();
           return;
         } catch (requestError: unknown) {
           if (!active) return;

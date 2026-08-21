@@ -13,7 +13,7 @@ function App() {
     return <ErrorScreen variant={classifyError(error)} message={error} />;
   }
 
-  if (!raceState || !track) {
+  if (!raceState) {
     return <LoadingScreen variant="connecting" />;
   }
 

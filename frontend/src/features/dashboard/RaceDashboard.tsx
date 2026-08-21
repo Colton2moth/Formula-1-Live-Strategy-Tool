@@ -9,7 +9,7 @@ import { TrackMap } from "../track-map/TrackMap";
 
 type RaceDashboardProps = {
   raceState: RaceState;
-  track: TrackState;
+  track: TrackState | null;
   source: DashboardSource;
 };
 
