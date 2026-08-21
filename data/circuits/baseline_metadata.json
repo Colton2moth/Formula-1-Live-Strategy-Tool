@@ -1,0 +1,144 @@
+{
+  "captured_at": "2026-08-21T04:41:14.927412+00:00",
+  "source": "circuits.py (circuit_key/name/rotation), countries.py (country), pit_lanes.py (pit-lane availability)",
+  "circuits": {
+    "2": {
+      "name": "Silverstone Circuit",
+      "country": "United Kingdom",
+      "rotation": 92.0,
+      "pit_lane": true
+    },
+    "4": {
+      "name": "Hungaroring",
+      "country": "Hungary",
+      "rotation": 40.0,
+      "pit_lane": true
+    },
+    "7": {
+      "name": "Circuit de Spa-Francorchamps",
+      "country": "Belgium",
+      "rotation": 91.0,
+      "pit_lane": true
+    },
+    "9": {
+      "name": "Circuit of the Americas",
+      "country": "United States",
+      "rotation": 0.0,
+      "pit_lane": true
+    },
+    "10": {
+      "name": "Albert Park Circuit",
+      "country": "Australia",
+      "rotation": 44.0,
+      "pit_lane": true
+    },
+    "14": {
+      "name": "Autodromo Jose Carlos Pace",
+      "country": "Brazil",
+      "rotation": 258.0,
+      "pit_lane": false
+    },
+    "15": {
+      "name": "Circuit de Barcelona-Catalunya",
+      "country": "Spain",
+      "rotation": 303.0,
+      "pit_lane": true
+    },
+    "19": {
+      "name": "Red Bull Ring",
+      "country": "Austria",
+      "rotation": 1.0,
+      "pit_lane": true
+    },
+    "22": {
+      "name": "Circuit de Monaco",
+      "country": "Monaco",
+      "rotation": 315.0,
+      "pit_lane": true
+    },
+    "23": {
+      "name": "Circuit Gilles Villeneuve",
+      "country": "Canada",
+      "rotation": 62.0,
+      "pit_lane": true
+    },
+    "39": {
+      "name": "Autodromo Nazionale Monza",
+      "country": "Italy",
+      "rotation": 95.0,
+      "pit_lane": true
+    },
+    "46": {
+      "name": "Suzuka International Racing Course",
+      "country": "Japan",
+      "rotation": 49.0,
+      "pit_lane": false
+    },
+    "49": {
+      "name": "Shanghai International Circuit",
+      "country": "China",
+      "rotation": 237.0,
+      "pit_lane": true
+    },
+    "55": {
+      "name": "Circuit Zandvoort",
+      "country": "Netherlands",
+      "rotation": 0.0,
+      "pit_lane": false
+    },
+    "61": {
+      "name": "Marina Bay Street Circuit",
+      "country": "Singapore",
+      "rotation": 335.0,
+      "pit_lane": true
+    },
+    "63": {
+      "name": "Bahrain International Circuit",
+      "country": "Bahrain",
+      "rotation": 92.0,
+      "pit_lane": true
+    },
+    "65": {
+      "name": "Autodromo Hermanos Rodriguez",
+      "country": "Mexico",
+      "rotation": 36.0,
+      "pit_lane": true
+    },
+    "70": {
+      "name": "Yas Marina Circuit",
+      "country": "United Arab Emirates",
+      "rotation": 280.0,
+      "pit_lane": true
+    },
+    "144": {
+      "name": "Baku City Circuit",
+      "country": "Azerbaijan",
+      "rotation": 357.0,
+      "pit_lane": true
+    },
+    "149": {
+      "name": "Jeddah Corniche Circuit",
+      "country": "Saudi Arabia",
+      "rotation": 104.0,
+      "pit_lane": true
+    },
+    "150": {
+      "name": "Lusail International Circuit",
+      "country": "Qatar",
+      "rotation": 61.0,
+      "pit_lane": false
+    },
+    "151": {
+      "name": "Miami International Autodrome",
+      "country": "United States",
+      "rotation": 2.0,
+      "pit_lane": true
+    },
+    "152": {
+      "name": "Las Vegas Strip Circuit",
+      "country": "United States",
+      "rotation": 90.0,
+      "pit_lane": true
+    }
+  }
+}
