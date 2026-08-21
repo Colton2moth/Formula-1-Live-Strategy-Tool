@@ -96,6 +96,9 @@ function TrackPreviewCard({ track }: { track: TrackState }) {
         <span className={`track-preview-pit track-preview-pit--${pitLane}`}>
           Pit lane: {PIT_LANE_LABELS[pitLane]}
         </span>
+        <span className="track-preview-note">
+          {track.display_path.length} pts · rot {track.rotation}°
+        </span>
         {!startFinishValid && <span className="track-preview-note">Start/finish: missing</span>}
       </div>
     </div>
