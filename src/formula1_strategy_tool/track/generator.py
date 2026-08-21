@@ -297,10 +297,32 @@ def _orient(point: Point, rotation_deg: float) -> Point:
     )
 
 
-def build_display_path(
+class DisplayTransform:
+    """Rotation + Y-flip followed by one uniform scale and centering."""
+
+    def __init__(
+        self, rotation_deg: float, scale: float, offset_x: float, offset_y: float
+    ) -> None:
+        radians = math.radians(rotation_deg)
+        self.rotation_deg = rotation_deg
+        self.scale = scale
+        self.offset_x = offset_x
+        self.offset_y = offset_y
+        self._cos = math.cos(radians)
+        self._sin = math.sin(radians)
+
+    def apply(self, point: Point) -> Point:
+        xr = point[0] * self._cos - point[1] * self._sin
+        yr = -(point[0] * self._sin + point[1] * self._cos)
+        return (
+            xr * self.scale + self.offset_x,
+            yr * self.scale + self.offset_y,
+        )
+
+
+def build_display_transform(
     reference: list[Point], rotation_deg: float
-) -> tuple[list[Point], float]:
-    """Rotate + Y-flip, then uniformly scale and centre into the SVG view."""
+) -> DisplayTransform:
     oriented = [_orient(p, rotation_deg) for p in reference]
     xs = [p[0] for p in oriented]
     ys = [p[1] for p in oriented]
@@ -314,7 +336,15 @@ def build_display_path(
     )
     offset_x = (VIEW_WIDTH - width * scale) / 2 - min_x * scale
     offset_y = (VIEW_HEIGHT - height * scale) / 2 - min_y * scale
-    display = [(x * scale + offset_x, y * scale + offset_y) for x, y in oriented]
+    return DisplayTransform(rotation_deg, scale, offset_x, offset_y)
+
+
+def build_display_path(
+    reference: list[Point], rotation_deg: float
+) -> tuple[list[Point], float]:
+    """Rotate + Y-flip, then uniformly scale and centre into the SVG view."""
+    transform = build_display_transform(reference, rotation_deg)
+    display = [transform.apply(p) for p in reference]
 
     span = min(10, len(display) - 1)
     dx = display[span][0] - display[0][0]
