@@ -7,6 +7,7 @@ import {
   fetchReplayTrack,
   fetchTrack,
 } from "../api/raceState";
+import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../features/activity/useActivity";
 import type { ApiDriver, ApiPrediction, ApiSession, RaceState, TrackState } from "../types/race";
 
 export type DriverLocation = { map_x: number; map_y: number };
@@ -37,6 +38,7 @@ export type RaceStreamResult = {
   drivers: ApiDriver[];
   predictions: ReadonlyMap<number, ApiPrediction>;
   locations: ReadonlyMap<number, DriverLocation>;
+  refreshing: boolean;
 };
 
 function toPredictionMap(snapshot: RaceState | null): ReadonlyMap<number, ApiPrediction> {
@@ -52,7 +54,9 @@ export function useRaceStream(
   const [predictions, setPredictions] = useState<ReadonlyMap<number, ApiPrediction>>(() => toPredictionMap(snapshot));
   const [locations, setLocations] = useState<ReadonlyMap<number, DriverLocation>>(() => new Map());
   const [status, setStatus] = useState<LiveSocketStatus>("connecting");
+  const [refreshing, setRefreshing] = useState(false);
   const [seededSnapshot, setSeededSnapshot] = useState(snapshot);
+  const activity = useActivity();
 
   if (snapshot !== seededSnapshot) {
     setSeededSnapshot(snapshot);
@@ -147,6 +151,8 @@ export function useRaceStream(
     };
 
     const recoverSnapshot = async () => {
+      activity.set(ACTIVITY_IDS.snapshotRefresh, ACTIVITY_MESSAGES.snapshotRefresh);
+      setRefreshing(true);
       try {
         const fresh = await source.fetchRaceState();
         setSession(fresh.session);
@@ -155,19 +161,27 @@ export function useRaceStream(
         setLocations(new Map());
       } catch {
         // Keep the last valid data visible until the next reconnect.
+      } finally {
+        setRefreshing(false);
+        activity.clear(ACTIVITY_IDS.snapshotRefresh);
       }
     };
+
+    activity.set(ACTIVITY_IDS.socket, ACTIVITY_MESSAGES.socketConnecting);
 
     const socket = openSocket(source.socketPath, {
       onEvent: applyEvent,
       onStatus: (next) => {
         setStatus(next);
         if (next === "open") {
+          activity.clear(ACTIVITY_IDS.socket);
           if (hasConnectedRef.current) {
             void recoverSnapshot();
           } else {
             hasConnectedRef.current = true;
           }
+        } else if (next === "reconnecting") {
+          activity.set(ACTIVITY_IDS.socket, ACTIVITY_MESSAGES.socketReconnecting, "amber");
         }
       },
     });
@@ -175,8 +189,10 @@ export function useRaceStream(
     return () => {
       hasConnectedRef.current = false;
       socket.close();
+      activity.clear(ACTIVITY_IDS.socket);
+      activity.clear(ACTIVITY_IDS.snapshotRefresh);
     };
-  }, [snapshot, source]);
+  }, [snapshot, source, activity]);
 
   const liveSession = useMemo<ApiSession | null>(() => {
     if (!session) {
@@ -189,5 +205,5 @@ export function useRaceStream(
     return { ...session, current_lap: liveLap };
   }, [session, drivers]);
 
-  return { status, session: liveSession, drivers, predictions, locations };
+  return { status, session: liveSession, drivers, predictions, locations, refreshing };
 }

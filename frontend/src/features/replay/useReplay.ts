@@ -11,6 +11,7 @@ import {
   stopReplay,
 } from "../../api/replay";
 import type { ReplaySessionOption, ReplayStatusValue } from "../../api/replay";
+import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../activity/useActivity";
 
 export const SPEED_PRESETS = [1, 2, 5, 10, 20, 50, 100] as const;
 export const MIN_SPEED = 0.25;
@@ -86,6 +87,7 @@ export function useReplay(onSeeded: () => void) {
   const [sessionIdInput, setSessionIdInput] = useState<string>("");
   const [sessionIdError, setSessionIdError] = useState<string | null>(null);
   const seededRef = useRef(false);
+  const activity = useActivity();
 
   const years = useMemo(
     () => [...new Set(sessions.map((session) => session.year))].sort((a, b) => b - a),
@@ -105,6 +107,7 @@ export function useReplay(onSeeded: () => void) {
 
   useEffect(() => {
     let cancelled = false;
+    activity.set(ACTIVITY_IDS.replaySessions, ACTIVITY_MESSAGES.replaySessions);
     fetchReplaySessions()
       .then((list) => {
         if (cancelled) return;
@@ -122,11 +125,21 @@ export function useReplay(onSeeded: () => void) {
       })
       .finally(() => {
         if (!cancelled) setLoadingSessions(false);
+        activity.clear(ACTIVITY_IDS.replaySessions);
       });
     return () => {
       cancelled = true;
+      activity.clear(ACTIVITY_IDS.replaySessions);
     };
-  }, []);
+  }, [activity]);
+
+  useEffect(() => {
+    if (status === "downloading") {
+      activity.set(ACTIVITY_IDS.replayDownload, ACTIVITY_MESSAGES.replayDownload);
+    } else {
+      activity.clear(ACTIVITY_IDS.replayDownload);
+    }
+  }, [status, activity]);
 
   const active = status === "downloading" || status === "running" || status === "paused";
 

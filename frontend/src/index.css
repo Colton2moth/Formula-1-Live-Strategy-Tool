@@ -22,6 +22,7 @@
   --motion-duration-standard: 220ms;
   --motion-duration-marker: 100ms;
   --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --header-offset: 5.5rem;
 }
 
 @property --leaderboard-row-base {

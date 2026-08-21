@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { stopReplay } from "../../api/replay";
+import { ActivityToastStack } from "../../components/ActivityToastStack";
 import { BrandBar } from "../../components/BrandBar";
 import { Footer } from "../../components/Footer";
 import { Panel } from "../../components/Panel";
@@ -19,7 +20,7 @@ export function ReplayPage() {
     () => (replay.replayId ? replaySourceFor(replay.replayId) : null),
     [replay.replayId],
   );
-  const { raceState, track, error } = useRaceData(reloadKey, source);
+  const { raceState, track, error } = useRaceData(reloadKey, source, false);
 
   const replayIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -48,6 +49,7 @@ export function ReplayPage() {
     <main className="dashboard-shell">
       <div className="dashboard-container">
         <BrandBar replayMode />
+        <ActivityToastStack />
         <div className="replay-banner" role="status">
           {banner}
         </div>

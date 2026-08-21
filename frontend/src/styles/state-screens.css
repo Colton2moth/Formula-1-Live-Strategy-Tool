@@ -1,6 +1,6 @@
 .state-screen {
   @apply mx-auto grid max-w-[34rem] justify-items-center gap-5 text-center;
-  margin-top: 12vh;
+  margin-top: calc(var(--header-offset) + 4vh);
 }
 
 .state-screen-icon {
@@ -102,7 +102,6 @@
 
 @media (max-width: 48rem) {
   .state-screen {
-    margin-top: 8vh;
     @apply px-4;
   }
 

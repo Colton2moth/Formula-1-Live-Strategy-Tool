@@ -1,3 +1,4 @@
+import { ActivityToastStack } from "./components/ActivityToastStack";
 import { BrandBar } from "./components/BrandBar";
 import { ErrorScreen } from "./components/ErrorScreen";
 import { Footer } from "./components/Footer";
@@ -9,20 +10,19 @@ import { liveSource } from "./hooks/useLiveState";
 function App() {
   const { raceState, track, error } = useRaceData(0, liveSource);
 
-  if (error) {
-    return <ErrorScreen variant={classifyError(error)} error={error} />;
-  }
-
-  if (!raceState) {
-    return <LoadingScreen variant="connecting" />;
-  }
-
   return (
     <main className="dashboard-shell">
-      <div className="dashboard-container">
-        <BrandBar />
-        <RaceDashboard raceState={raceState} track={track} source={liveSource} />
-      </div>
+      <BrandBar />
+      <ActivityToastStack />
+      {error ? (
+        <ErrorScreen variant={classifyError(error)} error={error} embedded />
+      ) : !raceState ? (
+        <LoadingScreen variant="connecting" embedded />
+      ) : (
+        <div className="dashboard-container">
+          <RaceDashboard raceState={raceState} track={track} source={liveSource} />
+        </div>
+      )}
       <Footer />
     </main>
   );

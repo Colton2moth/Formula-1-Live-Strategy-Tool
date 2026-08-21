@@ -13,24 +13,31 @@ const loadingContent: Record<LoadingVariant, { title: string; message: string }>
   },
 };
 
-export const LoadingScreen: FC<{ variant: LoadingVariant }> = ({ variant }) => {
+export const LoadingScreen: FC<{ variant: LoadingVariant; embedded?: boolean }> = ({
+  variant,
+  embedded = false,
+}) => {
   const { title, message } = loadingContent[variant];
 
-  return (
-    <main className="dashboard-shell">
-      <div className="state-screen">
-        <div className="loading-spinner" aria-label="Loading">
-          <div className="loading-dot" />
-          <div className="loading-dot" />
-          <div className="loading-dot" />
-        </div>
-        <div>
-          <div role="heading" aria-level={1} className="state-screen-title">
-            {title}
-          </div>
-          <div className="state-screen-message">{message}</div>
-        </div>
+  const content = (
+    <div className="state-screen">
+      <div className="loading-spinner" aria-label="Loading">
+        <div className="loading-dot" />
+        <div className="loading-dot" />
+        <div className="loading-dot" />
       </div>
-    </main>
+      <div>
+        <div role="heading" aria-level={1} className="state-screen-title">
+          {title}
+        </div>
+        <div className="state-screen-message">{message}</div>
+      </div>
+    </div>
   );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <main className="dashboard-shell">{content}</main>;
 };

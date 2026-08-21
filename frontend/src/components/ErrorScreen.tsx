@@ -84,7 +84,8 @@ export const ErrorScreen: FC<{
   variant: ErrorVariant;
   message?: string;
   error?: ApiError;
-}> = ({ variant, message, error }) => {
+  embedded?: boolean;
+}> = ({ variant, message, error, embedded = false }) => {
   const { icon, title, message: defaultMessage, help } = errorContent[variant];
   const [copied, setCopied] = useState(false);
 
@@ -101,45 +102,49 @@ export const ErrorScreen: FC<{
     );
   };
 
-  return (
-    <main className="dashboard-shell">
-      <div className="state-screen">
-        <span className="material-symbols-rounded state-screen-icon state-screen-icon--error" aria-hidden="true">
-          {icon}
-        </span>
-        <div>
-          <div role="heading" aria-level={1} className="state-screen-title">
-            {title}
-          </div>
-          <div className="state-screen-message">{message ?? defaultMessage}</div>
-          <div className="state-screen-help">{help}</div>
+  const content = (
+    <div className="state-screen">
+      <span className="material-symbols-rounded state-screen-icon state-screen-icon--error" aria-hidden="true">
+        {icon}
+      </span>
+      <div>
+        <div role="heading" aria-level={1} className="state-screen-title">
+          {title}
         </div>
-        {error ? (
-          <details className="error-details">
-            <summary className="error-details-summary">
-              <span className="material-symbols-rounded error-details-chevron" aria-hidden="true">
-                expand_more
-              </span>
-              Error details
-            </summary>
-            <div className="error-details-panel">
-              <div className="error-details-toolbar">
-                <button type="button" className="error-details-copy" onClick={handleCopy}>
-                  {copied ? "Copied" : "Copy error details"}
-                </button>
-              </div>
-              <dl className="error-details-list">
-                {detailRows(error).map(({ label, value }) => (
-                  <div className="error-details-row" key={label}>
-                    <dt className="error-details-label">{label}</dt>
-                    <dd className="error-details-value">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          </details>
-        ) : null}
+        <div className="state-screen-message">{message ?? defaultMessage}</div>
+        <div className="state-screen-help">{help}</div>
       </div>
-    </main>
+      {error ? (
+        <details className="error-details">
+          <summary className="error-details-summary">
+            <span className="material-symbols-rounded error-details-chevron" aria-hidden="true">
+              expand_more
+            </span>
+            Error details
+          </summary>
+          <div className="error-details-panel">
+            <div className="error-details-toolbar">
+              <button type="button" className="error-details-copy" onClick={handleCopy}>
+                {copied ? "Copied" : "Copy error details"}
+              </button>
+            </div>
+            <dl className="error-details-list">
+              {detailRows(error).map(({ label, value }) => (
+                <div className="error-details-row" key={label}>
+                  <dt className="error-details-label">{label}</dt>
+                  <dd className="error-details-value">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </details>
+      ) : null}
+    </div>
   );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <main className="dashboard-shell">{content}</main>;
 };

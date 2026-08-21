@@ -5,7 +5,7 @@
 .dashboard-container {
   @apply mx-auto grid max-w-[90rem] gap-4;
   min-width: 0;
-  padding-top: 5.5rem;
+  padding-top: var(--header-offset);
   width: 100%;
 }
 
@@ -198,6 +198,10 @@
 }
 
 @media (max-width: 48rem) {
+  :root {
+    --header-offset: 4.5rem;
+  }
+
   .dashboard-shell {
     @apply px-3 py-3;
   }
@@ -206,10 +210,6 @@
   .dashboard-layout,
   .dashboard-stack {
     @apply gap-3;
-  }
-
-  .dashboard-container {
-    padding-top: 4.5rem;
   }
 
   .dashboard-brand {
