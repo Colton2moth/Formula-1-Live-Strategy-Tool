@@ -83,6 +83,31 @@ def _seed_live_session() -> None:
     )
 
 
+def test_location_update_projects_map_position():
+    from formula1_strategy_tool.track.models import load_layout
+
+    layout = load_layout(2)
+    assert layout is not None
+    ref = layout.reference_path[100]
+    LIVE_STATE.update(
+        "v1/sessions",
+        {"circuit_key": 2, "circuit_short_name": "Silverstone", "session_name": "Race"},
+    )
+    LIVE_STATE.update(
+        "v1/location",
+        {"driver_number": 4, "x": ref.x, "y": ref.y, "date": "2025-07-06T14:00:00"},
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws/live") as websocket:
+            time.sleep(1.0)
+            event = websocket.receive_json()
+            assert event["type"] == "location_update"
+            assert event["map_x"] is not None
+            assert event["map_y"] is not None
+            assert 0.0 <= event["map_x"] <= 100.0
+            assert 0.0 <= event["map_y"] <= 85.0
+
+
 def test_replay_race_state_reads_replay_state_not_live(monkeypatch):
     _seed_live_session()
     runtime = _make_runtime(monkeypatch, circuit_key=23)
