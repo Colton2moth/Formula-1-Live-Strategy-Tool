@@ -57,12 +57,11 @@
 
 .track-preview-pit-lane {
   fill: none;
-  stroke: #eab308;
+  stroke: var(--color-f1-red);
   stroke-width: 0.055rem;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 0.35rem 0.3rem;
-  opacity: 0.95;
+  opacity: 1;
 }
 
 .track-preview-start-finish-line {

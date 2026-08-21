@@ -37,12 +37,11 @@
 
 .track-map-pit-lane {
   fill: none;
-  stroke: var(--color-track-surface);
+  stroke: var(--color-f1-red);
   stroke-width: .05rem;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 0.35rem 0.3rem;
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .track-map-start-finish-line {

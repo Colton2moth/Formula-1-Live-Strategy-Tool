@@ -29,8 +29,8 @@ export function TrackMap({ track, session, drivers, locations, selectedDriver, o
             role="img"
             aria-label={`${track.circuit_name} circuit map with selectable driver markers`}
           >
-            <path d={mapPath} className="track-map-road" />
             {pitLanePath && <path d={pitLanePath} className="track-map-pit-lane" />}
+            <path d={mapPath} className="track-map-road" />
             <g
               aria-label="Start finish line"
               transform={`rotate(${track.start_finish.angle_deg}, ${track.start_finish.x}, ${track.start_finish.y})`}
