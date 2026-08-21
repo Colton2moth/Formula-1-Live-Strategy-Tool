@@ -5,9 +5,9 @@ import { LoadingScreen } from "../../components/LoadingScreen";
 import { classifyError } from "../dashboard/useRaceData";
 import type { TrackState } from "../../types/race";
 import {
-  buildTrackGeometry,
-  isPointValid,
   START_FINISH_SQUARE_SIZE,
+  startFinishSquares,
+  trackPath,
   VIEW_HEIGHT,
   VIEW_WIDTH,
 } from "../track-map/geometry";
@@ -72,8 +72,8 @@ const PIT_LANE_LABELS: Record<PitLaneStatus, string> = {
 };
 
 function TrackPreviewCard({ track }: { track: TrackState }) {
-  const pathValid = Array.isArray(track.path) && track.path.length >= 2 && track.path.every(isPointValid);
-  const startFinishValid = isPointValid(track.start_finish);
+  const pathValid = Array.isArray(track.display_path) && track.display_path.length >= 2;
+  const startFinishValid = typeof track.start_finish?.angle_deg === "number";
   const pitLane = pitLaneStatus(track);
 
   return (
@@ -103,7 +103,7 @@ function TrackPreviewCard({ track }: { track: TrackState }) {
 }
 
 function TrackPreviewSvg({ track }: { track: TrackState }) {
-  const geometry = buildTrackGeometry(track);
+  const squares = startFinishSquares(track.start_finish);
 
   return (
     <div className="track-preview-frame">
@@ -113,32 +113,32 @@ function TrackPreviewSvg({ track }: { track: TrackState }) {
         role="img"
         aria-label={`${track.circuit_name} circuit map preview`}
       >
-        <path d={geometry.mapPath} className="track-preview-road" />
-        {geometry.pitLanePath && <path d={geometry.pitLanePath} className="track-preview-pit-lane" />}
-        {geometry.startFinish && (
-          <g
-            aria-label="Start finish line"
-            transform={`rotate(${geometry.startFinishRotation}, ${geometry.startFinish.x}, ${geometry.startFinish.y})`}
-          >
-            <line
-              className="track-preview-start-finish-line"
-              x1={geometry.startFinish.x}
-              x2={geometry.startFinish.x}
-              y1={geometry.startFinish.y - START_FINISH_SQUARE_SIZE * 1.5}
-              y2={geometry.startFinish.y + START_FINISH_SQUARE_SIZE * 1.5}
+        <path d={trackPath(track.display_path)} className="track-preview-road" />
+        {track.pit_lane?.path?.length ? (
+          <path d={trackPath(track.pit_lane.path)} className="track-preview-pit-lane" />
+        ) : null}
+        <g
+          aria-label="Start finish line"
+          transform={`rotate(${track.start_finish.angle_deg}, ${track.start_finish.x}, ${track.start_finish.y})`}
+        >
+          <line
+            className="track-preview-start-finish-line"
+            x1={track.start_finish.x}
+            x2={track.start_finish.x}
+            y1={track.start_finish.y - START_FINISH_SQUARE_SIZE * 1.5}
+            y2={track.start_finish.y + START_FINISH_SQUARE_SIZE * 1.5}
+          />
+          {squares.map((square) => (
+            <rect
+              key={`${square.row}-${square.column}`}
+              className={`track-preview-start-finish-square track-preview-start-finish-square--${square.isLight ? "light" : "dark"}`}
+              x={square.x}
+              y={square.y}
+              width={START_FINISH_SQUARE_SIZE}
+              height={START_FINISH_SQUARE_SIZE}
             />
-            {geometry.startFinishSquares.map((square) => (
-              <rect
-                key={`${square.row}-${square.column}`}
-                className={`track-preview-start-finish-square track-preview-start-finish-square--${square.isLight ? "light" : "dark"}`}
-                x={square.x}
-                y={square.y}
-                width={START_FINISH_SQUARE_SIZE}
-                height={START_FINISH_SQUARE_SIZE}
-              />
-            ))}
-          </g>
-        )}
+          ))}
+        </g>
       </svg>
     </div>
   );
@@ -146,10 +146,10 @@ function TrackPreviewSvg({ track }: { track: TrackState }) {
 
 function pitLaneStatus(track: TrackState): PitLaneStatus {
   const lane = track.pit_lane;
-  if (!Array.isArray(lane) || lane.length === 0) {
+  if (!lane || !Array.isArray(lane.path) || lane.path.length === 0) {
     return "missing";
   }
-  if (lane.length < 2 || !lane.every(isPointValid)) {
+  if (lane.path.length < 2) {
     return "invalid";
   }
   return "available";

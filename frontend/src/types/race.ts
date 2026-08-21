@@ -54,12 +54,18 @@ export type RaceState = {
 };
 
 export type TrackPoint = { x: number; y: number };
+export type StartFinish = { x: number; y: number; angle_deg: number };
+export type DisplayPitLane = {
+  path: TrackPoint[];
+  entry_progress: number | null;
+  exit_progress: number | null;
+};
 export type TrackState = {
   circuit_name: string;
   circuit_key: number;
   rotation: number;
   country_name?: string;
-  start_finish: TrackPoint;
-  path: TrackPoint[];
-  pit_lane?: TrackPoint[];
+  display_path: TrackPoint[];
+  start_finish: StartFinish;
+  pit_lane?: DisplayPitLane | null;
 };

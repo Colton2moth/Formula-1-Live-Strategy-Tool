@@ -9,7 +9,7 @@ import {
 } from "../api/raceState";
 import type { ApiDriver, ApiPrediction, ApiSession, RaceState, TrackState } from "../types/race";
 
-export type DriverLocation = { x: number; y: number };
+export type DriverLocation = { map_x: number; map_y: number };
 
 export type DashboardSource = {
   socketPath: string;
@@ -75,7 +75,7 @@ export function useRaceStream(
       switch (event.type) {
         case "location_update": {
           setLocations((prev) => {
-            if (event.x === null || event.y === null) {
+            if (event.map_x === null || event.map_y === null) {
               if (!prev.has(event.driver_number)) {
                 return prev;
               }
@@ -84,7 +84,7 @@ export function useRaceStream(
               return next;
             }
             const next = new Map(prev);
-            next.set(event.driver_number, { x: event.x, y: event.y });
+            next.set(event.driver_number, { map_x: event.map_x, map_y: event.map_y });
             return next;
           });
           break;

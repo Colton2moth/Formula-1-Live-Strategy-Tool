@@ -22,7 +22,7 @@ function assertRaceState(value: unknown): RaceState {
 }
 
 function assertTrackState(value: unknown): TrackState {
-  if (!isRecord(value) || !Array.isArray(value.path)) {
+  if (!isRecord(value) || !Array.isArray(value.display_path)) {
     throw new Error("Track response did not match the expected shape.");
   }
   return value as TrackState;

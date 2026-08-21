@@ -6,6 +6,8 @@ export type LocationUpdate = {
   driver_number: number;
   x: number | null;
   y: number | null;
+  map_x: number | null;
+  map_y: number | null;
 };
 
 export type DriverUpdate = {
@@ -96,6 +98,8 @@ function parseLocationUpdate(value: Record<string, unknown>): LocationUpdate | n
     driver_number: value.driver_number,
     x: isNumber(value.x) ? value.x : null,
     y: isNumber(value.y) ? value.y : null,
+    map_x: isNumber(value.map_x) ? value.map_x : null,
+    map_y: isNumber(value.map_y) ? value.map_y : null,
   };
 }
 

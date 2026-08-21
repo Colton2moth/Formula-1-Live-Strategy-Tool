@@ -26,14 +26,6 @@ export function RaceDashboard({ raceState, track, source }: RaceDashboardProps) 
     () => [...stream.drivers].sort((a, b) => a.position - b.position),
     [stream.drivers],
   );
-  const mapDrivers = useMemo<ApiDriver[]>(
-    () =>
-      sortedDrivers.map((driver) => {
-        const location = stream.locations.get(driver.driver_number);
-        return location ? { ...driver, x: location.x, y: location.y } : driver;
-      }),
-    [sortedDrivers, stream.locations],
-  );
   const toggleSelectedDriver = (driverNumber: number) => {
     setSelectedDriverNumber((currentDriverNumber) => (currentDriverNumber === driverNumber ? null : driverNumber));
   };
@@ -56,7 +48,8 @@ export function RaceDashboard({ raceState, track, source }: RaceDashboardProps) 
           <TrackMap
             track={track}
             session={session}
-            drivers={mapDrivers}
+            drivers={sortedDrivers}
+            locations={stream.locations}
             selectedDriver={selectedDriver}
             onSelectDriver={toggleSelectedDriver}
           />
