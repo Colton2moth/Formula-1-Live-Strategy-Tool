@@ -165,3 +165,280 @@ def test_websocket_live_ignores_replay_updates():
             event = websocket.receive_json()
             assert event["type"] == "weather_update"
             assert event["track_temperature"] == 20.0
+
+
+def test_websocket_replay_ignores_live_updates():
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws/replay") as websocket:
+            LIVE_STATE.update(
+                "v1/weather",
+                {
+                    "track_temperature": 20.0,
+                    "air_temperature": 15.0,
+                    "rainfall": False,
+                    "date": "2026-07-26T14:00:00",
+                },
+            )
+            time.sleep(1.0)
+
+            replay_controller.state.update(
+                "v1/weather",
+                {
+                    "track_temperature": 30.0,
+                    "air_temperature": 25.0,
+                    "rainfall": True,
+                    "date": "2025-06-15T18:30:00",
+                },
+            )
+            time.sleep(1.0)
+
+            event = websocket.receive_json()
+            assert event["type"] == "weather_update"
+            assert event["track_temperature"] == 30.0
+
+
+def test_live_predictions_use_live_state(monkeypatch):
+    from formula1_strategy_tool.api import routes as routes_mod
+
+    supplied: list[object] = []
+    monkeypatch.setattr(
+        routes_mod, "features_from_live", lambda state: supplied.append(state) or None
+    )
+    monkeypatch.setattr(routes_mod, "_csv_predictions", lambda: [])
+
+    routes_mod._model_predictions()
+
+    assert supplied == [LIVE_STATE]
+    assert replay_controller.state not in supplied
+
+
+def test_replay_predictions_use_replay_state_not_live(monkeypatch):
+    from formula1_strategy_tool.api import routes as routes_mod
+
+    supplied: list[object] = []
+    monkeypatch.setattr(
+        routes_mod, "features_from_live", lambda state: supplied.append(state) or None
+    )
+
+    result = routes_mod._replay_predictions()
+
+    assert result == []
+    assert supplied == [replay_controller.state]
+    assert LIVE_STATE not in supplied
+
+
+def test_race_state_endpoints_score_their_own_state(monkeypatch):
+    from formula1_strategy_tool.api import routes as routes_mod
+
+    supplied: list[object] = []
+    monkeypatch.setattr(
+        routes_mod, "features_from_live", lambda state: supplied.append(state) or None
+    )
+    monkeypatch.setattr(routes_mod, "_csv_predictions", lambda: [])
+
+    _seed_live_session()
+    _seed_replay_session(circuit_key=23)
+
+    with TestClient(app) as client:
+        client.get("/api/race-state")
+        client.get("/api/replay/race-state")
+
+    assert supplied == [LIVE_STATE, replay_controller.state]
+
+
+def _mqtt_lifecycle_guard(monkeypatch) -> list[str]:
+    """Patch the live MQTT entry points and return a recorder for any calls."""
+    from formula1_strategy_tool import main as main_mod
+    from formula1_strategy_tool.acquisition import live_mqtt
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        live_mqtt, "run_listener", lambda *a, **k: calls.append("run_listener")
+    )
+    monkeypatch.setattr(main_mod, "_start_mqtt", lambda: calls.append("_start_mqtt"))
+    return calls
+
+
+def test_replay_controls_do_not_control_live_mqtt(monkeypatch):
+    calls = _mqtt_lifecycle_guard(monkeypatch)
+
+    started = threading.Event()
+
+    def fake_replay(
+        session_key,
+        speed=10.0,
+        state=None,
+        *,
+        stop_event=None,
+        pause_event=None,
+        progress=None,
+        on_seeded=None,
+        seek_time=None,
+        seek_lap=None,
+        speed_holder=None,
+    ):
+        if on_seeded is not None:
+            on_seeded()
+        started.set()
+        if stop_event is not None:
+            stop_event.wait(timeout=2.0)
+
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+    controller = replay_mod.ReplayController()
+
+    controller.start(9979, speed=10)
+    assert started.wait(timeout=1.0)
+    controller.pause()
+    controller.resume()
+
+    started.clear()
+    controller.seek(50.0)
+    assert started.wait(timeout=1.0)
+
+    started.clear()
+    controller.seek_lap(12)
+    assert started.wait(timeout=1.0)
+
+    assert controller.set_speed(20.0) is True
+    controller.stop()
+
+    assert calls == []
+
+
+def test_replay_completion_does_not_control_live_mqtt(monkeypatch):
+    calls = _mqtt_lifecycle_guard(monkeypatch)
+    finished = threading.Event()
+
+    def fake_replay(
+        session_key,
+        speed=10.0,
+        state=None,
+        *,
+        stop_event=None,
+        pause_event=None,
+        progress=None,
+        on_seeded=None,
+        seek_time=None,
+        seek_lap=None,
+        speed_holder=None,
+    ):
+        if on_seeded is not None:
+            on_seeded()
+        finished.set()
+
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+    controller = replay_mod.ReplayController()
+
+    controller.start(9979, speed=10)
+    assert finished.wait(timeout=1.0)
+    deadline = time.time() + 2.0
+    while controller.snapshot()["status"] != "finished" and time.time() < deadline:
+        time.sleep(0.01)
+    assert controller.snapshot()["status"] == "finished"
+
+    assert calls == []
+
+
+def test_live_and_replay_state_hold_distinct_data(monkeypatch):
+    _seed_live_session()
+    LIVE_STATE.update(
+        "v1/weather",
+        {
+            "track_temperature": 20.0,
+            "air_temperature": 15.0,
+            "rainfall": False,
+            "date": "2026-07-26T14:00:00",
+        },
+    )
+    LIVE_STATE.update("v1/drivers", {"driver_number": 4, "full_name": "Live Driver"})
+
+    seeded = threading.Event()
+
+    def fake_replay(
+        session_key,
+        speed=10.0,
+        state=None,
+        *,
+        stop_event=None,
+        pause_event=None,
+        progress=None,
+        on_seeded=None,
+        seek_time=None,
+        seek_lap=None,
+        speed_holder=None,
+    ):
+        assert state is not None
+        state.update(
+            "v1/sessions",
+            {
+                "session_key": session_key,
+                "circuit_key": 23,
+                "circuit_short_name": "Montreal",
+                "session_name": "Race",
+                "session_type": "Race",
+                "location": "Montreal",
+                "date_start": "2025-06-15T18:00:00+00:00",
+                "date_end": "2025-06-15T20:00:00+00:00",
+                "is_cancelled": False,
+            },
+        )
+        state.update(
+            "v1/weather",
+            {
+                "track_temperature": 30.0,
+                "air_temperature": 25.0,
+                "rainfall": True,
+                "date": "2025-06-15T18:30:00",
+            },
+        )
+        state.update("v1/drivers", {"driver_number": 44, "full_name": "Replay Driver"})
+        if on_seeded is not None:
+            on_seeded()
+        seeded.set()
+        if stop_event is not None:
+            stop_event.wait(timeout=2.0)
+
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+    replay_controller.start(9999, speed=10)
+    assert seeded.wait(timeout=1.0)
+
+    # Both states hold their own session, weather, and driver data.
+    assert LIVE_STATE.docs_for("v1/sessions")[0]["circuit_key"] == 4
+    assert replay_controller.state.docs_for("v1/sessions")[0]["circuit_key"] == 23
+    assert LIVE_STATE.docs_for("v1/weather")[0]["track_temperature"] == 20.0
+    assert (
+        replay_controller.state.docs_for("v1/weather")[0]["track_temperature"] == 30.0
+    )
+    assert LIVE_STATE.docs_for("v1/drivers")[0]["full_name"] == "Live Driver"
+    assert (
+        replay_controller.state.docs_for("v1/drivers")[0]["full_name"]
+        == "Replay Driver"
+    )
+
+    # A live update must not overwrite or clear the replay state.
+    LIVE_STATE.update(
+        "v1/weather",
+        {
+            "track_temperature": 21.0,
+            "air_temperature": 16.0,
+            "rainfall": False,
+            "date": "2026-07-26T14:00:00",
+        },
+    )
+    assert (
+        replay_controller.state.docs_for("v1/weather")[0]["track_temperature"] == 30.0
+    )
+
+    # A replay update must not overwrite or clear the live state.
+    replay_controller.state.update(
+        "v1/weather",
+        {
+            "track_temperature": 31.0,
+            "air_temperature": 26.0,
+            "rainfall": True,
+            "date": "2025-06-15T18:30:00",
+        },
+    )
+    assert LIVE_STATE.docs_for("v1/weather")[0]["track_temperature"] == 21.0
+
+    replay_controller.stop()
