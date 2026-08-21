@@ -116,4 +116,21 @@ The backend provides:
 
 The frontend communicates only with this backend.
 
+## 7. Track map
+
+Circuit geometry is generated offline from cached OpenF1 location traces into
+versioned layouts under `data/circuits/layouts/`:
+
+```text
+cached location traces
+→ 1,000-point raw reference path (OpenF1 coordinates)
+→ 1,000-point display path (rotated, scaled, centred)
+```
+
+The reference path is backend-internal: live/replay x/y are projected onto it
+to lap progress, then mapped to a display position. The frontend receives only
+the display path and projected `map_x`/`map_y` positions, so it never
+reconstructs geometry. See `scripts/generate_track_reference_paths.py` and
+`src/formula1_strategy_tool/track/`.
+
 [Back to Documentation](README.md)

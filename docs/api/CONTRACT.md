@@ -67,7 +67,7 @@ Returns the current state of every driver.
 ]
 ```
 
-`x` / `y` are raw OpenF1/FastF1 track coordinates and `null` when the car has
+`x` / `y` are raw OpenF1 track coordinates and `null` when the car has
 no live telemetry.
 
 ### GET `/api/drivers/{driver_number}`

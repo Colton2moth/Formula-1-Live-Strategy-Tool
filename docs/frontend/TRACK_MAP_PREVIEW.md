@@ -34,23 +34,16 @@ track geometry.
 
 ## Data source
 
-The page reads the same geometry the dashboard uses, via a single request to
-`GET /api/tracks`, which returns the full static circuit library from
-`src/formula1_strategy_tool/api/circuits.py` with pit lanes merged from
-`src/formula1_strategy_tool/api/pit_lanes.py` and country names from
-`src/formula1_strategy_tool/api/countries.py`. It does not maintain its own
-copy of the coordinates. Rendering reuses the transformation, smoothing, and
-start/finish logic extracted into
-`frontend/src/features/track-map/geometry.ts` (shared with the production
-`TrackMap`).
+The page reads the same display geometry the dashboard uses, via a single
+request to `GET /api/tracks`, which returns every generated circuit layout from
+`data/circuits/layouts/*.json`. Each layout is built offline from cached OpenF1
+location traces (`scripts/generate_track_reference_paths.py`) with pit lanes
+attached by `scripts/generate_pit_lanes.py`. The page does not maintain its own
+copy of the coordinates; it draws `display_path` directly (no runtime transform
+or smoothing), reusing `frontend/src/features/track-map/geometry.ts`.
 
-Circuits currently without reviewed pit-lane data:
-
-- 14 Autodromo Jose Carlos Pace (Interlagos)
-- 55 Circuit Zandvoort
-- 63 Bahrain International Circuit
-- 149 Jeddah Corniche Circuit
-- 150 Lusail International Circuit
+Every generated layout currently includes a pit lane (generated and
+entry/exit-validated).
 
 ## Using the page when editing geometry
 
@@ -60,9 +53,8 @@ Circuits currently without reviewed pit-lane data:
 3. Confirm the outline is not clipped or distorted, the pit lane follows the
    track where it exists, and the start/finish marker sits on the outline.
 
-When adding a circuit, regenerate the static library with
-`scripts/generate_circuit_paths.py` and, if pit geometry is available,
-`scripts/generate_pit_lanes.py`; the preview page picks the changes up on the
-next request with no frontend edits.
+To rebuild the layouts, run `scripts/generate_track_reference_paths.py --all --write`
+then `scripts/generate_pit_lanes.py --all --write`; the preview page picks the
+changes up on the next request with no frontend edits.
 
 [Back to Documentation](../README.md)
