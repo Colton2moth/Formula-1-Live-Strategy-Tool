@@ -20,7 +20,7 @@ export function ReplayPage() {
     () => (replay.replayId ? replaySourceFor(replay.replayId) : null),
     [replay.replayId],
   );
-  const { raceState, track, error } = useRaceData(reloadKey, source, false);
+  const { raceState, track, trackStatus, raceStateStatus, raceStateError } = useRaceData(reloadKey, source, false);
 
   const replayIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -60,13 +60,15 @@ export function ReplayPage() {
           onSeekLap={replay.seekLap}
           canSeek={canSeek}
         />
-        {error ? (
+        {raceStateStatus === "error" && !raceState ? (
           <Panel label="Race data">
             <div className="p-4">
               <div className="text-base font-black uppercase tracking-wide text-white">
                 Unable to load race data
               </div>
-              <div className="mt-1 text-sm font-medium leading-6 text-app-muted">{error.message}</div>
+              <div className="mt-1 text-sm font-medium leading-6 text-app-muted">
+                {raceStateError?.message}
+              </div>
             </div>
           </Panel>
         ) : !raceState || !source ? (
@@ -81,7 +83,7 @@ export function ReplayPage() {
             </div>
           </Panel>
         ) : (
-          <RaceDashboard raceState={raceState} track={track} source={source} />
+          <RaceDashboard raceState={raceState} track={track} trackStatus={trackStatus} source={source} />
         )}
       </div>
       <Footer />

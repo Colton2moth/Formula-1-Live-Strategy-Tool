@@ -116,6 +116,10 @@
   @apply text-[0.6875rem] font-semibold tabular-nums text-app-text;
 }
 
+.strategy-freshness-stale {
+  @apply rounded-sm border border-amber-300 px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide text-amber-200;
+}
+
 .strategy-category-unavailable {
   @apply text-sm font-semibold text-white justify-items-center;
 }

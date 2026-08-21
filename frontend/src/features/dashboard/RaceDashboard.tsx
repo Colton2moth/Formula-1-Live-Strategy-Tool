@@ -6,14 +6,16 @@ import { Leaderboard } from "../leaderboard/Leaderboard";
 import { RaceHeader } from "../race-header/RaceHeader";
 import { StrategyPanel } from "../strategy-panel/StrategyPanel";
 import { TrackMap } from "../track-map/TrackMap";
+import type { ResourceStatus } from "./useRaceData";
 
 type RaceDashboardProps = {
   raceState: RaceState;
   track: TrackState | null;
+  trackStatus: ResourceStatus;
   source: DashboardSource;
 };
 
-export function RaceDashboard({ raceState, track, source }: RaceDashboardProps) {
+export function RaceDashboard({ raceState, track, trackStatus, source }: RaceDashboardProps) {
   const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
 
   const stream = useRaceStream(raceState, source);
@@ -36,7 +38,11 @@ export function RaceDashboard({ raceState, track, source }: RaceDashboardProps) 
     <>
       <div className="dashboard-layout">
         <div className="dashboard-stack">
-          <StrategyPanel selectedDriver={selectedDriver} prediction={selectedPrediction} />
+          <StrategyPanel
+            selectedDriver={selectedDriver}
+            prediction={selectedPrediction}
+            stale={stream.stale}
+          />
           <Leaderboard
             drivers={sortedDrivers}
             selectedDriver={selectedDriver}
@@ -44,9 +50,10 @@ export function RaceDashboard({ raceState, track, source }: RaceDashboardProps) 
           />
         </div>
         <div className="dashboard-stack">
-          <RaceHeader session={session} connectionStatus={stream.status} />
+          <RaceHeader session={session} connectionStatus={stream.status} stale={stream.stale} />
           <TrackMap
             track={track}
+            trackStatus={trackStatus}
             session={session}
             drivers={sortedDrivers}
             locations={stream.locations}

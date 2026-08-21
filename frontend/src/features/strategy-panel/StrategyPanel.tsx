@@ -8,13 +8,14 @@ import { formatUpdatedAt, tyreColors } from "../../utils/raceDisplay";
 type StrategyPanelProps = {
   selectedDriver: ApiDriver | null;
   prediction: ApiPrediction | null;
+  stale?: boolean;
 };
 
 type BarDatum = { laps: number; pct: number };
 
 const COMPOUND_ORDER = ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"] as const;
 
-export function StrategyPanel({ selectedDriver, prediction }: StrategyPanelProps) {
+export function StrategyPanel({ selectedDriver, prediction, stale = false }: StrategyPanelProps) {
   const selectedTeamColor = selectedDriver ? `#${selectedDriver.team_colour}` : "var(--color-line)";
   const selectedDriverName = selectedDriver ? splitDriverName(selectedDriver.name) : null;
   const summaryStyle = { "--strategy-team-colour": selectedTeamColor } as CSSProperties;
@@ -33,6 +34,7 @@ export function StrategyPanel({ selectedDriver, prediction }: StrategyPanelProps
         <div className="strategy-freshness-row">
           <span className="strategy-freshness-label">Last Updated:</span>
           <span className="strategy-freshness-value">{formatUpdatedAt(prediction.updated_at)}</span>
+          {stale ? <span className="strategy-freshness-stale">Stale</span> : null}
         </div>
       ) : null}
     >

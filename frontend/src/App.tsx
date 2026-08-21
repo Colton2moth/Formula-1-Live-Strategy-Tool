@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ActivityToastStack } from "./components/ActivityToastStack";
 import { BrandBar } from "./components/BrandBar";
 import { ErrorScreen } from "./components/ErrorScreen";
@@ -8,19 +9,30 @@ import { classifyError, useRaceData } from "./features/dashboard/useRaceData";
 import { liveSource } from "./hooks/useLiveState";
 
 function App() {
-  const { raceState, track, error } = useRaceData(0, liveSource);
+  const [reloadKey, setReloadKey] = useState(0);
+  const { raceState, track, trackStatus, raceStateStatus, raceStateError } = useRaceData(
+    reloadKey,
+    liveSource,
+  );
+
+  const fatal = raceState === null && raceStateStatus === "error";
 
   return (
     <main className="dashboard-shell">
       <BrandBar />
       <ActivityToastStack />
-      {error ? (
-        <ErrorScreen variant={classifyError(error)} error={error} embedded />
+      {fatal ? (
+        <ErrorScreen
+          variant={classifyError(raceStateError)}
+          error={raceStateError ?? undefined}
+          embedded
+          onRetry={() => setReloadKey((key) => key + 1)}
+        />
       ) : !raceState ? (
         <LoadingScreen variant="connecting" embedded />
       ) : (
         <div className="dashboard-container">
-          <RaceDashboard raceState={raceState} track={track} source={liveSource} />
+          <RaceDashboard raceState={raceState} track={track} trackStatus={trackStatus} source={liveSource} />
         </div>
       )}
       <Footer />

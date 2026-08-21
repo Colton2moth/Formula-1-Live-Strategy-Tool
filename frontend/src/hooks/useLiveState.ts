@@ -39,10 +39,17 @@ export type RaceStreamResult = {
   predictions: ReadonlyMap<number, ApiPrediction>;
   locations: ReadonlyMap<number, DriverLocation>;
   refreshing: boolean;
+  stale: boolean;
 };
 
 function toPredictionMap(snapshot: RaceState | null): ReadonlyMap<number, ApiPrediction> {
   return new Map((snapshot?.predictions ?? []).map((prediction) => [prediction.driver_number, prediction]));
+}
+
+const MAX_RECOVERY_DELAY_MS = 8000;
+
+function recoveryDelay(attempt: number): number {
+  return Math.min(1000 * 2 ** attempt, MAX_RECOVERY_DELAY_MS);
 }
 
 export function useRaceStream(
@@ -55,6 +62,7 @@ export function useRaceStream(
   const [locations, setLocations] = useState<ReadonlyMap<number, DriverLocation>>(() => new Map());
   const [status, setStatus] = useState<LiveSocketStatus>("connecting");
   const [refreshing, setRefreshing] = useState(false);
+  const [stale, setStale] = useState(false);
   const [seededSnapshot, setSeededSnapshot] = useState(snapshot);
   const activity = useActivity();
 
@@ -65,10 +73,13 @@ export function useRaceStream(
       setDrivers(snapshot.drivers);
       setPredictions(toPredictionMap(snapshot));
       setLocations(new Map());
+      setStale(false);
     }
   }
 
   const hasConnectedRef = useRef(false);
+  const recoveryTimerRef = useRef<number | null>(null);
+  const recoveryAttemptRef = useRef(0);
 
   useEffect(() => {
     if (!snapshot) {
@@ -150,20 +161,38 @@ export function useRaceStream(
       }
     };
 
+    const clearRecoveryTimer = () => {
+      if (recoveryTimerRef.current !== null) {
+        window.clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = null;
+      }
+    };
+
     const recoverSnapshot = async () => {
-      activity.set(ACTIVITY_IDS.snapshotRefresh, ACTIVITY_MESSAGES.snapshotRefresh);
       setRefreshing(true);
+      activity.set(ACTIVITY_IDS.snapshotRefresh, ACTIVITY_MESSAGES.snapshotRefresh);
       try {
         const fresh = await source.fetchRaceState();
         setSession(fresh.session);
         setDrivers(fresh.drivers);
         setPredictions(toPredictionMap(fresh));
         setLocations(new Map());
+        setStale(false);
+        recoveryAttemptRef.current = 0;
+        activity.clear(ACTIVITY_IDS.snapshotRefresh);
       } catch {
-        // Keep the last valid data visible until the next reconnect.
+        // Keep the last valid data visible, but mark it stale and retry the
+        // REST resync with capped backoff until it succeeds or the socket
+        // reconnects again.
+        setStale(true);
+        recoveryAttemptRef.current += 1;
+        activity.set(ACTIVITY_IDS.snapshotRefresh, ACTIVITY_MESSAGES.snapshotStale, "amber");
+        recoveryTimerRef.current = window.setTimeout(
+          () => void recoverSnapshot(),
+          recoveryDelay(recoveryAttemptRef.current - 1),
+        );
       } finally {
         setRefreshing(false);
-        activity.clear(ACTIVITY_IDS.snapshotRefresh);
       }
     };
 
@@ -176,11 +205,14 @@ export function useRaceStream(
         if (next === "open") {
           activity.clear(ACTIVITY_IDS.socket);
           if (hasConnectedRef.current) {
+            clearRecoveryTimer();
+            recoveryAttemptRef.current = 0;
             void recoverSnapshot();
           } else {
             hasConnectedRef.current = true;
           }
         } else if (next === "reconnecting") {
+          clearRecoveryTimer();
           activity.set(ACTIVITY_IDS.socket, ACTIVITY_MESSAGES.socketReconnecting, "amber");
         }
       },
@@ -188,6 +220,7 @@ export function useRaceStream(
 
     return () => {
       hasConnectedRef.current = false;
+      clearRecoveryTimer();
       socket.close();
       activity.clear(ACTIVITY_IDS.socket);
       activity.clear(ACTIVITY_IDS.snapshotRefresh);
@@ -205,5 +238,5 @@ export function useRaceStream(
     return { ...session, current_lap: liveLap };
   }, [session, drivers]);
 
-  return { status, session: liveSession, drivers, predictions, locations, refreshing };
+  return { status, session: liveSession, drivers, predictions, locations, refreshing, stale };
 }

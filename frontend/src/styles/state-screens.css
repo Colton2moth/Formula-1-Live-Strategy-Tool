@@ -25,6 +25,21 @@
   @apply pt-1 text-xs font-semibold text-app-text;
 }
 
+.state-screen-retry {
+  @apply mt-1 inline-flex items-center gap-2 border border-app-red px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-white;
+  background-color: var(--color-f1-red);
+  border-radius: var(--radius-control);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    border-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.state-screen-retry:hover,
+.state-screen-retry:focus-visible {
+  border-color: white;
+  background-color: color-mix(in srgb, var(--color-f1-red) 82%, white);
+}
+
 .loading-spinner {
   @apply flex items-center justify-center gap-2;
 }

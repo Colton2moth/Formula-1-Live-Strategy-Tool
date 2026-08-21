@@ -82,11 +82,11 @@ function buildCopyText(error: ApiError): string {
 
 export const ErrorScreen: FC<{
   variant: ErrorVariant;
-  message?: string;
   error?: ApiError;
   embedded?: boolean;
-}> = ({ variant, message, error, embedded = false }) => {
-  const { icon, title, message: defaultMessage, help } = errorContent[variant];
+  onRetry?: () => void;
+}> = ({ variant, error, embedded = false, onRetry }) => {
+  const { icon, title, message, help } = errorContent[variant];
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -111,8 +111,13 @@ export const ErrorScreen: FC<{
         <div role="heading" aria-level={1} className="state-screen-title">
           {title}
         </div>
-        <div className="state-screen-message">{message ?? defaultMessage}</div>
+        <div className="state-screen-message">{message}</div>
         <div className="state-screen-help">{help}</div>
+        {onRetry ? (
+          <button type="button" className="state-screen-retry" onClick={onRetry}>
+            Try again
+          </button>
+        ) : null}
       </div>
       {error ? (
         <details className="error-details">

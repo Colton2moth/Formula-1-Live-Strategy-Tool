@@ -2,10 +2,12 @@ import type { CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
 import type { ApiDriver, ApiSession, TrackState } from "../../types/race";
 import type { DriverLocation } from "../../hooks/useLiveState";
+import type { ResourceStatus } from "../dashboard/useRaceData";
 import { START_FINISH_SQUARE_SIZE, startFinishSquares, trackPath } from "./geometry";
 
 type TrackMapProps = {
   track: TrackState | null;
+  trackStatus: ResourceStatus;
   session: ApiSession;
   drivers: ApiDriver[];
   locations: ReadonlyMap<number, DriverLocation>;
@@ -13,7 +15,7 @@ type TrackMapProps = {
   onSelectDriver: (driverNumber: number) => void;
 };
 
-export function TrackMap({ track, session, drivers, locations, selectedDriver, onSelectDriver }: TrackMapProps) {
+export function TrackMap({ track, trackStatus, session, drivers, locations, selectedDriver, onSelectDriver }: TrackMapProps) {
   const label = `${session.meeting_name.toUpperCase()} | ${session.session_name.toUpperCase()}`;
   const mapPath = track ? trackPath(track.display_path) : "";
   const pitLanePath = track?.pit_lane?.path?.length ? trackPath(track.pit_lane.path) : null;
@@ -92,11 +94,18 @@ export function TrackMap({ track, session, drivers, locations, selectedDriver, o
             })}
           </svg>
         </div>
+      ) : trackStatus === "loading" ? (
+        <div className="track-map-frame track-map-frame--unavailable">
+          <div className="track-map-unavailable">
+            <span className="track-map-unavailable-title">Loading circuit map</span>
+            <span className="track-map-unavailable-copy">Fetching track geometry.</span>
+          </div>
+        </div>
       ) : (
         <div className="track-map-frame track-map-frame--unavailable">
           <div className="track-map-unavailable">
             <span className="track-map-unavailable-title">Circuit map unavailable</span>
-            <span className="track-map-unavailable-copy">Track geometry is being rebuilt.</span>
+            <span className="track-map-unavailable-copy">Track data could not be loaded.</span>
           </div>
         </div>
       )}

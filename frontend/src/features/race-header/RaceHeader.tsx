@@ -6,6 +6,7 @@ import { StatusChip } from "../../components/StatusChip";
 type RaceHeaderProps = {
   session: ApiSession;
   connectionStatus: LiveSocketStatus;
+  stale?: boolean;
 };
 
 const LIVE_STATUS_TONES: Record<LiveSocketStatus, "green" | "amber" | "red" | "neutral"> = {
@@ -40,7 +41,7 @@ const raceControlStates: Record<string, { label: string; tone: FlagTone }> = {
   "SESSION ABORTED": { label: "Aborted", tone: "red" },
 };
 
-export function RaceHeader({ session, connectionStatus }: RaceHeaderProps) {
+export function RaceHeader({ session, connectionStatus, stale = false }: RaceHeaderProps) {
   const raceControl = getRaceControlState(session.race_control_status);
   const weatherIcon = session.rainfall ? "rainy" : "clear_day";
 
@@ -48,7 +49,10 @@ export function RaceHeader({ session, connectionStatus }: RaceHeaderProps) {
     <Panel
       label="Race conditions"
       headerContent={
-        <StatusChip label={LIVE_STATUS_LABELS[connectionStatus]} tone={LIVE_STATUS_TONES[connectionStatus]} />
+        <div className="flex items-center gap-2">
+          <StatusChip label={LIVE_STATUS_LABELS[connectionStatus]} tone={LIVE_STATUS_TONES[connectionStatus]} />
+          {stale ? <StatusChip label="Stale" tone="amber" /> : null}
+        </div>
       }
     >
       <div className="p-3">

@@ -13,18 +13,21 @@ animation indicates the app is actively working.
 
 | Screen | Test link | Trigger condition |
 |---|---|---|
-| **Connecting to race server** | `/test/loading/connecting` | Initial page load before the first `fetch()` call completes. Shown while `Promise.all([fetchRaceState(), fetchTrack()])` is in flight. |
+| **Connecting to race server** | `/test/loading/connecting` | Initial page load before the critical `/api/race-state` snapshot has ever succeeded. Track loads in parallel but no longer blocks this screen. |
 | **Loading race data** | `/test/loading/data` | Reserved for subsequent data refresh cycles where the connection is already established but new data is being fetched. Not currently used by `App.tsx`. |
 
 ## Error states
 
-These screens replace the dashboard when an API call fails.
+These screens appear only when the critical race snapshot cannot be established.
+A non-critical resource failure (track data, or a live-transport interruption) no
+longer replaces the dashboard; it degrades the affected surface instead while the
+rest of the page keeps rendering last-known-good data.
 
 | Screen | Test link | Trigger condition |
 |---|---|---|
-| **API unavailable** | `/test/error/unavailable` | The `fetch()` call threw a network-level error before receiving any HTTP response. Typical causes: backend process is not running, wrong port, CORS misconfiguration, VPN required, or the machine is offline. |
-| **Server error** | `/test/error/server-error` | The API returned a non-2xx HTTP status (e.g. 500, 503, 502). Typical causes: backend internal crash, upstream data provider outage, or backend middleware rejecting the request. |
-| **Invalid data** | `/test/error/invalid-data` | The API returned HTTP 200 but the JSON body did not pass the frontend type assertion (`assertRaceState` or `assertTrackState`). Typical causes: backend schema change without a corresponding frontend update, or the API returned an unexpected payload (e.g. an HTML error page behind a 200 status). |
+| **API unavailable** | `/test/error/unavailable` | The critical race-state `fetch()` threw a network-level error before receiving any HTTP response. Typical causes: backend process is not running, wrong port, CORS misconfiguration, VPN required, or the machine is offline. |
+| **Server error** | `/test/error/server-error` | The critical race-state request returned a non-2xx HTTP status that is not retryable (e.g. 500, 502). Typical causes: backend internal crash, upstream data provider outage, or backend middleware rejecting the request. |
+| **Invalid data** | `/test/error/invalid-data` | The critical race-state request returned HTTP 200 but the JSON body did not pass `assertRaceState`. Typical causes: backend schema change without a corresponding frontend update, or an unexpected payload behind a 200 status. |
 | **Request timed out** | `/test/error/timeout` | Not currently triggered by the app (the `fetch()` wrapper has no built-in timeout). This screen exists for future use when a timeout mechanism is added, or when a wrapping load balancer / proxy returns a gateway timeout. |
 
 ## Structured error diagnostics
@@ -66,16 +69,31 @@ full configured backend URL.
 
 ## Retry behaviour
 
-`useRaceData` automatically retries **503 Service Unavailable** responses with
-exponential backoff (up to ~8 s), because a 503 normally means the backend is
-still bootstrapping a live session. Retries finish before an error is surfaced,
-and the final error reports the total attempt count. Any other error is surfaced
-immediately and the user must refresh.
+`useRaceData` loads `/api/race-state` and `/api/track` concurrently but settles
+them independently. Each resource retries **503 Service Unavailable** (and **409**
+for replay sources) with capped exponential backoff (up to ~8 s), so a 503 on the
+track endpoint no longer forces a retry of the race-state request and vice versa.
+A 503 normally means the backend is still bootstrapping a live session. Retries
+finish before an error is surfaced, and the final error reports the total attempt
+count. Any other error is surfaced immediately.
+
+Race state is the critical resource: only its failure (with no usable snapshot)
+produces the full-page error screen, which now offers a **Try again** action that
+re-runs the bootstrap without a page refresh. Track is non-critical: its failure
+leaves the header, leaderboard, and strategy panel running while the track panel
+shows a loading or unavailable state.
+
+Live-transport recovery is separate from the bootstrap. When the WebSocket
+reconnects, `useLiveState` resyncs `/api/race-state`; if that resync fails it
+keeps the last valid data visible, marks it `stale`, and retries the resync with
+capped backoff until it succeeds or the socket reconnects again.
 
 ## How errors are classified
 
-`classifyError()` (in `frontend/src/features/dashboard/useRaceData.ts`, used by
-`App.tsx`) maps the structured `ApiError.type` to an error variant:
+`classifyError()` (in `frontend/src/features/dashboard/useRaceData.ts`) maps the
+structured `ApiError.type` to an error variant. `App.tsx` applies it only to the
+critical `raceStateError` to choose the fatal screen; `TrackMapPreviews` uses it
+for its test screen.
 
 - `network` → `unavailable`
 - `http` → `server-error`
