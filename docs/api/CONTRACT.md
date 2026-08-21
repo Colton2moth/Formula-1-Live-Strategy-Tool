@@ -139,6 +139,7 @@ library (see `src/formula1_strategy_tool/api/circuits.py`).
 {
   "circuit_name": "Hungaroring",
   "circuit_key": 4,
+  "rotation": 40.0,
   "country_name": "Hungary",
   "start_finish": {"x": -1470.9, "y": -123.3},
   "path": [
@@ -152,6 +153,11 @@ library (see `src/formula1_strategy_tool/api/circuits.py`).
 `path` is a closed loop in the raw FastF1 coordinate system (first point repeats
 last). This is the same coordinate space as OpenF1 `v1/location` `x`/`y` on
 `/api/drivers`, so the frontend applies one shared display transform to both.
+
+`rotation` is the FastF1 circuit rotation in degrees. It comes from FastF1's
+`CircuitInfo.rotation` (sourced from the MultiViewer circuit data) and is used
+to orient the raw coordinates to the official F1 track map. It defaults to `0.0`
+when unavailable.
 
 `pit_lane` is an optional pit-lane centreline in the same raw coordinate space,
 generated offline from historical location traces (see
@@ -171,6 +177,7 @@ developer track-map preview page can render them all without a live session.
   {
     "circuit_name": "Silverstone Circuit",
     "circuit_key": 2,
+    "rotation": 92.0,
     "country_name": "United Kingdom",
     "start_finish": {"x": -1756.0, "y": 1208.0},
     "path": [{"x": -1535.7, "y": 1556.3}],

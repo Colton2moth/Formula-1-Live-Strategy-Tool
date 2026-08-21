@@ -116,6 +116,9 @@ class TrackState(BaseModel):
 
     circuit_name: str
     circuit_key: int
+    # FastF1 circuit rotation in degrees, used to orient the raw coordinates
+    # to the official F1 track map. Defaults to 0 when unavailable.
+    rotation: float = 0.0
     # Country/event identifier for the circuit; None when unknown.
     country_name: str | None = None
     # FE map draws a start/finish marker; default to first path point if omitted.

@@ -2,6 +2,7 @@ import { useMemo, type CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
 import type { ApiDriver, ApiSession, TrackState } from "../../types/race";
 import {
+  applyOrientation,
   applyTransform,
   buildTrackGeometry,
   START_FINISH_SQUARE_SIZE,
@@ -59,10 +60,11 @@ export function TrackMap({ track, session, drivers, selectedDriver, onSelectDriv
             if (driver.x === null || driver.y === null) {
               return null;
             }
-            if (!isOnTrack({ x: driver.x, y: driver.y }, geometry.rawBounds)) {
+            const oriented = applyOrientation({ x: driver.x, y: driver.y }, geometry.rotation);
+            if (!isOnTrack(oriented, geometry.rawBounds)) {
               return null;
             }
-            const marker = applyTransform({ x: driver.x, y: driver.y }, geometry.transform);
+            const marker = applyTransform(oriented, geometry.transform);
             const isSelected = driver.driver_number === selectedDriver?.driver_number;
             const markerStyle = {
               "--driver-colour": `#${driver.team_colour}`,

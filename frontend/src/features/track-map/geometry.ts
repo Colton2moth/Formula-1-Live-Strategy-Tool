@@ -13,6 +13,7 @@ export type StartFinishSquare = {
 };
 
 export type TrackGeometry = {
+  rotation: number;
   rawBounds: Bounds;
   transform: Transform;
   mapPath: string;
@@ -45,27 +46,47 @@ export function isPointValid(point: unknown): point is SvgPoint {
 }
 
 export function buildTrackGeometry(track: TrackState): TrackGeometry {
-  const rawBounds = boundsOf([...track.path, ...(track.pit_lane ?? [])]);
+  const rotation = finiteRotation(track.rotation);
+  const orientedPath = track.path.map((point) => applyOrientation(point, rotation));
+  const orientedPitLane = (track.pit_lane ?? []).map((point) => applyOrientation(point, rotation));
+  const rawBounds = boundsOf([...orientedPath, ...orientedPitLane]);
   const transform = buildTransform(rawBounds);
-  const displayPoints = smoothTrackPoints(track.path.map((point) => applyTransform(point, transform)));
+  const displayPoints = smoothTrackPoints(orientedPath.map((point) => applyTransform(point, transform)));
   const mapPath = trackPath(displayPoints);
   const pitLanePath =
     track.pit_lane && track.pit_lane.length > 1
-      ? trackPath(track.pit_lane.map((point) => applyTransform(point, transform)))
+      ? trackPath(orientedPitLane.map((point) => applyTransform(point, transform)))
       : null;
   const startFinish = isPointValid(track.start_finish)
-    ? applyTransform(track.start_finish, transform)
+    ? applyTransform(applyOrientation(track.start_finish, rotation), transform)
     : null;
   const startFinishSquares = startFinish ? startFinishMarkerSquares(startFinish) : [];
   const startFinishRotation = startFinish
     ? startFinishMarkerRotation(displayPoints, startFinish)
     : 0;
 
-  return { rawBounds, transform, mapPath, pitLanePath, startFinish, startFinishSquares, startFinishRotation };
+  return { rotation, rawBounds, transform, mapPath, pitLanePath, startFinish, startFinishSquares, startFinishRotation };
 }
 
 export function applyTransform(point: SvgPoint, transform: Transform): SvgPoint {
   return { x: point.x * transform.scale + transform.offsetX, y: point.y * transform.scale + transform.offsetY };
+}
+
+// FastF1 `CircuitInfo.rotation` is a counter-clockwise rotation in Y-up
+// cartesian space. SVG is Y-down, so the rotated Y coordinate is negated to
+// keep the circuit in the official F1 orientation.
+export function applyOrientation(point: SvgPoint, rotationDeg: number): SvgPoint {
+  const radians = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  return {
+    x: point.x * cos - point.y * sin,
+    y: -point.x * sin - point.y * cos,
+  };
+}
+
+function finiteRotation(rotation: unknown): number {
+  return typeof rotation === "number" && Number.isFinite(rotation) ? rotation : 0;
 }
 
 function buildTransform(bounds: Bounds): Transform {

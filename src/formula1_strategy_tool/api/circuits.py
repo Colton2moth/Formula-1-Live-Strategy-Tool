@@ -4,7 +4,9 @@ Static circuit path library for the track map.
 Each entry maps an OpenF1 ``circuit_key`` to a :class:`TrackState` whose
 path points are in the raw FastF1 coordinate system. This is the same
 coordinate system as OpenF1 ``v1/location`` ``x``/``y``, so live car
-markers and the circuit outline can share one display transform.
+markers and the circuit outline can share one display transform. The
+``rotation`` field is the FastF1 circuit rotation (degrees) used to
+orient the raw coordinates to the official F1 track map.
 
 Geometry is derived from official FastF1 circuit data via
 ``scripts/generate_circuit_paths.py``; see that script for the source and
@@ -24,6 +26,7 @@ CIRCUITS: dict[int, TrackState] = {
     2: TrackState(
         circuit_name="Silverstone Circuit",
         circuit_key=2,
+        rotation=92.0000,
         start_finish=TrackPoint(x=-1756.0000, y=1208.0000),
         path=[
             TrackPoint(x=-1535.7380, y=1556.3056),
@@ -172,6 +175,7 @@ CIRCUITS: dict[int, TrackState] = {
     4: TrackState(
         circuit_name="Hungaroring",
         circuit_key=4,
+        rotation=40.0000,
         start_finish=TrackPoint(x=-1470.8529, y=-123.3124),
         path=[
             TrackPoint(x=-1710.4810, y=76.6034),
@@ -320,6 +324,7 @@ CIRCUITS: dict[int, TrackState] = {
     7: TrackState(
         circuit_name="Circuit de Spa-Francorchamps",
         circuit_key=7,
+        rotation=91.0000,
         start_finish=TrackPoint(x=-1152.8993, y=2391.4307),
         path=[
             TrackPoint(x=-1333.4819, y=2866.7143),
@@ -467,6 +472,7 @@ CIRCUITS: dict[int, TrackState] = {
     9: TrackState(
         circuit_name="Circuit of the Americas",
         circuit_key=9,
+        rotation=0.0000,
         start_finish=TrackPoint(x=-1395.9999, y=-339.9999),
         path=[
             TrackPoint(x=-1087.7368, y=-580.7181),
@@ -615,6 +621,7 @@ CIRCUITS: dict[int, TrackState] = {
     10: TrackState(
         circuit_name="Albert Park Circuit",
         circuit_key=10,
+        rotation=44.0000,
         start_finish=TrackPoint(x=-1185.0000, y=-1341.0000),
         path=[
             TrackPoint(x=-1463.4670, y=-1086.5465),
@@ -762,6 +769,7 @@ CIRCUITS: dict[int, TrackState] = {
     14: TrackState(
         circuit_name="Autodromo Jose Carlos Pace",
         circuit_key=14,
+        rotation=258.0000,
         start_finish=TrackPoint(x=-3276.9771, y=-6782.3359),
         path=[
             TrackPoint(x=-3188.0124, y=-7062.2249),
@@ -910,6 +918,7 @@ CIRCUITS: dict[int, TrackState] = {
     15: TrackState(
         circuit_name="Circuit de Barcelona-Catalunya",
         circuit_key=15,
+        rotation=303.0000,
         start_finish=TrackPoint(x=1511.8603, y=-39.7081),
         path=[
             TrackPoint(x=1373.1870, y=-323.8842),
@@ -1058,6 +1067,7 @@ CIRCUITS: dict[int, TrackState] = {
     19: TrackState(
         circuit_name="Red Bull Ring",
         circuit_key=19,
+        rotation=1.0000,
         start_finish=TrackPoint(x=1338.7441, y=-1144.7971),
         path=[
             TrackPoint(x=1048.4546, y=-1240.9793),
@@ -1206,6 +1216,7 @@ CIRCUITS: dict[int, TrackState] = {
     22: TrackState(
         circuit_name="Circuit de Monaco",
         circuit_key=22,
+        rotation=315.0000,
         start_finish=TrackPoint(x=-7651.7090, y=-6792.4165),
         path=[
             TrackPoint(x=-7661.0723, y=-6553.4912),
@@ -1353,6 +1364,7 @@ CIRCUITS: dict[int, TrackState] = {
     23: TrackState(
         circuit_name="Circuit Gilles Villeneuve",
         circuit_key=23,
+        rotation=62.0000,
         start_finish=TrackPoint(x=3353.0000, y=920.0000),
         path=[
             TrackPoint(x=3384.2746, y=609.8651),
@@ -1501,6 +1513,7 @@ CIRCUITS: dict[int, TrackState] = {
     39: TrackState(
         circuit_name="Autodromo Nazionale Monza",
         circuit_key=39,
+        rotation=95.0000,
         start_finish=TrackPoint(x=-1414.5510, y=-1183.9387),
         path=[
             TrackPoint(x=-1390.0452, y=-773.3049),
@@ -1648,6 +1661,7 @@ CIRCUITS: dict[int, TrackState] = {
     46: TrackState(
         circuit_name="Suzuka International Racing Course",
         circuit_key=46,
+        rotation=49.0000,
         start_finish=TrackPoint(x=1749.5099, y=-706.7329),
         path=[
             TrackPoint(x=2034.4166, y=-1032.4522),
@@ -1796,6 +1810,7 @@ CIRCUITS: dict[int, TrackState] = {
     49: TrackState(
         circuit_name="Shanghai International Circuit",
         circuit_key=49,
+        rotation=237.0000,
         start_finish=TrackPoint(x=-2977.0544, y=-2214.7722),
         path=[
             TrackPoint(x=-3375.6444, y=-2230.2967),
@@ -1943,6 +1958,7 @@ CIRCUITS: dict[int, TrackState] = {
     55: TrackState(
         circuit_name="Circuit Zandvoort",
         circuit_key=55,
+        rotation=0.0000,
         start_finish=TrackPoint(x=391.3127, y=3485.0056),
         path=[
             TrackPoint(x=463.9877, y=3766.5273),
@@ -2091,6 +2107,7 @@ CIRCUITS: dict[int, TrackState] = {
     61: TrackState(
         circuit_name="Marina Bay Street Circuit",
         circuit_key=61,
+        rotation=335.0000,
         start_finish=TrackPoint(x=1116.2604, y=-684.5624),
         path=[
             TrackPoint(x=1075.9743, y=-340.8763),
@@ -2238,6 +2255,7 @@ CIRCUITS: dict[int, TrackState] = {
     63: TrackState(
         circuit_name="Bahrain International Circuit",
         circuit_key=63,
+        rotation=92.0000,
         start_finish=TrackPoint(x=-393.1852, y=1019.2457),
         path=[
             TrackPoint(x=-376.9890, y=1408.9493),
@@ -2385,6 +2403,7 @@ CIRCUITS: dict[int, TrackState] = {
     65: TrackState(
         circuit_name="Autodromo Hermanos Rodriguez",
         circuit_key=65,
+        rotation=36.0000,
         start_finish=TrackPoint(x=-271.9717, y=1223.0093),
         path=[
             TrackPoint(x=32.4246, y=1190.7052),
@@ -2532,6 +2551,7 @@ CIRCUITS: dict[int, TrackState] = {
     70: TrackState(
         circuit_name="Yas Marina Circuit",
         circuit_key=70,
+        rotation=280.0000,
         start_finish=TrackPoint(x=107.8277, y=2040.8763),
         path=[
             TrackPoint(x=490.3683, y=2087.7809),
@@ -2679,6 +2699,7 @@ CIRCUITS: dict[int, TrackState] = {
     144: TrackState(
         circuit_name="Baku City Circuit",
         circuit_key=144,
+        rotation=357.0000,
         start_finish=TrackPoint(x=856.1649, y=-678.2292),
         path=[
             TrackPoint(x=1253.9328, y=-516.1895),
@@ -2827,6 +2848,7 @@ CIRCUITS: dict[int, TrackState] = {
     149: TrackState(
         circuit_name="Jeddah Corniche Circuit",
         circuit_key=149,
+        rotation=104.0000,
         start_finish=TrackPoint(x=-1291.0000, y=216.0001),
         path=[
             TrackPoint(x=-1421.3500, y=632.8047),
@@ -2974,6 +2996,7 @@ CIRCUITS: dict[int, TrackState] = {
     150: TrackState(
         circuit_name="Lusail International Circuit",
         circuit_key=150,
+        rotation=61.0000,
         start_finish=TrackPoint(x=-1539.6030, y=-193.1552),
         path=[
             TrackPoint(x=-1740.0666, y=156.5418),
@@ -3122,6 +3145,7 @@ CIRCUITS: dict[int, TrackState] = {
     151: TrackState(
         circuit_name="Miami International Autodrome",
         circuit_key=151,
+        rotation=2.0000,
         start_finish=TrackPoint(x=2803.3988, y=-478.8062),
         path=[
             TrackPoint(x=3153.8684, y=-661.9406),
@@ -3270,6 +3294,7 @@ CIRCUITS: dict[int, TrackState] = {
     152: TrackState(
         circuit_name="Las Vegas Strip Circuit",
         circuit_key=152,
+        rotation=90.0000,
         start_finish=TrackPoint(x=2105.0000, y=-575.0000),
         path=[
             TrackPoint(x=2415.6804, y=-260.8263),

@@ -177,8 +177,8 @@ def _resample(
 
 def build_raw(
     year: int, circuit_key: int
-) -> tuple[list[tuple[float, float]], tuple[float, float]]:
-    """Return (raw closed path points, raw start_finish point)."""
+) -> tuple[list[tuple[float, float]], tuple[float, float], float]:
+    """Return (raw closed path points, raw start_finish point, rotation)."""
     info = mvapi.get_circuit_info(year=year, circuit_key=circuit_key)
     if info is None:
         raise ValueError(
@@ -196,7 +196,7 @@ def build_raw(
     splined = _catmull_rom_closed(anchors, SAMPLES_PER_SEGMENT)
     resampled = _resample(splined, RESAMPLE)
     resampled.append(resampled[0])
-    return resampled, start_finish_raw
+    return resampled, start_finish_raw, float(info.rotation)
 
 
 def _format_point(x: float, y: float) -> str:
@@ -212,7 +212,9 @@ def write_circuits_module(year: int, destination: Path) -> None:
         "Each entry maps an OpenF1 ``circuit_key`` to a :class:`TrackState` whose",
         "path points are in the raw FastF1 coordinate system. This is the same",
         "coordinate system as OpenF1 ``v1/location`` ``x``/``y``, so live car",
-        "markers and the circuit outline can share one display transform.",
+        "markers and the circuit outline can share one display transform. The",
+        "``rotation`` field is the FastF1 circuit rotation (degrees) used to",
+        "orient the raw coordinates to the official F1 track map.",
         "",
         "Geometry is derived from official FastF1 circuit data via",
         "``scripts/generate_circuit_paths.py``; see that script for the source and",
@@ -232,10 +234,11 @@ def write_circuits_module(year: int, destination: Path) -> None:
     ]
 
     for circuit_key, circuit_name in CIRCUITS:
-        path, start_finish = build_raw(year, circuit_key)
+        path, start_finish, rotation = build_raw(year, circuit_key)
         lines.append(f"    {circuit_key}: TrackState(")
         lines.append(f'        circuit_name="{circuit_name}",')
         lines.append(f"        circuit_key={circuit_key},")
+        lines.append(f"        rotation={rotation:.4f},")
         lines.append(
             f"        start_finish={_format_point(start_finish[0], start_finish[1])},"
         )
@@ -250,7 +253,8 @@ def write_circuits_module(year: int, destination: Path) -> None:
             "",
             "",
             "def track_for_circuit(circuit_key: int) -> TrackState | None:",
-            '    """Return the static TrackState for a circuit_key."""',
+            '    """Return the static TrackState for a circuit_key, or None '
+            'if unknown."""',
             "    track = CIRCUITS.get(circuit_key)",
             "    if track is None:",
             "        return None",
@@ -295,7 +299,8 @@ def main() -> None:
     if args.circuit_key is None:
         parser.error("--circuit-key is required unless --write-circuits is set")
 
-    path, start_finish = build_raw(args.year, args.circuit_key)
+    path, start_finish, rotation = build_raw(args.year, args.circuit_key)
+    print(f"rotation={rotation:.4f}")
     print(
         f"start_finish=TrackPoint(x={start_finish[0]:.4f}, y={start_finish[1]:.4f})"
     )
