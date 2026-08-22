@@ -35,21 +35,21 @@
 }
 
 .track-map-info-name {
-  @apply font-sans  uppercase tracking-widest text-app-text;
+  @apply uppercase tracking-widest text-app-text;
+  font-family: "Bebas Neue", var(--font-app);
   max-width: 100%;
   font-size: 3rem;
   font-weight: 800;
   overflow-wrap: break-word;
-  line-height: 1.15;
 }
 
 .track-map-info-country {
-  @apply font-sans uppercase tracking-widest text-app-text;
+  @apply uppercase tracking-widest text-app-text;
   max-width: 100%;
   font-size: 1rem;
+  margin-top: -1rem;
   font-weight: 700;
   overflow-wrap: anywhere;
-  line-height: 1.2;
 }
 
 .track-map-road {
