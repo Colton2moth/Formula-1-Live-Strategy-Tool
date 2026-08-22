@@ -9,6 +9,7 @@ import { ReplayPage } from "./features/replay/ReplayPage";
 import { StateWorkbench } from "./features/test-screens/StateWorkbench";
 import { LiveStateWorkbench } from "./features/test-screens/LiveStateWorkbench";
 import { TestIndex } from "./features/test-screens/TestIndex";
+import { TrackMapPicker } from "./features/test-screens/TrackMapPicker";
 import { TrackMapPreviews } from "./features/test-screens/TrackMapPreviews";
 import {
   invalidDataExample,
@@ -20,6 +21,7 @@ import "./index.css";
 import "./styles/shared.css";
 import "./styles/race-header.css";
 import "./styles/track-map.css";
+import "./styles/track-map-picker.css";
 import "./styles/track-map-previews.css";
 import "./styles/leaderboard.css";
 import "./styles/strategy-panel.css";
@@ -39,6 +41,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
           <Route path="/test/states" element={<StateWorkbench />} />
           <Route path="/test/live" element={<LiveStateWorkbench />} />
           <Route path="/test/maps" element={<TrackMapPreviews />} />
+          <Route path="/test/map" element={<TrackMapPicker />} />
           <Route path="/test/loading/connecting" element={<LoadingScreen variant="connecting" />} />
           <Route path="/test/loading/data" element={<LoadingScreen variant="loading" />} />
           <Route path="/test/error/unavailable" element={<ErrorScreen variant="unavailable" error={unavailableExample} />} />

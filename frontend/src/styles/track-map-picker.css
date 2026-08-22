@@ -1,0 +1,33 @@
+.track-picker {
+  @apply mx-auto grid w-full max-w-[45rem] gap-5;
+}
+
+.track-picker-heading {
+  @apply text-2xl font-black uppercase text-white;
+}
+
+.track-picker-control {
+  @apply grid gap-2;
+}
+
+.track-picker-label {
+  @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.track-picker-select {
+  @apply w-full border border-app-line bg-app-panelAlt px-3 py-2 text-sm font-semibold text-app-text;
+  border-radius: var(--radius-compact);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.track-picker-select:focus-visible {
+  outline: 0.125rem solid var(--color-f1-red);
+  outline-offset: 0.125rem;
+}
+
+.track-picker-empty {
+  @apply mx-auto max-w-[45rem] text-sm font-semibold text-app-muted;
+}

@@ -1,10 +1,11 @@
 """
 REST route handlers for the strategy API contract.
 
-Session and drivers are served from the live OpenF1 buffer. Predictions are
-scored from the trained models against a historical CSV snapshot (see
-inference.py). Circuit-map endpoints are temporarily unavailable while track
-geometry is rebuilt from cached OpenF1 location data.
+Session and drivers are served from the live OpenF1 buffer. Live predictions
+are scored from the trained models against the current live session's features
+only — never silently from a historical CSV snapshot (see inference.py).
+Circuit-map endpoints are temporarily unavailable while track geometry is
+rebuilt from cached OpenF1 location data.
 """
 
 from __future__ import annotations
@@ -51,7 +52,7 @@ load_dotenv()
 # All contract REST paths live under /api (see docs/api/CONTRACT.md).
 router = APIRouter(prefix="/api", tags=["strategy-api"])
 
-# CSV fallback cache; live predictions are recomputed from LIVE_STATE.
+# CSV fallback cache; used only by the opt-in dev fallback (off by default).
 _prediction_cache: list[PredictionState] | None = None
 
 
@@ -105,7 +106,13 @@ def _drivers_by_number() -> dict[int, DriverState]:
 
 
 def _csv_predictions() -> list[PredictionState]:
-    """Cached predictions from the configured historical CSV snapshot."""
+    """
+    Predictions from the configured historical CSV snapshot.
+
+    Not used by the normal live path: a live prediction must come from the
+    current live session. This is consulted only when the opt-in
+    ``INFERENCE_CSV_FALLBACK`` dev flag is enabled (see ``_csv_fallback_enabled``).
+    """
     global _prediction_cache
     if _prediction_cache is not None:
         return _prediction_cache
@@ -148,14 +155,28 @@ def _predictions_from_state(state: LiveState) -> list[PredictionState] | None:
     return None
 
 
+def _csv_fallback_enabled() -> bool:
+    """True only when the explicit dev fallback flag is set (default OFF)."""
+    flag = os.getenv("INFERENCE_CSV_FALLBACK", "0").strip().lower()
+    return flag in {"1", "true", "yes", "on"}
+
+
 def _model_predictions() -> list[PredictionState]:
     """
-    Live predictions: prefer live-buffer features + models; fall back to CSV.
+    Live predictions for the current live session.
+
+    A prediction shown as live must come from the current live session. When
+    live feature generation/inference cannot produce one, return no prediction
+    (the frontend then shows its unavailable state) rather than silently
+    substituting a historical CSV snapshot. The CSV path is only consulted when
+    ``INFERENCE_CSV_FALLBACK`` is explicitly enabled for development.
     """
     from_state = _predictions_from_state(LIVE_STATE)
     if from_state:
         return from_state
-    return _csv_predictions()
+    if _csv_fallback_enabled():
+        return _csv_predictions()
+    return []
 
 
 def replay_predictions(state: LiveState) -> list[PredictionState]:
@@ -206,7 +227,7 @@ def get_locations() -> list[LocationState]:
 
 @router.get("/predictions", response_model=list[PredictionState])
 def get_predictions() -> list[PredictionState]:
-    """Latest strategy prediction for every driver (trained models on CSV)."""
+    """Latest live strategy prediction for every driver; empty when unavailable."""
     return _model_predictions()
 
 
@@ -227,7 +248,8 @@ def get_race_state() -> RaceStateSnapshot:
     """
     Full bootstrap snapshot for initial page load.
 
-    Session and drivers come from the live buffer; predictions from the models.
+    Session and drivers come from the live buffer; predictions from the live
+    session's features (empty when live inference is unavailable).
     """
     return RaceStateSnapshot(
         session=_active_session(),
@@ -357,8 +379,11 @@ def get_replay_race_state(replay_id: str) -> RaceStateSnapshot:
     """Replay-owned bootstrap snapshot for the given replay runtime."""
     runtime = _runtime(replay_id)
     state = runtime.controller.state
+    # The replay producer knows the completed race distance from the prepared
+    # timeline; pass it through so a completed replay keeps a real denominator.
+    total_laps = runtime.controller.progress.get("total_laps")
     try:
-        session = session_from_live(state)
+        session = session_from_live(state, total_laps=total_laps)
     except Exception:  # noqa: BLE001 — treat an unseeded replay as "not ready"
         session = None
     if session is None:

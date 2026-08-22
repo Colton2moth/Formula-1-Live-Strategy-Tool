@@ -14,6 +14,7 @@ const errorStates = [
 ] as const;
 
 const utilityPages = [
+  { path: "/test/map", label: "Single track map", code: "track-map-picker" },
   { path: "/test/maps", label: "Track map previews", code: "track-map-previews" },
 ] as const;
 
