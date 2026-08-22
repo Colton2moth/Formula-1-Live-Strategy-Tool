@@ -29,6 +29,34 @@
   @apply text-[1.375rem] leading-none text-app-muted;
 }
 
+.race-header-stat-icon--rain {
+  @apply text-sky-400;
+}
+
+.race-header-stat-icon--dry {
+  @apply text-orange-400;
+}
+
+.race-header-stat-icon--green {
+  @apply text-emerald-400;
+}
+
+.race-header-stat-icon--yellow {
+  @apply text-amber-300;
+}
+
+.race-header-stat-icon--red {
+  @apply text-app-red;
+}
+
+.race-header-stat-icon--blue {
+  @apply text-sky-400;
+}
+
+.race-header-stat-icon--neutral {
+  @apply text-app-muted;
+}
+
 .race-header-stat-value--numeric {
   @apply tabular-nums;
 }

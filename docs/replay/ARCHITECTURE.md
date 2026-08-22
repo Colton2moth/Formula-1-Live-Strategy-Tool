@@ -6,13 +6,16 @@ How Replay Mode works under the hood. For how to run it, see
 ## System flow
 
 ```text
-OpenF1 historical REST → cache → chronological timeline → LIVE_STATE.update(...)
-    → /ws/live broadcaster → frontend live state → header / map / table / strategy
+OpenF1 historical REST → cache → chronological timeline → replay_controller.state
+    → /api/replay/* + /ws/replay → frontend replay state → header / map / table / strategy
 ```
 
-No frontend component knows about replay. The dashboard advances exactly as it
-would during a live race because the replay producer feeds the same
-`LIVE_STATE` topics that MQTT does.
+Replay and live run from separate mutable state. Live uses the module-level
+`LIVE_STATE` (REST bootstrap + MQTT) and `/api/*` + `/ws/live`; replay uses the
+`ReplayController`'s private `LiveState` and `/api/replay/*` + `/ws/replay`.
+They share the presentation components and the state/feature/event-building
+logic, but replay never clears or seeds `LIVE_STATE` and live ingestion never
+stops while a replay is running.
 
 ## Acquisition
 
@@ -67,10 +70,11 @@ never leaking a future stint boundary to the model. The shared feature pipeline
 
 ## Playback
 
-Before replaying, `LIVE_STATE` is cleared so stale live/test data cannot mix
-with the historical race. Identity rows are seeded, then the worker advances a
-race clock scaled by the replay speed, emitting every event whose offset is due
-and sleeping until the next event.
+Before replaying, the controller's private `LiveState` is cleared so stale
+replay/test data cannot mix with the new historical race. Live `LIVE_STATE` is
+never touched. Identity rows are seeded, then the worker advances a race clock
+scaled by the replay speed, emitting every event whose offset is due and
+sleeping until the next event.
 
 A `pause_event` suspends the clock: the paused wall-clock time is excluded from
 the scaled elapsed time, so resume continues from the same position. The

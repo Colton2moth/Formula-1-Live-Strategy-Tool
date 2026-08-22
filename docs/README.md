@@ -7,7 +7,7 @@ document you need.
 
 - [Project architecture](./ARCHITECTURE.md)
 - [First-time setup](./development/SETUP.md)
-- [Normal development startup](./development/SETUP.md#normal-daily-startup)
+- [Fast start (after setup)](./development/FAST_START.md)
 - [Development workflow](./development/WORKFLOW.md)
 
 ## Data
@@ -27,6 +27,7 @@ document you need.
 
 - [API contract](./api/CONTRACT.md)
 - [Frontend state screens](./frontend/STATE_SCREENS.md)
+- [Track map previews](./frontend/TRACK_MAP_PREVIEW.md)
 
 ## Replay Mode
 

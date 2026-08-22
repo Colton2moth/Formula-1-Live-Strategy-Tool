@@ -1,14 +1,12 @@
 """
-Generate static pit-lane centreline(s) from historical replay location traces.
+Generate static pit-lane centrelines and attach them to circuit layouts.
 
-Offline build-time tool beside ``generate_circuit_paths.py``. It reads the raw
-replay cache (``sessions.json``, ``pit.json`` and ``location/*.json`` windows)
-for one or more completed races, isolates each selected pit stop's lane trace,
-and writes the reviewed centrelines into
-``src/formula1_strategy_tool/api/pit_lanes.py``.
+Offline build-time tool. It reads the cached replay location traces
+(``pit.json`` and ``location/*.json``), isolates each pit stop's lane trace,
+builds a reviewed centreline, and writes it into the circuit's layout JSON as
+``pit_lane`` (raw reference points, display points, entry/exit progress).
 
-Coordinates: raw decimetres in the output (same space as ``TrackState.path``);
-geometry runs in metres internally (raw ``÷10``).
+Run after ``generate_track_reference_paths.py`` so the reference layouts exist.
 
 Usage:
     python scripts/generate_pit_lanes.py --session-key 9963 --write
@@ -26,7 +24,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from formula1_strategy_tool.acquisition.replay import replay_dir
-from formula1_strategy_tool.api.circuits import CIRCUITS
 from formula1_strategy_tool.pit_geometry import (
     DECIMETRES_PER_METRE,
     build_centerline,
@@ -36,6 +33,14 @@ from formula1_strategy_tool.pit_geometry import (
     simplify,
     smooth,
 )
+from formula1_strategy_tool.track.generator import build_display_transform
+from formula1_strategy_tool.track.models import (
+    LayoutPoint,
+    PitLane,
+    layouts_dir,
+    load_layout,
+)
+from formula1_strategy_tool.track.projection import Projector
 
 D = DECIMETRES_PER_METRE
 _WINDOW_SECONDS = 300
@@ -63,7 +68,6 @@ def _load_json(path: Path) -> list[dict]:
 
 
 def _select_stops(pit_rows: list[dict], max_stops: int) -> list[dict]:
-    """Real pit stops from distinct drivers, within a sane lane-duration band."""
     chosen: list[dict] = []
     seen: set[int] = set()
     for row in sorted(pit_rows, key=lambda r: str(r.get("date") or "")):
@@ -119,16 +123,15 @@ def _extract_trace(
     return rows
 
 
-def generate_circuit(
+def _raw_centreline(
     session_key: int, circuit_key: int, max_stops: int
-) -> tuple[list[tuple[float, float]], str] | None:
-    """Build one circuit's pit-lane centreline in raw decimetres, or None."""
+) -> list[tuple[float, float]] | None:
     cache = replay_dir(session_key)
     sessions = _load_json(cache / "sessions.json")
     session = sessions[0] if sessions else {}
-    track = CIRCUITS.get(circuit_key)
-    if track is None:
-        print(f"  circuit {circuit_key}: no main-circuit geometry, skipped")
+    layout = load_layout(circuit_key)
+    if layout is None:
+        print(f"  circuit {circuit_key}: no reference layout, skipped")
         return None
 
     session_start = _parse(session["date_start"])
@@ -138,7 +141,7 @@ def generate_circuit(
         print(f"  circuit {circuit_key}: only {len(stops)} usable stops, skipped")
         return None
 
-    path_m = [(p.x / D, p.y / D) for p in track.path]
+    path_m = [(p.x / D, p.y / D) for p in layout.reference_path]
     windows: dict[int, list[dict]] = {}
     traces: list[list[tuple[float, float]]] = []
 
@@ -179,58 +182,46 @@ def generate_circuit(
             f"({d_entry:.1f}m/{d_exit:.1f}m), skipped"
         )
         return None
-    source = (
-        f"{session.get('country_name', '?')} {session.get('year', '?')} "
-        f"session {session_key}"
-    )
     print(
-        f"  circuit {circuit_key:>3} {track.circuit_name:<28} "
+        f"  circuit {circuit_key:>3} {layout.name:<28} "
         f"{len(centreline):>2} pts from {len(traces)} traces  "
         f"entry {d_entry:.1f}m  exit {d_exit:.1f}m"
     )
-    return [(x * D, y * D) for x, y in centreline], source
+    return [(x * D, y * D) for x, y in centreline]
 
 
-def _format_point(x: float, y: float) -> str:
-    return f"TrackPoint(x={x:.1f}, y={y:.1f})"
+def _update_layout(circuit_key: int, raw_points: list[tuple[float, float]]) -> None:
+    layout = load_layout(circuit_key)
+    if layout is None:
+        return
+    reference = [(p.x, p.y) for p in layout.reference_path]
+    transform = build_display_transform(reference, layout.rotation)
+    display = [transform.apply(p) for p in raw_points]
+    projector = Projector(layout)
+    entry = projector.project(raw_points[0][0], raw_points[0][1])
+    exit_ = projector.project(raw_points[-1][0], raw_points[-1][1])
 
-
-def write_pit_lanes_module(
-    destination: Path, entries: dict[int, tuple[list[tuple[float, float]], str]]
-) -> None:
-    lines = [
-        '"""',
-        "Static pit-lane centreline library for the track map.",
-        "",
-        "Each entry maps an OpenF1 ``circuit_key`` to a pit-lane centreline in",
-        "the same raw decimetre coordinate system as ``TrackState.path``. Generated",
-        "offline from historical OpenF1 location traces (never rebuilt at request",
-        "time); see ``scripts/generate_pit_lanes.py``.",
-        "",
-        "Circuits without a reviewed pit lane are simply absent from this mapping.",
-        '"""',
-        "",
-        "from __future__ import annotations",
-        "",
-        "from formula1_strategy_tool.api.schemas import TrackPoint",
-        "",
-        "PIT_LANES: dict[int, list[TrackPoint]] = {",
-    ]
-    for circuit_key in sorted(entries):
-        points, source = entries[circuit_key]
-        lines.append(f"    {circuit_key}: [  # {source}")
-        lines.extend(f"        {_format_point(x, y)}," for x, y in points)
-        lines.append("    ],")
-    lines.extend(["}", "", ""])
-    destination.write_text("\n".join(lines), encoding="utf-8")
-    print(f"wrote {destination} ({len(entries)} circuits)")
+    pit_lane = PitLane(
+        reference=[LayoutPoint(x=x, y=y) for x, y in raw_points],
+        display=[LayoutPoint(x=x, y=y) for x, y in display],
+        entry_progress=entry[0] if entry else None,
+        exit_progress=exit_[0] if exit_ else None,
+    )
+    updated = layout.model_copy(update={"pit_lane": pit_lane})
+    path = layouts_dir() / f"{circuit_key}.json"
+    path.write_text(updated.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    print(f"  wrote pit lane to {path}")
 
 
 def _cached_sessions() -> list[int]:
     root = Path("data/replay")
     keys: list[int] = []
     for child in sorted(root.iterdir()):
-        if child.is_dir() and (child / "sessions.json").exists():
+        if (
+            child.is_dir()
+            and child.name.isdigit()
+            and (child / "sessions.json").exists()
+        ):
             keys.append(int(child.name))
     return keys
 
@@ -249,35 +240,28 @@ def main() -> None:
     if not session_keys:
         parser.error("--session-key or --all is required")
 
-    # Prefer the latest session per circuit so regenerating is deterministic.
     by_circuit: dict[int, int] = {}
     for key in session_keys:
         sessions = _load_json(replay_dir(key) / "sessions.json")
         if not sessions:
             continue
         ck = sessions[0].get("circuit_key")
-        if ck is None:
-            continue
-        by_circuit[int(ck)] = key
+        if ck is not None:
+            by_circuit[int(ck)] = key
 
-    entries: dict[int, tuple[list[tuple[float, float]], str]] = {}
+    results: dict[int, list[tuple[float, float]]] = {}
     for circuit_key, session_key in sorted(by_circuit.items()):
         print(f"session {session_key} circuit {circuit_key}:")
-        result = generate_circuit(session_key, circuit_key, args.max_stops)
-        if result is not None:
-            entries[circuit_key] = result
+        centreline = _raw_centreline(session_key, circuit_key, args.max_stops)
+        if centreline is not None:
+            results[circuit_key] = centreline
 
-    if not entries:
-        raise SystemExit("no circuits generated")
+    if not results:
+        raise SystemExit("no pit lanes generated")
+
     if args.write:
-        destination = (
-            Path(__file__).resolve().parents[1]
-            / "src"
-            / "formula1_strategy_tool"
-            / "api"
-            / "pit_lanes.py"
-        )
-        write_pit_lanes_module(destination, entries)
+        for circuit_key, raw_points in results.items():
+            _update_layout(circuit_key, raw_points)
 
 
 if __name__ == "__main__":

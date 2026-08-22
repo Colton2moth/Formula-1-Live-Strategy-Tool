@@ -3,7 +3,7 @@ export type ApiSession = {
   session_name: string;
   session_status: string;
   current_lap: number;
-  total_laps: number;
+  total_laps: number | null;
   track_temperature: number;
   air_temperature: number;
   rainfall: boolean;
@@ -54,9 +54,18 @@ export type RaceState = {
 };
 
 export type TrackPoint = { x: number; y: number };
+export type StartFinish = { x: number; y: number; angle_deg: number };
+export type DisplayPitLane = {
+  path: TrackPoint[];
+  entry_progress: number | null;
+  exit_progress: number | null;
+};
 export type TrackState = {
   circuit_name: string;
-  start_finish: TrackPoint;
-  path: TrackPoint[];
-  pit_lane?: TrackPoint[];
+  circuit_key: number;
+  rotation: number;
+  country_name?: string;
+  display_path: TrackPoint[];
+  start_finish: StartFinish;
+  pit_lane?: DisplayPitLane | null;
 };

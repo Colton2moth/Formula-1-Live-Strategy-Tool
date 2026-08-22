@@ -4,7 +4,7 @@
 
 .strategy-driver-summary {
   @apply grid  gap-1 p-4 justify-items-center;
-  box-shadow: inset 0 0.25rem var(--strategy-team-colour);
+  box-shadow: inset 0 0.5rem var(--strategy-team-colour);
 }
 
 .strategy-eyebrow {
@@ -17,18 +17,18 @@
 }
 
 .strategy-driver-first-name {
-  @apply text-lg font-medium leading-none text-app-muted;
+  @apply text-[1rem] font-medium leading-none;
 }
 
 .strategy-driver-last-name {
-  @apply text-lg font-black uppercase leading-none tracking-wide text-white;
+  @apply text-[1.5rem]  font-black uppercase leading-none tracking-wide text-white;
 }
 
 .strategy-driver-empty {
   @apply text-2xl font-black uppercase leading-none tracking-wide text-white;
 }
 
-.strategy-driver-meta {
+.strategy-driver-team {
   @apply text-sm font-normal text-app-muted;
 }
 
@@ -39,7 +39,7 @@
 }
 
 .strategy-category {
-  @apply grid p-4 justify-items-center items-center;
+  @apply grid p-2 justify-items-center items-center;
   grid-template-rows: auto minmax(0, 1fr);
 }
 
@@ -56,7 +56,7 @@
 }
 
 .stat-category-body {
-  @apply grid justify-items-center gap-1 text-center;
+  @apply grid justify-items-center text-center;
 }
 
 .strategy-pit-bars {
@@ -74,6 +74,10 @@
 
 .strategy-pit-bar-value {
   @apply text-xs font-bold tabular-nums text-white leading-none;
+}
+
+.strategy-pit-bar-value--muted {
+  color: var(--color-muted);
 }
 
 .strategy-pit-bar-track {
@@ -95,7 +99,38 @@
 }
 
 .strategy-compound-breakdown {
-  @apply grid w-full gap-2 content-center;
+  @apply flex w-full items-end justify-between gap-2;
+  height: 6rem;
+}
+
+.strategy-compound-bar {
+  @apply flex h-full min-w-0 flex-col items-center gap-2;
+  width: 2.25rem;
+  flex: 1 1 0;
+}
+
+.strategy-compound-value {
+  @apply text-xs font-bold tabular-nums leading-none text-white;
+}
+
+.strategy-compound-value--muted {
+  color: var(--color-muted);
+}
+
+.strategy-compound-track {
+  @apply relative w-4 overflow-hidden;
+  flex: 1;
+  border-radius: var(--radius-control);
+  background: var(--color-line);
+}
+
+.strategy-compound-fill {
+  @apply absolute bottom-0 w-full;
+  min-height: 0.125rem;
+  border-radius: var(--radius-control);
+  transition:
+    height var(--motion-duration-standard) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
 .strategy-tyre-logo {
@@ -114,6 +149,10 @@
 
 .strategy-freshness-value {
   @apply text-[0.6875rem] font-semibold tabular-nums text-app-text;
+}
+
+.strategy-freshness-stale {
+  @apply rounded-sm border border-amber-300 px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide text-amber-200;
 }
 
 .strategy-category-unavailable {

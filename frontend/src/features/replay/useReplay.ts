@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  createReplay,
   fetchReplaySessions,
   fetchReplayStatus,
   pauseReplay,
@@ -7,10 +8,10 @@ import {
   seekReplay,
   seekReplayLap,
   setReplaySpeed,
-  startReplay,
   stopReplay,
 } from "../../api/replay";
 import type { ReplaySessionOption, ReplayStatusValue } from "../../api/replay";
+import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../activity/useActivity";
 
 export const SPEED_PRESETS = [1, 2, 5, 10, 20, 50, 100] as const;
 export const MIN_SPEED = 0.25;
@@ -78,6 +79,7 @@ export function useReplay(onSeeded: () => void) {
   const [sessionKey, setSessionKey] = useState<string>("");
   const [speed, setSpeedState] = useState<number>(defaultSpeed);
   const [status, setStatus] = useState<ReplayStatusValue>("idle");
+  const [replayId, setReplayId] = useState<string | null>(null);
   const [progress, setProgress] = useState<ReplayProgress>(EMPTY_PROGRESS);
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +87,7 @@ export function useReplay(onSeeded: () => void) {
   const [sessionIdInput, setSessionIdInput] = useState<string>("");
   const [sessionIdError, setSessionIdError] = useState<string | null>(null);
   const seededRef = useRef(false);
+  const activity = useActivity();
 
   const years = useMemo(
     () => [...new Set(sessions.map((session) => session.year))].sort((a, b) => b - a),
@@ -104,6 +107,7 @@ export function useReplay(onSeeded: () => void) {
 
   useEffect(() => {
     let cancelled = false;
+    activity.set(ACTIVITY_IDS.replaySessions, ACTIVITY_MESSAGES.replaySessions);
     fetchReplaySessions()
       .then((list) => {
         if (cancelled) return;
@@ -121,21 +125,31 @@ export function useReplay(onSeeded: () => void) {
       })
       .finally(() => {
         if (!cancelled) setLoadingSessions(false);
+        activity.clear(ACTIVITY_IDS.replaySessions);
       });
     return () => {
       cancelled = true;
+      activity.clear(ACTIVITY_IDS.replaySessions);
     };
-  }, []);
+  }, [activity]);
+
+  useEffect(() => {
+    if (status === "downloading") {
+      activity.set(ACTIVITY_IDS.replayDownload, ACTIVITY_MESSAGES.replayDownload);
+    } else {
+      activity.clear(ACTIVITY_IDS.replayDownload);
+    }
+  }, [status, activity]);
 
   const active = status === "downloading" || status === "running" || status === "paused";
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || !replayId) return;
     let cancelled = false;
 
     const poll = async () => {
       try {
-        const next = await fetchReplayStatus();
+        const next = await fetchReplayStatus(replayId);
         if (cancelled) return;
         setStatus(next.status);
         setProgress({
@@ -166,7 +180,7 @@ export function useReplay(onSeeded: () => void) {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [active, onSeeded]);
+  }, [active, replayId, onSeeded]);
 
   const selectYear = useCallback(
     (nextYear: string) => {
@@ -185,13 +199,13 @@ export function useReplay(onSeeded: () => void) {
     (nextSpeed: number) => {
       const clamped = clampSpeed(nextSpeed);
       setSpeedState(clamped);
-      if (status === "running" || status === "paused") {
-        void setReplaySpeed(clamped)
+      if (replayId && (status === "running" || status === "paused")) {
+        void setReplaySpeed(replayId, clamped)
           .then((result) => setStatus(result.status))
           .catch(() => setError("Failed to change replay speed"));
       }
     },
-    [status],
+    [replayId, status],
   );
 
   const submitSessionId = useCallback(() => {
@@ -226,7 +240,8 @@ export function useReplay(onSeeded: () => void) {
     seededRef.current = false;
     setProgress(EMPTY_PROGRESS);
     try {
-      const next = await startReplay(key, Number(speed) || 10);
+      const next = await createReplay(key, Number(speed) || 10);
+      setReplayId(next.replay_id);
       setStatus(next.status);
     } catch (requestError) {
       setError(
@@ -238,10 +253,11 @@ export function useReplay(onSeeded: () => void) {
   }, [sessionKey, speed]);
 
   const pause = useCallback(async () => {
+    if (!replayId) return;
     setBusy(true);
     setError(null);
     try {
-      const next = await pauseReplay();
+      const next = await pauseReplay(replayId);
       setStatus(next.status);
     } catch (requestError) {
       setError(
@@ -250,13 +266,14 @@ export function useReplay(onSeeded: () => void) {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [replayId]);
 
   const resume = useCallback(async () => {
+    if (!replayId) return;
     setBusy(true);
     setError(null);
     try {
-      const next = await resumeReplay();
+      const next = await resumeReplay(replayId);
       setStatus(next.status);
     } catch (requestError) {
       setError(
@@ -265,15 +282,18 @@ export function useReplay(onSeeded: () => void) {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [replayId]);
 
   const stop = useCallback(async () => {
+    if (!replayId) return;
     setBusy(true);
     setError(null);
     seededRef.current = false;
     try {
-      const next = await stopReplay();
+      const next = await stopReplay(replayId);
       setStatus(next.status);
+      setReplayId(null);
+      setProgress(EMPTY_PROGRESS);
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "Failed to stop replay",
@@ -281,47 +301,55 @@ export function useReplay(onSeeded: () => void) {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [replayId]);
 
-  const seek = useCallback(async (time: number) => {
-    if (!Number.isFinite(time) || time < 0) {
-      setError("Pick a time to seek to");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    seededRef.current = false;
-    try {
-      const next = await seekReplay(time);
-      setStatus(next.status);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "Failed to seek replay",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  const seek = useCallback(
+    async (time: number) => {
+      if (!Number.isFinite(time) || time < 0) {
+        setError("Pick a time to seek to");
+        return;
+      }
+      if (!replayId) return;
+      setBusy(true);
+      setError(null);
+      seededRef.current = false;
+      try {
+        const next = await seekReplay(replayId, time);
+        setStatus(next.status);
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error ? requestError.message : "Failed to seek replay",
+        );
+      } finally {
+        setBusy(false);
+      }
+    },
+    [replayId],
+  );
 
-  const seekLap = useCallback(async (lap: number) => {
-    if (!Number.isInteger(lap) || lap < 1) {
-      setError("Pick a valid lap to seek to");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    seededRef.current = false;
-    try {
-      const next = await seekReplayLap(lap);
-      setStatus(next.status);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "Failed to seek replay",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  const seekLap = useCallback(
+    async (lap: number) => {
+      if (!Number.isInteger(lap) || lap < 1) {
+        setError("Pick a valid lap to seek to");
+        return;
+      }
+      if (!replayId) return;
+      setBusy(true);
+      setError(null);
+      seededRef.current = false;
+      try {
+        const next = await seekReplayLap(replayId, lap);
+        setStatus(next.status);
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error ? requestError.message : "Failed to seek replay",
+        );
+      } finally {
+        setBusy(false);
+      }
+    },
+    [replayId],
+  );
 
   return {
     sessions,
@@ -333,6 +361,7 @@ export function useReplay(onSeeded: () => void) {
     speed,
     setSpeed,
     status,
+    replayId,
     progress,
     busy,
     error,

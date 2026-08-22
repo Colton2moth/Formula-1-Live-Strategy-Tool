@@ -32,13 +32,20 @@ any live session has been ingested.
   "session_name": "Race",
   "session_status": "active",
   "current_lap": 25,
-  "total_laps": 70,
+  "total_laps": null,
   "track_temperature": 34.2,
   "air_temperature": 21.5,
   "rainfall": false,
   "race_control_status": "GREEN"
 }
 ```
+
+`total_laps` is the scheduled race distance when it is authoritatively
+known, and `null` when it is not. OpenF1's live session object does not carry
+a lap count, so the live endpoints return `null` rather than inventing a
+denominator. A completed replay that knows the final lap count from its
+prepared timeline returns a real number. The frontend shows `14` when the
+total is unknown and `14 / 72` when it is known.
 
 ### GET `/api/drivers`
 
@@ -67,7 +74,7 @@ Returns the current state of every driver.
 ]
 ```
 
-`x` / `y` are raw OpenF1/FastF1 track coordinates and `null` when the car has
+`x` / `y` are raw OpenF1 track coordinates and `null` when the car has
 no live telemetry.
 
 ### GET `/api/drivers/{driver_number}`
@@ -109,6 +116,12 @@ Three pit-window probabilities (3 / 5 / 7 laps) plus next-compound multiclass:
 available. `predicted_pit_window_start` / `predicted_pit_window_end` are a
 placeholder window for the strategy panel (not from a dedicated model yet).
 
+Live predictions are scored only from the current live session's features.
+When live inference cannot produce a prediction, the endpoint returns `[]`
+(and the single-driver endpoint returns `404`) rather than substituting a
+historical CSV snapshot. A historical snapshot is used only when the backend's
+opt-in `INFERENCE_CSV_FALLBACK` development flag is set.
+
 ### GET `/api/drivers/{driver_number}/prediction`
 
 Returns the latest prediction for one driver (same shape as one element of
@@ -131,34 +144,60 @@ The fields use the same schemas as `/api/session`, `/api/drivers`, and
 
 ### GET `/api/track`
 
-Returns track metadata and the points used to draw the circuit. The circuit is
-resolved from the live session's `circuit_key` against a static circuit
-library (see `src/formula1_strategy_tool/api/circuits.py`).
+Returns display-ready circuit geometry for the live session's `circuit_key`.
+The geometry is generated offline from cached OpenF1 location traces into a
+versioned layout (see `scripts/generate_track_reference_paths.py`).
 
 ```json
 {
-  "circuit_name": "Hungaroring",
-  "circuit_key": 4,
-  "start_finish": {"x": -1470.9, "y": -123.3},
-  "path": [
-    {"x": -1710.5, "y": 76.6},
-    {"x": -1950.7, "y": 275.8}
+  "circuit_name": "Silverstone Circuit",
+  "circuit_key": 2,
+  "rotation": 92.0,
+  "country_name": "United Kingdom",
+  "display_path": [
+    {"x": 67.3, "y": 64.8},
+    {"x": 66.9, "y": 64.5}
   ],
-  "pit_lane": null
+  "start_finish": {"x": 67.3, "y": 64.8, "angle_deg": -144.1},
+  "pit_lane": {
+    "path": [{"x": 66.0, "y": 63.0}],
+    "entry_progress": 0.91,
+    "exit_progress": 0.11
+  }
 }
 ```
 
-`path` is a closed loop in the raw FastF1 coordinate system (first point repeats
-last). This is the same coordinate space as OpenF1 `v1/location` `x`/`y` on
-`/api/drivers`, so the frontend applies one shared display transform to both.
-
-`pit_lane` is an optional pit-lane centreline in the same raw coordinate space,
-generated offline from historical location traces (see
-`scripts/generate_pit_lanes.py`). It is `null` for circuits without reviewed pit
-geometry, so the frontend must treat it as optional and only draw it when present.
+`display_path` is 1000 progress-aligned points already rotated, uniformly
+scaled, and centred for the SVG view — the frontend draws it directly with no
+runtime transform. `start_finish` is the marker position and angle in the same
+display space. `pit_lane` is optional and `null` for circuits without reviewed
+pit geometry; `entry_progress` / `exit_progress` are the pit entry/exit
+positions on the main loop (0.0–1.0).
 
 Returns `503` before any live session is ingested and `404` when the session's
-`circuit_key` is not yet in the circuit library.
+`circuit_key` has no generated layout.
+
+### GET `/api/tracks`
+
+Returns every generated circuit layout (display-ready), sorted by
+`circuit_key`, for the developer track-map preview page.
+
+```json
+[
+  {
+    "circuit_name": "Silverstone Circuit",
+    "circuit_key": 2,
+    "rotation": 92.0,
+    "country_name": "United Kingdom",
+    "display_path": [{"x": 67.3, "y": 64.8}],
+    "start_finish": {"x": 67.3, "y": 64.8, "angle_deg": -144.1},
+    "pit_lane": null
+  }
+]
+```
+
+Each entry uses the same `TrackState` schema as `/api/track`. Unlike
+`/api/track`, this endpoint does not require a live session.
 
 ### GET `/api/locations`
 
@@ -212,6 +251,10 @@ Connect to:
 Every event contains a `type` field. Events are pushed only when the relevant
 value changes.
 
+When OpenF1 moves to a new session, the backend resets its live buffer and
+closes `/ws/live` connections. Clients should treat the close as a normal
+reconnect and refetch `/api/race-state` to resync to the new session.
+
 ### Location update
 
 ```json
@@ -220,9 +263,16 @@ value changes.
   "driver_number": 4,
   "x": 1245,
   "y": -438,
+  "map_x": 45.2,
+  "map_y": 30.1,
   "timestamp": "2026-06-14T18:34:10Z"
 }
 ```
+
+`x` / `y` are the raw OpenF1 coordinates (kept for debugging). `map_x` /
+`map_y` are the projected display positions the frontend should use to place
+the marker; they are `null` when the sample cannot be projected onto the
+circuit, so the frontend should hold or hide the marker.
 
 ### Driver state update
 

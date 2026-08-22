@@ -1,0 +1,119 @@
+.track-previews {
+  @apply mx-auto grid w-full max-w-[90rem] gap-6;
+}
+
+.track-previews-heading {
+  @apply text-2xl font-black uppercase text-white;
+}
+
+.track-previews-grid {
+  @apply grid gap-4;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+}
+
+.track-preview-card {
+  @apply grid gap-3 border border-app-line bg-app-panel p-4;
+  min-width: 0;
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-surface);
+}
+
+.track-preview-header {
+  @apply flex items-start justify-between gap-3;
+}
+
+.track-preview-title {
+  @apply grid min-w-0 gap-0.5;
+}
+
+.track-preview-name {
+  @apply truncate text-sm font-bold uppercase tracking-wide text-app-text;
+}
+
+.track-preview-country {
+  @apply truncate text-xs font-semibold text-app-muted;
+}
+
+.track-preview-key {
+  @apply shrink-0 text-xs font-semibold text-app-muted;
+}
+
+.track-preview-frame {
+  @apply aspect-[4/3] overflow-hidden bg-app-panelAlt p-3;
+  border-radius: 0.375rem;
+}
+
+.track-preview-svg {
+  @apply h-full w-full;
+}
+
+.track-preview-road {
+  fill: none;
+  stroke: var(--color-track-surface);
+  stroke-width: 0.08rem;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.track-preview-pit-lane {
+  fill: none;
+  stroke: var(--color-f1-red);
+  stroke-width: 0.055rem;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 1;
+}
+
+.track-preview-start-finish-line {
+  stroke: var(--color-f1-red);
+  stroke-width: 0.046875rem;
+  stroke-linecap: square;
+}
+
+.track-preview-start-finish-square {
+  shape-rendering: crispEdges;
+}
+
+.track-preview-start-finish-square--light {
+  fill: white;
+}
+
+.track-preview-start-finish-square--dark {
+  fill: var(--color-bg);
+}
+
+.track-preview-statuses {
+  @apply flex flex-wrap items-center gap-2;
+}
+
+.track-preview-pit {
+  @apply inline-flex items-center border px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide;
+  border-radius: var(--radius-control);
+}
+
+.track-preview-pit--available {
+  @apply border-emerald-500 text-emerald-200;
+}
+
+.track-preview-pit--missing {
+  @apply border-amber-300 text-amber-200;
+}
+
+.track-preview-pit--invalid {
+  @apply border-app-red text-white;
+}
+
+.track-preview-note {
+  @apply text-[0.6875rem] font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.track-preview-unavailable {
+  @apply flex aspect-[4/3] items-center justify-center border border-app-line bg-app-panelAlt px-4 text-center text-sm font-semibold text-app-muted;
+  border-radius: 0.375rem;
+}
+
+@media (max-width: 48rem) {
+  .track-previews-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

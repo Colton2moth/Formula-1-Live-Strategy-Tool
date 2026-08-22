@@ -45,7 +45,10 @@ staying memory-friendly.
 Windows already on disk are reused and not re-downloaded. A window that 404s
 (cars parked, red flag, race ended early) leaves a gap, but location is
 optional polish: a missing window does **not** block timeline/checkpoint
-preparation, and a replay can still become `ready` without it.
+preparation. A trailing gap at the very end of the session (only the last
+windows missing) is harmless end-of-race truncation and keeps a replay
+`ready`. A gap in the middle, where location data disappears and later
+resumes, makes the replay `partial` (playable, but the map is incomplete).
 
 ## Preparing races
 
@@ -82,11 +85,26 @@ rest; failures are appended to the failure log and the run continues.
 
 Readiness describes whether a race has everything needed to play:
 
-- `ready` — the prepared timeline and checkpoint/index data are available.
-- `not_ready` — the required replay artifacts (timeline + checkpoints) do not
-  yet exist and no recorded blocking failure exists.
-- `failed` — not ready and a preparation failure has been recorded.
+- `ready` — playable. The prepared timeline and checkpoint/index data load,
+  and location data is complete or only has a harmless trailing gap at the end
+  of the session.
+- `partial` — playable, but location has an internal gap (map data disappears
+  and then resumes) or is entirely absent. The replay works; the map is
+  incomplete.
+- `cancelled` — the race never took place, so there is no replay.
+- `not_ready` — the race has not been prepared yet and no blocking failure has
+  been recorded.
+- `failed` — preparation cannot produce a usable replay: a required/core
+  endpoint is unavailable and no valid timeline/checkpoints could be built.
 - `unknown` — readiness could not be determined (defensive fallback).
+
+Location is optional polish: core timing/race data determines whether the
+replay itself can function, and a missing location window never blocks
+preparation. Only a genuine internal location gap downgrades a playable replay
+from `ready` to `partial`; a trailing end-of-race gap stays `ready`.
+
+Cancelled races are marked explicitly (not inferred from 404s) because some
+legitimate historical races also have incomplete endpoint coverage.
 
 `not_ready` does **not** mean a background preparation process is running. It
 is the state for a race that has simply not been prepared yet. There is no
@@ -95,7 +113,9 @@ is not used as a readiness state. Prepare races manually with the
 `cache_replays` command above.
 
 A race with a recorded failure can still become `ready`: successful
-timeline/checkpoint preparation takes precedence when readiness is calculated.
+timeline/checkpoint preparation takes precedence when readiness is calculated,
+and a stale failure log entry for a location window never overrides the
+current cache contents.
 
 ## Failure history
 

@@ -55,7 +55,7 @@ export function ReplayProgress({ progress, onSeek, onSeekLap, canSeek }: ReplayP
   };
 
   return (
-    <Panel label="Replay Progress" className="replay-progress-panel">
+    <Panel label="Replay Progress" className="replay-progress-panel" icon="timeline">
       <div className="replay-progress-body">
         <input
           type="range"

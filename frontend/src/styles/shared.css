@@ -5,7 +5,7 @@
 .dashboard-container {
   @apply mx-auto grid max-w-[90rem] gap-4;
   min-width: 0;
-  padding-top: 5.5rem;
+  padding-top: var(--header-offset);
   width: 100%;
 }
 
@@ -17,7 +17,9 @@
 }
 
 .dashboard-brand-title {
-  @apply text-3xl font-black uppercase tracking-[0.12em] text-white;
+  @apply text-[2rem] font-black italic uppercase tracking-[0.12em] text-white;
+  font-family: var(--font-brand);
+  font-weight: 800;
 }
 
 .dashboard-brand-subtitle {
@@ -77,7 +79,7 @@
 }
 
 .dashboard-layout {
-  @apply grid grid-cols-[1.6fr_1.55fr] gap-4;
+  @apply grid grid-cols-[1.55fr_1.6fr] gap-4;
   min-width: 0;
 }
 
@@ -120,19 +122,57 @@
 
 .panel-header {
   @apply flex items-center justify-between gap-3 border-b border-app-line px-4 py-3;
+  height: 3rem;
 }
 
 .panel-title {
-  @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
+  @apply flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.panel-title-icon {
+  @apply text-[1.125rem] leading-none;
 }
 
 .status-chip {
-  @apply inline-flex items-center border px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide;
+  @apply inline-flex items-center gap-1.5 px-2 py-1 text-[.75rem] font-semibold uppercase tracking-wide;
   border-radius: var(--radius-control);
+  border: .1rem solid;
   transition:
     border-color var(--motion-duration-fast) var(--motion-easing-standard),
     color var(--motion-duration-fast) var(--motion-easing-standard),
     background-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.status-chip-dot {
+  @apply h-1.5 w-1.5 rounded-full;
+}
+
+.status-chip-dot--green {
+  @apply bg-emerald-500;
+  animation: status-dot-pulse 1.8s ease-in-out infinite;
+}
+
+.status-chip-dot--amber {
+  @apply bg-amber-300;
+  animation: status-dot-pulse 1.8s ease-in-out infinite;
+}
+
+.status-chip-dot--red {
+  @apply bg-app-red;
+}
+
+.status-chip-dot--neutral {
+  @apply bg-app-muted;
+}
+
+@keyframes status-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .status-chip--neutral {
@@ -198,6 +238,10 @@
 }
 
 @media (max-width: 48rem) {
+  :root {
+    --header-offset: 4.5rem;
+  }
+
   .dashboard-shell {
     @apply px-3 py-3;
   }
@@ -206,10 +250,6 @@
   .dashboard-layout,
   .dashboard-stack {
     @apply gap-3;
-  }
-
-  .dashboard-container {
-    padding-top: 4.5rem;
   }
 
   .dashboard-brand {

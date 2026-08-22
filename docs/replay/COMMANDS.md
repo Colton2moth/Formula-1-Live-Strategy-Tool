@@ -74,7 +74,7 @@ your OpenF1 API limits allow it.
 ```
 
 Use when: you need the API up so the `Invoke-RestMethod` commands below (and
-the Replay page) work. Start it without `REPLAY_SESSION_KEY` to drive replay
+the Replay page) work. Live ingestion and replay run side by side; drive replay
 from the page or the control endpoints below.
 
 ## Inspect race readiness
@@ -97,8 +97,11 @@ Invoke-RestMethod http://127.0.0.1:8000/api/replay/sessions |
   Format-Table year, country_name, session_key, readiness
 ```
 
-Use when: you want a short list of what still needs to be prepared. See
-[CACHE.md](./CACHE.md#readiness-states) for what each state means.
+Use when: you want a short list of everything that is not a clean `ready` —
+including `partial` (playable but incomplete map data), `cancelled` (never
+ran), `not_ready` (not yet prepared), and `failed` (blocking preparation
+failure). See [CACHE.md](./CACHE.md#readiness-states) for what each state
+means.
 
 ## Inspect replay status
 

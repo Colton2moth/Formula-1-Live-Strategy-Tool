@@ -6,6 +6,7 @@ import { StatusChip } from "../../components/StatusChip";
 type RaceHeaderProps = {
   session: ApiSession;
   connectionStatus: LiveSocketStatus;
+  stale?: boolean;
 };
 
 const LIVE_STATUS_TONES: Record<LiveSocketStatus, "green" | "amber" | "red" | "neutral"> = {
@@ -40,15 +41,19 @@ const raceControlStates: Record<string, { label: string; tone: FlagTone }> = {
   "SESSION ABORTED": { label: "Aborted", tone: "red" },
 };
 
-export function RaceHeader({ session, connectionStatus }: RaceHeaderProps) {
+export function RaceHeader({ session, connectionStatus, stale = false }: RaceHeaderProps) {
   const raceControl = getRaceControlState(session.race_control_status);
   const weatherIcon = session.rainfall ? "rainy" : "clear_day";
 
   return (
     <Panel
       label="Race conditions"
+      icon="sports_motorsports"
       headerContent={
-        <StatusChip label={LIVE_STATUS_LABELS[connectionStatus]} tone={LIVE_STATUS_TONES[connectionStatus]} />
+        <div className="flex items-center gap-2">
+          <StatusChip label={LIVE_STATUS_LABELS[connectionStatus]} tone={LIVE_STATUS_TONES[connectionStatus]} />
+          {stale ? <StatusChip label="Stale" tone="amber" /> : null}
+        </div>
       }
     >
       <div className="p-3">
@@ -56,7 +61,7 @@ export function RaceHeader({ session, connectionStatus }: RaceHeaderProps) {
         <div className="race-header-stat">
           <span className="race-header-stat-label">Flag</span>
           <span className="race-header-stat-reading">
-            <span className="material-symbols-rounded race-header-stat-icon" aria-hidden="true">
+            <span className={`material-symbols-rounded race-header-stat-icon race-header-stat-icon--${raceControl.tone}`} aria-hidden="true">
               flag
             </span>
             <span className={`race-header-stat-value race-header-stat-value--${raceControl.tone}`}>
@@ -71,14 +76,16 @@ export function RaceHeader({ session, connectionStatus }: RaceHeaderProps) {
               laps
             </span>
             <span className="race-header-stat-value race-header-stat-value--numeric">
-              {session.current_lap} / {session.total_laps}
+              {session.total_laps != null
+                ? `${session.current_lap} / ${session.total_laps}`
+                : session.current_lap}
             </span>
           </span>
         </div>
         <div className="race-header-stat">
           <span className="race-header-stat-label">Track status</span>
           <span className="race-header-stat-reading">
-            <span className="material-symbols-rounded race-header-stat-icon" aria-hidden="true">
+            <span className={`material-symbols-rounded race-header-stat-icon ${session.rainfall ? "race-header-stat-icon--rain" : "race-header-stat-icon--dry"}`} aria-hidden="true">
               {weatherIcon}
             </span>
             <span className="race-header-stat-value">{session.rainfall ? "Wet" : "Dry"}</span>

@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { stopReplay } from "../../api/replay";
+import { ActivityToastStack } from "../../components/ActivityToastStack";
 import { BrandBar } from "../../components/BrandBar";
 import { Footer } from "../../components/Footer";
 import { Panel } from "../../components/Panel";
 import { RaceDashboard } from "../dashboard/RaceDashboard";
 import { useRaceData } from "../dashboard/useRaceData";
+import { replaySourceFor } from "../../hooks/useLiveState";
 import { ReplayControls } from "./ReplayControls";
 import { ReplayProgress } from "./ReplayProgress";
 import { grandPrixName, useReplay } from "./useReplay";
@@ -13,21 +15,22 @@ export function ReplayPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const onSeeded = useCallback(() => setReloadKey((key) => key + 1), []);
   const replay = useReplay(onSeeded);
-  const { raceState, track, error } = useRaceData(reloadKey);
 
-  const activeRef = useRef(false);
+  const source = useMemo(
+    () => (replay.replayId ? replaySourceFor(replay.replayId) : null),
+    [replay.replayId],
+  );
+  const { raceState, track, trackStatus, raceStateStatus, raceStateError } = useRaceData(reloadKey, source, false);
+
+  const replayIdRef = useRef<string | null>(null);
   useEffect(() => {
-    activeRef.current =
-      replay.status === "downloading" ||
-      replay.status === "running" ||
-      replay.status === "paused" ||
-      replay.status === "finished";
-  }, [replay.status]);
+    replayIdRef.current = replay.replayId;
+  }, [replay.replayId]);
 
   useEffect(() => {
     return () => {
-      if (activeRef.current) {
-        void stopReplay();
+      if (replayIdRef.current) {
+        void stopReplay(replayIdRef.current);
       }
     };
   }, []);
@@ -46,6 +49,7 @@ export function ReplayPage() {
     <main className="dashboard-shell">
       <div className="dashboard-container">
         <BrandBar replayMode />
+        <ActivityToastStack />
         <div className="replay-banner" role="status">
           {banner}
         </div>
@@ -56,17 +60,19 @@ export function ReplayPage() {
           onSeekLap={replay.seekLap}
           canSeek={canSeek}
         />
-        {error ? (
-          <Panel label="Race data">
+        {raceStateStatus === "error" && !raceState ? (
+          <Panel label="Race data" icon="database">
             <div className="p-4">
               <div className="text-base font-black uppercase tracking-wide text-white">
                 Unable to load race data
               </div>
-              <div className="mt-1 text-sm font-medium leading-6 text-app-muted">{error}</div>
+              <div className="mt-1 text-sm font-medium leading-6 text-app-muted">
+                {raceStateError?.message}
+              </div>
             </div>
           </Panel>
-        ) : !raceState || !track ? (
-          <Panel label="Race data">
+        ) : !raceState || !source ? (
+          <Panel label="Race data" icon="database">
             <div className="p-4">
               <div className="text-base font-black uppercase tracking-wide text-white">
                 Loading race data
@@ -77,7 +83,7 @@ export function ReplayPage() {
             </div>
           </Panel>
         ) : (
-          <RaceDashboard raceState={raceState} track={track} />
+          <RaceDashboard raceState={raceState} track={track} trackStatus={trackStatus} source={source} />
         )}
       </div>
       <Footer />

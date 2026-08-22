@@ -291,3 +291,73 @@
 2026-08-16T00:04:54.223083+00:00 | 11334 | 2026 Belgium | location window 0023 missing
 2026-08-16T00:05:06.942653+00:00 | 11342 | 2026 Hungary | location window 0022 missing
 2026-08-16T00:05:06.942653+00:00 | 11342 | 2026 Hungary | location window 0023 missing
+2026-08-17T06:15:45.055582+00:00 | 7953 | 2023 Bahrain | download: Failed GET pit with {'session_key': 7953} (HTTP 404: '{"detail":"No results found."}')
+2026-08-17T06:17:04.719198+00:00 | 7779 | 2023 Saudi Arabia | download: Failed GET pit with {'session_key': 7779} (HTTP 404: '{"detail":"No results found."}')
+2026-08-17T06:18:22.665905+00:00 | 7787 | 2023 Australia | download: Failed GET pit with {'session_key': 7787} (HTTP 404: '{"detail":"No results found."}')
+2026-08-17T06:19:39.987995+00:00 | 9070 | 2023 Azerbaijan | download: Failed GET pit with {'session_key': 9070} (HTTP 404: '{"detail":"No results found."}')
+2026-08-17T06:21:00.948572+00:00 | 9078 | 2023 United States | download: Failed GET pit with {'session_key': 9078} (HTTP 404: '{"detail":"No results found."}')
+2026-08-17T06:22:14.472557+00:00 | 9086 | 2023 Italy | download: Failed GET drivers with {'session_key': 9086} (HTTP 404: '{"detail":"No results found."}')
+2026-08-17T06:23:32.840560+00:00 | 9094 | 2023 Monaco | download: Failed GET pit with {'session_key': 9094} (HTTP 404: '{"detail":"No results found."}')
+2026-08-17T06:32:34.339459+00:00 | 9141 | 2023 Belgium | location window 0018 missing
+2026-08-17T06:39:48.528178+00:00 | 9173 | 2023 Japan | location window 0020 missing
+2026-08-17T06:43:57.280525+00:00 | 9213 | 2023 United States | location window 0021 missing
+2026-08-17T06:48:37.832941+00:00 | 9205 | 2023 Brazil | location window 0025 missing
+2026-08-17T06:53:49.697712+00:00 | 9472 | 2024 Bahrain | location window 0020 missing
+2026-08-17T06:56:20.753941+00:00 | 9480 | 2024 Saudi Arabia | location window 0018 missing
+2026-08-17T06:58:46.167392+00:00 | 9488 | 2024 Australia | location window 0018 missing
+2026-08-17T07:03:16.730777+00:00 | 9673 | 2024 China | location window 0022 missing
+2026-08-17T07:06:08.913446+00:00 | 9507 | 2024 United States | location window 0020 missing
+2026-08-17T07:08:30.363505+00:00 | 9515 | 2024 Italy | location window 0019 missing
+2026-08-17T07:11:19.474413+00:00 | 9523 | 2024 Monaco | location window 0030 missing
+2026-08-17T07:19:19.654494+00:00 | 9566 | 2024 Hungary | location window 0021 missing
+2026-08-17T07:21:37.960431+00:00 | 9574 | 2024 Belgium | location window 0018 missing
+2026-08-17T07:24:06.411800+00:00 | 9582 | 2024 Netherlands | location window 0020 missing
+2026-08-17T07:29:17.933260+00:00 | 9606 | 2024 Singapore | location window 0022 missing
+2026-08-17T07:31:55.013612+00:00 | 9617 | 2024 United States | location window 0021 missing
+2026-08-17T07:34:24.911148+00:00 | 9625 | 2024 Mexico | location window 0022 missing
+2026-08-17T07:37:38.472108+00:00 | 9636 | 2024 Brazil | location window 0030 missing
+2026-08-17T07:41:31.647961+00:00 | 9655 | 2024 Qatar | location window 0020 missing
+2026-08-17T07:44:05.157680+00:00 | 9693 | 2025 Australia | location window 0025 missing
+2026-08-17T07:45:18.227887+00:00 | 9998 | 2025 China | location window 0020 missing
+2026-08-17T07:46:30.269677+00:00 | 10006 | 2025 Japan | location window 0018 missing
+2026-08-17T07:47:49.492292+00:00 | 10022 | 2025 Saudi Arabia | location window 0018 missing
+2026-08-17T07:49:08.349636+00:00 | 9987 | 2025 Italy | location window 0020 missing
+2026-08-17T07:50:28.284102+00:00 | 9971 | 2025 Spain | location window 0020 missing
+2026-08-17T07:51:51.261108+00:00 | 9947 | 2025 United Kingdom | location window 0021 missing
+2026-08-17T07:53:28.825859+00:00 | 9939 | 2025 Belgium | location window 0034 missing
+2026-08-17T07:55:08.018087+00:00 | 9896 | 2025 Singapore | location window 0022 missing
+2026-08-17T07:56:35.307872+00:00 | 9869 | 2025 Brazil | location window 0020 missing
+2026-08-17T07:57:46.204440+00:00 | 9858 | 2025 United States | location window 0018 missing
+2026-08-17T07:59:12.293343+00:00 | 11234 | 2026 Australia | location window 0018 missing
+2026-08-17T08:00:24.629435+00:00 | 11245 | 2026 China | location window 0020 missing
+2026-08-17T08:01:39.016404+00:00 | 11261 | 2026 Bahrain | download: Failed GET laps with {'session_key': 11261} (HTTP 404: '{"detail":"No results found."}')
+2026-08-17T08:02:45.948923+00:00 | 11269 | 2026 Saudi Arabia | download: Failed GET laps with {'session_key': 11269} (HTTP 404: '{"detail":"No results found."}')
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0002 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0003 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0004 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0005 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0006 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0007 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0008 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0009 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0010 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0013 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0014 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0015 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0016 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0017 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0018 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0019 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0020 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0021 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0022 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0023 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0024 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0025 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0026 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0027 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0028 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0029 missing
+2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0030 missing
+2026-08-17T08:35:11.183924+00:00 | 11315 | 2026 Austria | location window 0019 missing
+2026-08-17T08:36:30.394969+00:00 | 11334 | 2026 Belgium | location window 0019 missing

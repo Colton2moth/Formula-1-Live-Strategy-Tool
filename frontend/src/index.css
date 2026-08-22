@@ -2,8 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "Eurostile Extended Black Italic";
+  src: url("./assets/fonts/eurostile-black-italic.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 900;
+  font-display: swap;
+}
+
 :root {
   --font-app: "Manrope", sans-serif;
+  --font-brand: "Eurostile Extended Black Italic", "Manrope", sans-serif;
   --color-bg: #070707;
   --color-panel: #121212;
   --color-panel-alt: #1b1b1b;
@@ -22,6 +31,7 @@
   --motion-duration-standard: 220ms;
   --motion-duration-marker: 100ms;
   --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --header-offset: 5.5rem;
 }
 
 @property --leaderboard-row-base {

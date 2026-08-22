@@ -18,7 +18,9 @@ class SessionState(BaseModel):
     session_name: str
     session_status: str
     current_lap: int
-    total_laps: int
+    # null when the scheduled race distance is not authoritatively known yet
+    # (OpenF1's live session object does not carry a total-lap count).
+    total_laps: int | None = None
     track_temperature: float
     air_temperature: float
     rainfall: bool
@@ -105,23 +107,42 @@ class RaceStateSnapshot(BaseModel):
 
 
 class TrackPoint(BaseModel):
-    """One normalized coordinate on the circuit outline (0.0–1.0)."""
+    """One display-space coordinate (already rotated, scaled, and centred)."""
 
     x: float
     y: float
 
 
+class StartFinishState(BaseModel):
+    """Start/finish marker position and angle in display space."""
+
+    x: float
+    y: float
+    angle_deg: float
+
+
+class DisplayPitLane(BaseModel):
+    """Pit-lane centreline in display space plus entry/exit progress."""
+
+    path: list[TrackPoint]
+    entry_progress: float | None = None
+    exit_progress: float | None = None
+
+
 class TrackState(BaseModel):
-    """Circuit metadata and drawable path for the track map."""
+    """Display-ready circuit geometry for the track map."""
 
     circuit_name: str
     circuit_key: int
-    # FE map draws a start/finish marker; default to first path point if omitted.
-    start_finish: TrackPoint
-    path: list[TrackPoint]
-    # Optional pit-lane centreline in the same raw coordinate space as ``path``.
-    # Null when no reviewed pit geometry exists for the circuit.
-    pit_lane: list[TrackPoint] | None = None
+    # FastF1 circuit rotation in degrees, used to orient the raw coordinates.
+    rotation: float = 0.0
+    # Country/event identifier for the circuit; None when unknown.
+    country_name: str | None = None
+    # 1000 progress-aligned display points; draw directly, no runtime transform.
+    display_path: list[TrackPoint]
+    start_finish: StartFinishState
+    # Optional pit-lane centreline in the same display space; None when absent.
+    pit_lane: DisplayPitLane | None = None
 
 
 class LiveTopicStats(BaseModel):
@@ -142,15 +163,15 @@ class LiveStatus(BaseModel):
     topics: dict[str, LiveTopicStats]
 
 
-class ReplayStartRequest(BaseModel):
-    """Body for POST /api/replay/start. session_key falls back to env when omitted."""
+class ReplayCreateRequest(BaseModel):
+    """Body for POST /api/replays."""
 
-    session_key: int | None = None
+    session_key: int
     speed: float = Field(default=10.0, ge=0.25, le=100.0)
 
 
 class ReplaySeekRequest(BaseModel):
-    """Body for POST /api/replay/seek with one clock-time or lap target."""
+    """Body for POST /api/replays/{replay_id}/seek with one clock-time or lap target."""
 
     time: float | None = Field(default=None, ge=0)
     lap: int | None = Field(default=None, ge=1)
@@ -163,13 +184,13 @@ class ReplaySeekRequest(BaseModel):
 
 
 class ReplaySpeedRequest(BaseModel):
-    """Body for POST /api/replay/speed. Same valid range as start."""
+    """Body for POST /api/replays/{replay_id}/speed. Same valid range as create."""
 
     speed: float = Field(ge=0.25, le=100.0)
 
 
 class ReplayStatus(BaseModel):
-    """Runtime replay controller state returned by the /api/replay endpoints."""
+    """Runtime replay controller state returned by the /api/replays endpoints."""
 
     status: str  # idle | downloading | running | paused | finished | error
     running: bool
@@ -182,6 +203,12 @@ class ReplayStatus(BaseModel):
     total_laps: int | None = None
 
 
+class ReplayCreated(ReplayStatus):
+    """ReplayStatus plus the opaque replay_id returned by POST /api/replays."""
+
+    replay_id: str
+
+
 class ReplaySessionOption(BaseModel):
     """One completed Race session, for the year → country replay picker."""
 
@@ -191,5 +218,6 @@ class ReplaySessionOption(BaseModel):
     location: str | None = None
     circuit_short_name: str | None = None
     date_start: str | None = None
-    # Replay readiness: "ready" | "not_ready" | "failed" | "unknown".
+    # Replay readiness: "ready" | "partial" | "cancelled" | "not_ready" |
+    # "failed" | "unknown".
     readiness: str = "unknown"

@@ -75,54 +75,34 @@ def test_session_from_live_data():
     assert data["session_name"] == "Race"
 
 
-def test_track_resolves_hungaroring():
-    seed_hungarian_session()
+def seed_silverstone_session() -> None:
+    LIVE_STATE.update(
+        "v1/sessions",
+        {"circuit_key": 2, "circuit_short_name": "Silverstone", "session_name": "Race"},
+    )
+
+
+def test_track_returns_display_path_for_silverstone():
+    seed_silverstone_session()
     response = client.get("/api/track")
     assert response.status_code == 200
     data = response.json()
-    assert data["circuit_name"] == "Hungaroring"
-    assert data["circuit_key"] == 4
-    assert len(data["path"]) > 2
-    assert data["path"][0] == data["path"][-1]
+    assert data["circuit_key"] == 2
+    assert len(data["display_path"]) == 1000
+    assert data["start_finish"]["angle_deg"] is not None
 
 
-def test_track_404_unknown_circuit():
-    LIVE_STATE.update(
-        "v1/sessions", {"circuit_key": 999, "session_name": "Race"}
-    )
+def test_track_404_when_no_layout():
+    LIVE_STATE.update("v1/sessions", {"circuit_key": 999, "session_name": "Race"})
     response = client.get("/api/track")
     assert response.status_code == 404
 
 
-def seed_montreal_session() -> None:
-    LIVE_STATE.update(
-        "v1/sessions",
-        {"circuit_key": 23, "circuit_short_name": "Montreal", "session_name": "Race"},
-    )
-
-
-def test_track_includes_pit_lane_for_montreal():
-    seed_montreal_session()
-    response = client.get("/api/track")
+def test_tracks_lists_generated_layouts():
+    response = client.get("/api/tracks")
     assert response.status_code == 200
-    data = response.json()
-    assert data["circuit_key"] == 23
-    assert data["pit_lane"] is not None
-    assert len(data["pit_lane"]) > 2
-
-
-def seed_interlagos_session() -> None:
-    LIVE_STATE.update(
-        "v1/sessions",
-        {"circuit_key": 14, "circuit_short_name": "Interlagos", "session_name": "Race"},
-    )
-
-
-def test_track_no_pit_lane_for_interlagos():
-    seed_interlagos_session()
-    response = client.get("/api/track")
-    assert response.status_code == 200
-    assert response.json().get("pit_lane") is None
+    keys = {track["circuit_key"] for track in response.json()}
+    assert 2 in keys
 
 
 def test_replay_sessions_include_readiness(monkeypatch):
@@ -150,30 +130,60 @@ def test_replay_sessions_include_readiness(monkeypatch):
     assert response.json()[0]["readiness"] == "ready"
 
 
-def test_replay_speed_requires_active_replay():
-    response = client.post("/api/replay/speed", json={"speed": 50.0})
-    assert response.status_code == 409
+def test_replay_speed_requires_running_runtime(monkeypatch):
+    from formula1_strategy_tool.acquisition import replay as replay_mod
+    from formula1_strategy_tool.acquisition import replay_registry
+
+    monkeypatch.setattr(
+        replay_mod.ReplayController, "start", lambda self, *a, **k: None
+    )
+    runtime = replay_registry.registry.create(100, speed=10)
+    try:
+        response = client.post(
+            f"/api/replays/{runtime.replay_id}/speed", json={"speed": 50.0}
+        )
+        assert response.status_code == 409
+    finally:
+        replay_registry.registry.stop(runtime.replay_id)
 
 
 def test_replay_speed_validates_range():
-    response = client.post("/api/replay/speed", json={"speed": 0.1})
+    response = client.post("/api/replays/unknown/speed", json={"speed": 0.1})
     assert response.status_code == 422
 
 
 def test_replay_seek_accepts_exactly_one_lap_or_time(monkeypatch):
-    from formula1_strategy_tool.api import routes as routes_mod
+    from formula1_strategy_tool.acquisition import replay as replay_mod
+    from formula1_strategy_tool.acquisition import replay_registry
 
-    laps: list[int] = []
-    monkeypatch.setattr(routes_mod.replay_controller, "seek_lap", laps.append)
-
-    response = client.post("/api/replay/seek", json={"lap": 12})
-    assert response.status_code == 200
-    assert laps == [12]
-    assert client.post("/api/replay/seek", json={}).status_code == 422
-    assert (
-        client.post("/api/replay/seek", json={"lap": 12, "time": 50}).status_code
-        == 422
+    monkeypatch.setattr(
+        replay_mod.ReplayController, "start", lambda self, *a, **k: None
     )
+    runtime = replay_registry.registry.create(100, speed=10)
+    try:
+        laps: list[object] = []
+        monkeypatch.setattr(runtime.controller, "seek_lap", laps.append)
+
+        assert (
+            client.post(
+                f"/api/replays/{runtime.replay_id}/seek", json={"lap": 12}
+            ).status_code
+            == 200
+        )
+        assert laps == [12]
+        assert (
+            client.post(f"/api/replays/{runtime.replay_id}/seek", json={}).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                f"/api/replays/{runtime.replay_id}/seek",
+                json={"lap": 12, "time": 50},
+            ).status_code
+            == 422
+        )
+    finally:
+        replay_registry.registry.stop(runtime.replay_id)
 
 
 def test_locations_endpoint_compact_shape():

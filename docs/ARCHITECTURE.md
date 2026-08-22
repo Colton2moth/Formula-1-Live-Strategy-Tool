@@ -90,6 +90,16 @@ live messages
 
 Location data is used for the frontend map, not the strategy models.
 
+A session monitor polls OpenF1 every ~45 seconds for the current
+`session_key`. When it changes (e.g. Practice → Race), the backend stops the
+MQTT listener, bootstraps the new session over REST into a temporary staging
+`LiveState`, then atomically swaps it into the process-wide `LIVE_STATE`. On a
+failed bootstrap the old session is left completely intact and MQTT stays
+stopped until the next tick retries. On success it restarts MQTT, resets the
+WebSocket diff state, and closes live clients so they reconnect and resync —
+the process never needs a restart. Live predictions are scored only from the
+current session's features (no silent historical fallback).
+
 ## 5. Shared feature generation
 
 Historical training and live inference call the same feature-building code
@@ -115,5 +125,22 @@ The backend provides:
 - race data and track geometry for the frontend.
 
 The frontend communicates only with this backend.
+
+## 7. Track map
+
+Circuit geometry is generated offline from cached OpenF1 location traces into
+versioned layouts under `data/circuits/layouts/`:
+
+```text
+cached location traces
+→ 1,000-point raw reference path (OpenF1 coordinates)
+→ 1,000-point display path (rotated, scaled, centred)
+```
+
+The reference path is backend-internal: live/replay x/y are projected onto it
+to lap progress, then mapped to a display position. The frontend receives only
+the display path and projected `map_x`/`map_y` positions, so it never
+reconstructs geometry. See `scripts/generate_track_reference_paths.py` and
+`src/formula1_strategy_tool/track/`.
 
 [Back to Documentation](README.md)

@@ -7,8 +7,49 @@
   border-radius: 0.5rem;
 }
 
+.track-map-frame--unavailable {
+  @apply flex items-center justify-center;
+}
+
+.track-map-unavailable {
+  @apply flex flex-col items-center gap-2 text-center;
+}
+
+.track-map-unavailable-title {
+  @apply text-sm font-semibold uppercase tracking-widest text-app-muted;
+}
+
+.track-map-unavailable-copy {
+  @apply text-xs text-app-muted;
+}
+
 .track-map-svg {
-  @apply h-full w-full;
+  @apply relative h-full w-full;
+  z-index: 2;
+}
+
+.track-map-info {
+  @apply pointer-events-none absolute inset-0 flex flex-col items-center justify-start gap-1 px-6 text-center;
+  z-index: 1;
+  opacity: .3;
+}
+
+.track-map-info-name {
+  @apply uppercase tracking-widest text-app-text;
+  font-family: "Bebas Neue", var(--font-app);
+  max-width: 100%;
+  font-size: 2.5rem;
+  font-weight: 800;
+  overflow-wrap: break-word;
+}
+
+.track-map-info-country {
+  @apply uppercase tracking-widest text-app-text;
+  max-width: 100%;
+  font-size: 1rem;
+  margin-top: -1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .track-map-road {
@@ -21,12 +62,11 @@
 
 .track-map-pit-lane {
   fill: none;
-  stroke: var(--color-track-surface);
+  stroke: var(--color-f1-red);
   stroke-width: .05rem;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 0.35rem 0.3rem;
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .track-map-start-finish-line {

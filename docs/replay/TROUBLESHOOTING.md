@@ -44,8 +44,32 @@ after a successful re-run. Do not delete the log to force a state change.
 `location` is downloaded in 5-minute windows, and a window can be missing when
 OpenF1 returns nothing for it (cars parked, red flag, race ended early).
 Missing location windows are report-only: they do **not** prevent
-timeline/checkpoint preparation, and a replay can still become `ready` without
-them. The map simply has no samples for that stretch.
+timeline/checkpoint preparation. The map simply has no samples for that
+stretch.
+
+Whether a missing window affects readiness depends on where it is:
+
+- **Trailing gap** — only the final windows are missing (e.g. the session
+  ended before the last few windows). This is harmless end-of-race truncation
+  and the replay stays `ready`.
+- **Internal gap** — a window is missing before a later window exists, so map
+  data disappears and then resumes. The replay stays playable but becomes
+  `partial`, with the picker showing `Partial location data`.
+
+Readiness is calculated from the actual window files on disk, not from old
+`location window XXXX missing` lines in `cache_failures.txt`. A race with valid
+timeline/checkpoints and only a trailing gap stays `ready` even if an earlier
+run recorded those location 404s.
+
+## Cancelled races
+
+A handful of sessions never actually ran (for example 2023 Emilia-Romagna,
+which was cancelled due to flooding, and the cancelled 2026 Bahrain and Saudi
+Arabia races). These are marked `cancelled` explicitly, shown in the picker
+with a `(cancelled)` suffix and a muted `Cancelled` chip, and cannot be played.
+Cancellation is **not** inferred from a 404 on `drivers`, `laps`, `pit`, or any
+other endpoint, because some legitimate historical races have incomplete
+endpoint coverage.
 
 ## Verify a replay
 
@@ -55,8 +79,9 @@ them. The map simply has no samples for that stretch.
   2.1s/request); later runs start instantly.
 - The dashboard advances on its own: lap counter ticks up, cars move on the
   map, leaderboard/compound/tyre-age update, flags and weather change.
-- `GET /api/live-status` shows the topic counters filling;
-  `GET /api/race-state` returns the live snapshot.
+- `GET /api/replay/race-state` returns the replay snapshot and
+  `GET /api/replay/track` its circuit, while `GET /api/race-state` keeps
+  serving live data (replay never mixes into the live endpoints).
 
 ## Common status meanings
 
@@ -72,8 +97,9 @@ them. The map simply has no samples for that stretch.
 | `error`       | the replay worker exited with an error (see `error` field)   |
 
 Note: `downloading` here refers to the runtime download after pressing Play, not
-to bulk cache preparation. Readiness (`ready` / `not_ready` / `failed`) is a
-separate concept about whether the race has been prepared — see
+to bulk cache preparation. Readiness (`ready` / `partial` / `cancelled` /
+`not_ready` / `failed` / `unknown`) is a separate concept about whether the
+race has been prepared — see
 [CACHE.md](./CACHE.md#readiness-states).
 
 [Back to Replay overview](./README.md)

@@ -9,12 +9,19 @@ REST endpoints for the replay controller. See
 | ------ | --------------------- | ----------------------------------------- |
 | GET    | `/api/replay/status`  | controller state + replay progress        |
 | GET    | `/api/replay/sessions`| completed Race sessions (year + country + readiness) |
+| GET    | `/api/replay/race-state` | replay-owned bootstrap snapshot (session + drivers + predictions) |
+| GET    | `/api/replay/track`   | static circuit map for the replay session |
 | POST   | `/api/replay/start`   | start a replay (`{session_key, speed}`)   |
 | POST   | `/api/replay/pause`   | suspend the running replay clock          |
 | POST   | `/api/replay/resume`  | continue a paused replay                  |
 | POST   | `/api/replay/seek`    | jump by replay-clock `time` or completed `lap` |
 | POST   | `/api/replay/speed`   | change the active replay speed in place   |
-| POST   | `/api/replay/stop`    | stop the replay and restore live MQTT     |
+| POST   | `/api/replay/stop`    | stop the replay (live mode unaffected)    |
+
+The replay WebSocket is `GET /ws/replay`; it emits the same event types as
+`/ws/live` (`location_update`, `driver_update`, `weather_update`,
+`race_control_update`, `prediction_update`) but sourced from the replay
+controller's private state.
 
 ## Response shape
 
@@ -53,14 +60,27 @@ Returns a list where each entry has:
 | `location`          | string \| null   | location                       |
 | `circuit_short_name`| string \| null   | short circuit name             |
 | `date_start`        | string \| null   | session start (ISO-8601)       |
-| `readiness`         | string           | `ready` \| `not_ready` \| `failed` \| `unknown` |
+| `readiness`         | string           | `ready` \| `partial` \| `cancelled` \| `not_ready` \| `failed` \| `unknown` |
 
 Readiness is documented in [CACHE.md](./CACHE.md#readiness-states). Returns
 `503` when the OpenF1 session list cannot be fetched.
 
+## GET `/api/replay/race-state`
+
+Full replay bootstrap snapshot for the Replay page, sourced from the replay
+controller's private state (never `LIVE_STATE`). Same shape as the live
+`/api/race-state`: `{ session, drivers, predictions }`. Returns `409` when no
+replay has been started yet.
+
+## GET `/api/replay/track`
+
+Static circuit map for the replay session's `circuit_key`, sourced from the
+replay controller's state. Returns `409` when no replay has been started, and
+`404` when the circuit is unknown.
+
 ## POST `/api/replay/start`
 
-Start replaying a completed session through `LIVE_STATE`.
+Start replaying a completed session into the controller's own state.
 
 Request body:
 
@@ -72,7 +92,7 @@ Request body:
   `INFERENCE_SESSION_KEY`. Returns `400` if none are set.
 - `speed` — replay multiplier, `0.25`–`100`, default `10`.
 
-Starting a replay stops the live MQTT listener so live pushes cannot mix.
+Live ingestion (bootstrap + MQTT) is unaffected.
 
 ## POST `/api/replay/pause`
 
@@ -84,7 +104,7 @@ Continue a paused replay from where it left off.
 
 ## POST `/api/replay/stop`
 
-Stop the running replay and restore the live MQTT listener.
+Stop the running replay. Live ingestion is unaffected.
 
 ## POST `/api/replay/seek`
 

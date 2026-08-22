@@ -20,7 +20,17 @@ export type ReplayStatus = {
   total_laps: number | null;
 };
 
-export type ReplayReadiness = "ready" | "not_ready" | "failed" | "unknown";
+export type ReplayCreated = ReplayStatus & {
+  replay_id: string;
+};
+
+export type ReplayReadiness =
+  | "ready"
+  | "partial"
+  | "cancelled"
+  | "not_ready"
+  | "failed"
+  | "unknown";
 
 export type ReplaySessionOption = {
   session_key: number;
@@ -57,6 +67,13 @@ function assertReplayStatus(value: unknown): ReplayStatus {
   };
 }
 
+function assertReplayCreated(value: unknown): ReplayCreated {
+  if (!isRecord(value) || typeof value.replay_id !== "string") {
+    throw new Error("Replay create response did not match the expected shape.");
+  }
+  return { ...assertReplayStatus(value), replay_id: value.replay_id };
+}
+
 function assertReplaySessions(value: unknown): ReplaySessionOption[] {
   if (!Array.isArray(value)) {
     throw new Error("Replay sessions response did not match the expected shape.");
@@ -67,6 +84,8 @@ function assertReplaySessions(value: unknown): ReplaySessionOption[] {
     }
     const readiness =
       session.readiness === "ready" ||
+      session.readiness === "partial" ||
+      session.readiness === "cancelled" ||
       session.readiness === "not_ready" ||
       session.readiness === "failed"
         ? session.readiness
@@ -88,34 +107,34 @@ export function fetchReplaySessions() {
   return fetchJson("/api/replay/sessions", assertReplaySessions);
 }
 
-export function fetchReplayStatus() {
-  return fetchJson("/api/replay/status", assertReplayStatus);
+export function createReplay(sessionKey: number, speed: number) {
+  return postJson("/api/replays", { session_key: sessionKey, speed }, assertReplayCreated);
 }
 
-export function startReplay(sessionKey: number, speed: number) {
-  return postJson("/api/replay/start", { session_key: sessionKey, speed }, assertReplayStatus);
+export function fetchReplayStatus(replayId: string) {
+  return fetchJson(`/api/replays/${replayId}/status`, assertReplayStatus);
 }
 
-export function pauseReplay() {
-  return postJson("/api/replay/pause", {}, assertReplayStatus);
+export function pauseReplay(replayId: string) {
+  return postJson(`/api/replays/${replayId}/pause`, {}, assertReplayStatus);
 }
 
-export function seekReplay(time: number) {
-  return postJson("/api/replay/seek", { time }, assertReplayStatus);
+export function seekReplay(replayId: string, time: number) {
+  return postJson(`/api/replays/${replayId}/seek`, { time }, assertReplayStatus);
 }
 
-export function seekReplayLap(lap: number) {
-  return postJson("/api/replay/seek", { lap }, assertReplayStatus);
+export function seekReplayLap(replayId: string, lap: number) {
+  return postJson(`/api/replays/${replayId}/seek`, { lap }, assertReplayStatus);
 }
 
-export function setReplaySpeed(speed: number) {
-  return postJson("/api/replay/speed", { speed }, assertReplayStatus);
+export function setReplaySpeed(replayId: string, speed: number) {
+  return postJson(`/api/replays/${replayId}/speed`, { speed }, assertReplayStatus);
 }
 
-export function resumeReplay() {
-  return postJson("/api/replay/resume", {}, assertReplayStatus);
+export function resumeReplay(replayId: string) {
+  return postJson(`/api/replays/${replayId}/resume`, {}, assertReplayStatus);
 }
 
-export function stopReplay() {
-  return postJson("/api/replay/stop", {}, assertReplayStatus);
+export function stopReplay(replayId: string) {
+  return postJson(`/api/replays/${replayId}/stop`, {}, assertReplayStatus);
 }
