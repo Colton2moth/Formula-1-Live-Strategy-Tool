@@ -73,11 +73,18 @@ def _latest_weather(state: LiveState) -> dict[str, Any] | None:
     return max(rows, key=lambda r: str(r.get("date") or ""))
 
 
-def session_from_live(state: LiveState) -> SessionState | None:
+def session_from_live(
+    state: LiveState, total_laps: int | None = None
+) -> SessionState | None:
     """
     Map LIVE_STATE into SessionState.
 
     Returns None when v1/sessions has not been seeded yet.
+
+    ``total_laps`` is the authoritative scheduled/known race distance when a
+    caller has one (replay knows it from the prepared timeline). Live callers
+    pass nothing because OpenF1's live session object carries no lap count, so
+    the value stays null rather than inventing a denominator.
     """
     sessions = _docs(state, "v1/sessions")
     if not sessions:
@@ -99,8 +106,8 @@ def session_from_live(state: LiveState) -> SessionState | None:
     rainfall_raw = weather.get("rainfall") if weather else 0
     rainfall = bool(rainfall_raw) and rainfall_raw not in (0, "0", 0.0)
 
-    # total_laps is not on the session object — use current lap as a floor;
-    # FE can treat 0 as unknown. Race weekends often know this from elsewhere later.
+    # total_laps is not on the live session object, so it stays None unless a
+    # caller supplies an authoritative value (e.g. replay from its timeline).
     current = _current_lap(state)
 
     return SessionState(
@@ -112,7 +119,7 @@ def session_from_live(state: LiveState) -> SessionState | None:
         ),
         session_status=_session_status(session),
         current_lap=current,
-        total_laps=current,  # unknown true distance; avoid guessing a lap count
+        total_laps=total_laps,
         track_temperature=track_temp,
         air_temperature=air_temp,
         rainfall=rainfall,

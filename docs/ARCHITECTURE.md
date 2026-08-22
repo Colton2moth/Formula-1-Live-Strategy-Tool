@@ -90,6 +90,13 @@ live messages
 
 Location data is used for the frontend map, not the strategy models.
 
+A session monitor polls OpenF1 every ~45 seconds for the current
+`session_key`. When it changes (e.g. Practice → Race), the backend stops the
+MQTT listener, clears `LIVE_STATE`, re-bootstraps the new session over REST,
+restarts MQTT, resets the WebSocket diff state, and closes live clients so they
+reconnect and resync — the process never needs a restart. Live predictions are
+scored only from the current session's features (no silent historical fallback).
+
 ## 5. Shared feature generation
 
 Historical training and live inference call the same feature-building code

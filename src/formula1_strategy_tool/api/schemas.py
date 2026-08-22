@@ -18,7 +18,9 @@ class SessionState(BaseModel):
     session_name: str
     session_status: str
     current_lap: int
-    total_laps: int
+    # null when the scheduled race distance is not authoritatively known yet
+    # (OpenF1's live session object does not carry a total-lap count).
+    total_laps: int | None = None
     track_temperature: float
     air_temperature: float
     rainfall: bool
