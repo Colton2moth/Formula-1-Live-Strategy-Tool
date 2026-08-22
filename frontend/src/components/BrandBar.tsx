@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 type BrandBarProps = {
@@ -5,8 +6,31 @@ type BrandBarProps = {
 };
 
 export function BrandBar({ replayMode = false }: BrandBarProps) {
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const updateHeaderOffset = () => {
+      document.documentElement.style.setProperty(
+        "--header-offset",
+        `${header.getBoundingClientRect().height}px`,
+      );
+    };
+
+    updateHeaderOffset();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateHeaderOffset);
+    observer?.observe(header);
+
+    return () => {
+      observer?.disconnect();
+      document.documentElement.style.removeProperty("--header-offset");
+    };
+  }, []);
+
   return (
-    <div className="dashboard-brand">
+    <div ref={headerRef} className="dashboard-brand">
       <div role="heading" aria-level={1} className="dashboard-brand-title">
         PitPit
       </div>

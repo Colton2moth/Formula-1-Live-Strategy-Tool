@@ -17,8 +17,9 @@
 }
 
 .dashboard-brand-title {
-  @apply text-3xl font-black uppercase tracking-[0.12em] text-white;
+  @apply text-[2rem] font-black italic uppercase tracking-[0.12em] text-white;
   font-family: var(--font-brand);
+  font-weight: 800;
 }
 
 .dashboard-brand-subtitle {
