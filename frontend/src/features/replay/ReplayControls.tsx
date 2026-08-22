@@ -161,6 +161,7 @@ export function ReplayControls(replay: ReplayControlsProps) {
   return (
     <Panel
       label="Replay Control"
+      icon="replay"
       className="replay-panel"
       headerContent={
         <StatusChip label={STATUS_LABELS[status] ?? status} tone={STATUS_TONES[status] ?? "neutral"} />

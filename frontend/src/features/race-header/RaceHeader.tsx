@@ -48,6 +48,7 @@ export function RaceHeader({ session, connectionStatus, stale = false }: RaceHea
   return (
     <Panel
       label="Race conditions"
+      icon="sports_motorsports"
       headerContent={
         <div className="flex items-center gap-2">
           <StatusChip label={LIVE_STATUS_LABELS[connectionStatus]} tone={LIVE_STATUS_TONES[connectionStatus]} />

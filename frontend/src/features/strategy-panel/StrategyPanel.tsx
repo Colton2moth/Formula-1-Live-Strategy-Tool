@@ -30,6 +30,7 @@ export function StrategyPanel({ selectedDriver, prediction, stale = false }: Str
   return (
     <Panel
       label="AI strategy panel"
+      icon="psychology"
       headerContent={selectedDriver && prediction ? (
         <div className="strategy-freshness-row">
           <span className="strategy-freshness-label">Last Updated:</span>

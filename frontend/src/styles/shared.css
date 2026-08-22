@@ -18,6 +18,7 @@
 
 .dashboard-brand-title {
   @apply text-3xl font-black uppercase tracking-[0.12em] text-white;
+  font-family: var(--font-brand);
 }
 
 .dashboard-brand-subtitle {
@@ -123,7 +124,11 @@
 }
 
 .panel-title {
-  @apply text-xs font-semibold uppercase tracking-wide text-app-muted;
+  @apply flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted;
+}
+
+.panel-title-icon {
+  @apply text-[1.125rem] leading-none;
 }
 
 .status-chip {

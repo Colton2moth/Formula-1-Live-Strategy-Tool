@@ -22,7 +22,7 @@ export function TrackMap({ track, trackStatus, session, drivers, locations, sele
   const squares = track ? startFinishSquares(track.start_finish) : [];
 
   return (
-    <Panel label={label} className="track-map-panel">
+    <Panel label={label} className="track-map-panel" icon="map">
       {track ? (
         <div className="track-map-frame">
           <div className="track-map-info" aria-hidden="true">

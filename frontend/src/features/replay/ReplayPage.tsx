@@ -61,7 +61,7 @@ export function ReplayPage() {
           canSeek={canSeek}
         />
         {raceStateStatus === "error" && !raceState ? (
-          <Panel label="Race data">
+          <Panel label="Race data" icon="database">
             <div className="p-4">
               <div className="text-base font-black uppercase tracking-wide text-white">
                 Unable to load race data
@@ -72,7 +72,7 @@ export function ReplayPage() {
             </div>
           </Panel>
         ) : !raceState || !source ? (
-          <Panel label="Race data">
+          <Panel label="Race data" icon="database">
             <div className="p-4">
               <div className="text-base font-black uppercase tracking-wide text-white">
                 Loading race data
