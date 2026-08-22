@@ -4,9 +4,15 @@
 
 .leaderboard-table {
   @apply w-full;
-  border-spacing: 0 0.5rem;
+  border-collapse: separate;
+  border-spacing: 0 0.15rem;
 }
 
+.leaderboard-header-cell.leaderboard-col--accent,
+.leaderboard-cell.leaderboard-col--accent {
+  width: 0.3rem;
+  padding-inline: 0;
+}
 .leaderboard-col--pos { width: 2rem; }
 .leaderboard-col--driver { width: 6rem; }
 .leaderboard-col--team { width: 8rem; }
@@ -30,45 +36,16 @@
 
 .leaderboard-row {
   --team-accent-color: var(--color-f1-red);
-  --stripe-gap: 0rem;
-  --stripe-1-width: 3.4375rem;
-  --stripe-2-width: 1.375rem;
-  --stripe-3-width: 0.9375rem;
-  --stripe-4-width: 0.625rem;
-  --stripe-5-width: 0.5rem;
 
-  --stripe-1-start: 0rem;
-  --stripe-1-end: var(--stripe-1-width);
-  --stripe-2-start: calc(var(--stripe-1-end) + var(--stripe-gap));
-  --stripe-2-end: calc(var(--stripe-2-start) + var(--stripe-2-width));
-  --stripe-3-start: calc(var(--stripe-2-end) + var(--stripe-gap));
-  --stripe-3-end: calc(var(--stripe-3-start) + var(--stripe-3-width));
-  --stripe-4-start: calc(var(--stripe-3-end) + var(--stripe-gap));
-  --stripe-4-end: calc(var(--stripe-4-start) + var(--stripe-4-width));
-  --stripe-5-start: calc(var(--stripe-4-end) + var(--stripe-gap));
-  --stripe-5-end: calc(var(--stripe-5-start) + var(--stripe-5-width));
-
-  background-image:
-    linear-gradient(
-      30deg,
-      color-mix(in srgb, var(--team-accent-color) 50%, transparent) var(--stripe-1-start) var(--stripe-1-end),
-      transparent var(--stripe-1-end) var(--stripe-2-start),
-      color-mix(in srgb, var(--team-accent-color) 35%, transparent) var(--stripe-2-start) var(--stripe-2-end),
-      transparent var(--stripe-2-end) var(--stripe-3-start),
-      color-mix(in srgb, var(--team-accent-color) 20%, transparent) var(--stripe-3-start) var(--stripe-3-end),
-      transparent var(--stripe-3-end) var(--stripe-4-start),
-      color-mix(in srgb, var(--team-accent-color) 10%, transparent) var(--stripe-4-start) var(--stripe-4-end),
-      transparent var(--stripe-4-end) var(--stripe-5-start),
-      color-mix(in srgb, var(--team-accent-color) 5%, transparent) var(--stripe-5-start) var(--stripe-5-end),
-      transparent var(--stripe-5-end)
-    );
-  background-color: color-mix(in srgb, var(--team-accent-color) 10%, transparent);
-  box-shadow: var(--shadow-surface);
-  border-left: .2rem solid transparent;
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--team-accent-color) 50%, transparent) 0%,
+    color-mix(in srgb, var(--team-accent-color) 0%, transparent) 50%
+  );
+  background-color: color-mix(in srgb, var(--team-accent-color) 2%, transparent);
   cursor: pointer;
   transition:
     background-color var(--motion-duration-fast) var(--motion-easing-standard),
-    border-left-color var(--motion-duration-fast) var(--motion-easing-standard),
     box-shadow var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
@@ -79,8 +56,6 @@
 
 .leaderboard-row--selected {
   background-color: color-mix(in srgb, var(--team-accent-color) 30%, transparent);
-  border-left-color: var(--color-selection-blue);
-  box-shadow: var(--shadow-surface-hover);
 }
 
 .leaderboard-row--selected:hover {
@@ -94,15 +69,19 @@
 
 .leaderboard-row .leaderboard-cell {
   background: transparent;
-  border-block: 0.0625rem solid color-mix(in srgb, var(--color-line) 58%, transparent);
+  border-block: 0.05rem solid color-mix(in srgb, var(--team-accent-color) 20%, transparent);
+}
+
+.leaderboard-row .leaderboard-cell.leaderboard-col--accent {
+  background: var(--team-accent-color);
 }
 
 .leaderboard-row .leaderboard-cell:first-child {
-  border-left: 0.0625rem solid color-mix(in srgb, var(--color-line) 58%, transparent);
+  padding: 0;
 }
 
 .leaderboard-row .leaderboard-cell:last-child {
-  border-right: 0.0625rem solid color-mix(in srgb, var(--color-line) 58%, transparent);
+  border-right: 0.06rem solid color-mix(in srgb, var(--team-accent-color) 20%, transparent);
 }
 
 .leaderboard-position {
@@ -114,7 +93,8 @@
 }
 
 .leaderboard-driver-first-name {
-  @apply text-[0.6875rem] font-medium leading-none text-app-muted;
+  @apply text-[.8rem] leading-none;
+  font-weight: 500;
 }
 
 .leaderboard-driver-last-name {

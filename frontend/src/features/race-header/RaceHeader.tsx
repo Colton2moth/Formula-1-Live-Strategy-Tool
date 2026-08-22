@@ -61,7 +61,7 @@ export function RaceHeader({ session, connectionStatus, stale = false }: RaceHea
         <div className="race-header-stat">
           <span className="race-header-stat-label">Flag</span>
           <span className="race-header-stat-reading">
-            <span className="material-symbols-rounded race-header-stat-icon" aria-hidden="true">
+            <span className={`material-symbols-rounded race-header-stat-icon race-header-stat-icon--${raceControl.tone}`} aria-hidden="true">
               flag
             </span>
             <span className={`race-header-stat-value race-header-stat-value--${raceControl.tone}`}>
@@ -83,7 +83,7 @@ export function RaceHeader({ session, connectionStatus, stale = false }: RaceHea
         <div className="race-header-stat">
           <span className="race-header-stat-label">Track status</span>
           <span className="race-header-stat-reading">
-            <span className="material-symbols-rounded race-header-stat-icon" aria-hidden="true">
+            <span className={`material-symbols-rounded race-header-stat-icon ${session.rainfall ? "race-header-stat-icon--rain" : "race-header-stat-icon--dry"}`} aria-hidden="true">
               {weatherIcon}
             </span>
             <span className="race-header-stat-value">{session.rainfall ? "Wet" : "Dry"}</span>

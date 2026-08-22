@@ -32,6 +32,10 @@ export const TestIndex: FC = () => {
               <span>UI State Workbench</span>
               <span className="test-index-link-code">/test/states</span>
             </Link>
+            <Link to="/test/live" className="test-index-link">
+              <span>Live State Workbench</span>
+              <span className="test-index-link-code">/test/live</span>
+            </Link>
           </div>
           <div className="test-index-subgroup-title">Loading states</div>
           <div className="test-index-links">

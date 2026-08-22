@@ -121,6 +121,7 @@
 
 .panel-header {
   @apply flex items-center justify-between gap-3 border-b border-app-line px-4 py-3;
+  height: 3rem;
 }
 
 .panel-title {
@@ -132,12 +133,45 @@
 }
 
 .status-chip {
-  @apply inline-flex items-center border px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide;
+  @apply inline-flex items-center gap-1.5 px-2 py-1 text-[.75rem] font-semibold uppercase tracking-wide;
   border-radius: var(--radius-control);
+  border: .1rem solid;
   transition:
     border-color var(--motion-duration-fast) var(--motion-easing-standard),
     color var(--motion-duration-fast) var(--motion-easing-standard),
     background-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.status-chip-dot {
+  @apply h-1.5 w-1.5 rounded-full;
+}
+
+.status-chip-dot--green {
+  @apply bg-emerald-500;
+  animation: status-dot-pulse 1.8s ease-in-out infinite;
+}
+
+.status-chip-dot--amber {
+  @apply bg-amber-300;
+  animation: status-dot-pulse 1.8s ease-in-out infinite;
+}
+
+.status-chip-dot--red {
+  @apply bg-app-red;
+}
+
+.status-chip-dot--neutral {
+  @apply bg-app-muted;
+}
+
+@keyframes status-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .status-chip--neutral {

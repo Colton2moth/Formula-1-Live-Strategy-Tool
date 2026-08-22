@@ -46,6 +46,7 @@ export function Leaderboard({ drivers, selectedDriver, onSelectDriver }: Leaderb
         <table className="leaderboard-table">
           <thead>
             <tr className="leaderboard-header-row">
+              <th className="leaderboard-header-cell leaderboard-col--accent" aria-hidden="true" />
               {leaderboardColumnLabels.map((label) => (
                 <th key={label} className={`leaderboard-header-cell leaderboard-col--${leaderboardColumnSlug[label]} ${label === "Gap / Interval" ? "leaderboard-timing-header" : ""}`}><span className="leaderboard-header-text">{label}</span></th>
               ))}
@@ -79,6 +80,7 @@ export function Leaderboard({ drivers, selectedDriver, onSelectDriver }: Leaderb
                   }}
                   style={rowStyle}
                 >
+                  <td className="leaderboard-cell leaderboard-col--accent" aria-hidden="true" />
                   <td className="leaderboard-cell leaderboard-col--pos"><span className="leaderboard-position">{driver.position}</span></td>
                   <td className="leaderboard-cell leaderboard-col--driver"><span className="leaderboard-driver-name">{firstName ? <span className="leaderboard-driver-first-name">{firstName}</span> : null}<span className="leaderboard-driver-last-name">{lastName.toUpperCase()}</span></span></td>
                   <td className="leaderboard-cell leaderboard-col--team"><span className="leaderboard-team-dot" /><span className="leaderboard-team-name">{driver.team_name}</span></td>

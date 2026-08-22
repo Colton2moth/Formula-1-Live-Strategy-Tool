@@ -7,6 +7,7 @@ import { LoadingScreen } from "./components/LoadingScreen";
 import { ActivityProvider } from "./features/activity/useActivity";
 import { ReplayPage } from "./features/replay/ReplayPage";
 import { StateWorkbench } from "./features/test-screens/StateWorkbench";
+import { LiveStateWorkbench } from "./features/test-screens/LiveStateWorkbench";
 import { TestIndex } from "./features/test-screens/TestIndex";
 import { TrackMapPreviews } from "./features/test-screens/TrackMapPreviews";
 import {
@@ -36,6 +37,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
           <Route path="/replay" element={<ReplayPage />} />
           <Route path="/test" element={<TestIndex />} />
           <Route path="/test/states" element={<StateWorkbench />} />
+          <Route path="/test/live" element={<LiveStateWorkbench />} />
           <Route path="/test/maps" element={<TrackMapPreviews />} />
           <Route path="/test/loading/connecting" element={<LoadingScreen variant="connecting" />} />
           <Route path="/test/loading/data" element={<LoadingScreen variant="loading" />} />

@@ -93,13 +93,29 @@
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
 }
 
+.live-state-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .state-workbench-preview .state-screen,
 .state-workbench-grid .state-screen {
   margin-top: 0;
 }
 
+.live-state-preview {
+  @apply grid gap-1.5;
+}
+
+.live-state-caption {
+  @apply text-xs font-bold uppercase tracking-wide text-app-muted;
+}
+
 @media (max-width: 48rem) {
   .state-workbench-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .live-state-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
