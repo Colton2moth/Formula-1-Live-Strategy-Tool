@@ -62,6 +62,9 @@ _initial_bootstrap_done = threading.Event()
 # How often the session monitor polls OpenF1 for the current session_key.
 _SESSION_CHECK_INTERVAL_SECONDS = 45.0
 
+# How long to wait for the MQTT worker to exit before failing a transition.
+_MQTT_STOP_TIMEOUT_SECONDS = 5.0
+
 
 def _mqtt_enabled() -> bool:
     """Return True unless LIVE_MQTT is explicitly disabled."""
@@ -108,23 +111,30 @@ def _start_mqtt() -> None:
     print("OpenF1 MQTT listener thread started (LIVE_MQTT=1)")
 
 
-def _stop_mqtt() -> None:
+def _stop_mqtt() -> bool:
     """
     Stop the current MQTT listener and wait for it to exit.
 
-    Sets the stop event, joins the worker, and clears the stored handle so the
-    next ``_start_mqtt`` creates a fresh listener. Safe to call when no
-    listener is running.
+    Returns True when no listener is running or the worker fully exited, and
+    False when the worker is still alive after the timeout. On False the thread
+    handle is deliberately retained so ``_start_mqtt`` refuses to spawn a
+    duplicate while the old worker is still alive.
     """
     global _mqtt_stop, _mqtt_thread
     stop = _mqtt_stop
     thread = _mqtt_thread
     if stop is not None:
         stop.set()
-    if thread is not None:
-        thread.join(timeout=5.0)
+    if thread is None:
+        _mqtt_stop = None
+        return True
+    thread.join(timeout=_MQTT_STOP_TIMEOUT_SECONDS)
+    if thread.is_alive():
+        print("MQTT listener did not stop in time; leaving it registered")
+        return False
     _mqtt_thread = None
     _mqtt_stop = None
+    return True
 
 
 def _run_bootstrap() -> None:
@@ -167,40 +177,63 @@ def _latest_session_key() -> int | None:
 
 def _swap_to_session(new_key: int) -> int:
     """
-    Blocking worker: stop MQTT, drop all old data, and re-bootstrap.
+    Blocking worker: bootstrap session B into a staging buffer, then swap it in.
 
     Runs in a worker thread so the slow REST bootstrap never stalls the event
-    loop. MQTT is stopped first (and joined) so no old-session push can race the
-    clear/bootstrap, then restarted afterward for the new session. Returns the
-    resolved session_key; raises if the bootstrap failed.
+    loop. MQTT is stopped first (and joined) so no old-session push can arrive
+    during the transition, then the new session is bootstrapped into a private
+    ``LiveState``. Only after that succeeds are the process-wide ``LIVE_STATE``
+    contents atomically replaced — the existing valid state is never cleared or
+    modified first. Returns the resolved session_key; raises on any failure so
+    the caller keeps session A untouched and MQTT stopped.
     """
     from formula1_strategy_tool.acquisition.live_bootstrap import bootstrap_live_state
+    from formula1_strategy_tool.acquisition.live_state import LiveState
 
-    _stop_mqtt()
-    LIVE_STATE.clear()
-    try:
-        return bootstrap_live_state(session_key=new_key)
-    finally:
-        _start_mqtt()
+    if not _stop_mqtt():
+        raise RuntimeError(
+            "MQTT listener did not stop in time; aborting session transition"
+        )
+
+    staging = LiveState()
+    resolved = bootstrap_live_state(state=staging, session_key=new_key)
+
+    # Validate the bootstrap resolved the expected session and produced enough
+    # session context to be usable before committing anything.
+    if resolved != new_key:
+        raise RuntimeError(
+            f"bootstrap resolved session_key={resolved}, expected {new_key}"
+        )
+    if not staging.docs_for("v1/sessions"):
+        raise RuntimeError("bootstrap produced no session context")
+
+    # Atomically replace the contents of the shared buffer (never the object
+    # itself, which other modules hold references to).
+    LIVE_STATE.replace_docs(staging.snapshot_docs())
+    return resolved
 
 
 async def _perform_session_transition(new_key: int) -> None:
     """
-    Move the live buffer to a newly detected OpenF1 session.
+    Move the live buffer to a newly detected OpenF1 session, transactionally.
 
-    On success: track the new key, reset the WS diff state, and close live
-    clients so they reconnect and resync from the fresh /api/race-state. On
-    failure: leave the buffer cleared and restart MQTT, then let the next
-    monitor tick retry the same transition (never permanently half-cleared).
+    On success: the shared buffer now holds session B, the tracked key is
+    updated, the WS diff state is reset, MQTT is restarted for the new session,
+    and live clients are closed so they reconnect/resync from the fresh
+    /api/race-state. On failure: session A (buffer + key) is left completely
+    untouched, the broadcaster is not reset, clients are not closed, and MQTT
+    stays stopped so session-B pushes cannot contaminate session A. The next
+    monitor tick retries the same new key.
     """
     global _live_session_key
     try:
         resolved = await asyncio.to_thread(_swap_to_session, new_key)
-    except Exception as exc:  # noqa: BLE001 — retry on the next check
+    except Exception as exc:  # noqa: BLE001 — keep session A; retry next check
         print(f"session transition to {new_key} failed: {exc}")
         return
     _live_session_key = resolved
     broadcaster.reset()
+    _start_mqtt()
     await manager.close_all()
     print(f"live session transitioned to session_key={resolved}")
 
