@@ -10,10 +10,15 @@ buffer and /api/drivers switches over automatically.
 
 from __future__ import annotations
 
+import re
+from datetime import datetime, timezone
 from typing import Any
 
 from formula1_strategy_tool.acquisition.live_state import LiveState, location_xy
 from formula1_strategy_tool.api.schemas import DriverState
+
+_UNKNOWN_GAP = "UNKNOWN"
+_LAP_GAP_PATTERN = re.compile(r"^\+\s*(\d+)\s+LAPS?$", re.IGNORECASE)
 
 
 def _docs(state: LiveState, topic: str) -> list[dict[str, Any]]:
@@ -75,6 +80,68 @@ def _car_location(
     if location_row is None:
         return None, None
     return location_xy(location_row)
+
+
+def _normalize_gap(value: Any) -> float | str | None:
+    """
+    Normalize one OpenF1 ``gap_to_leader`` value into the API contract shape.
+
+    Returns a numeric gap, ``None`` for the leader, a normalized lap-count
+    string (``"+1 LAP"`` / ``"+2 LAPS"``) for lapped cars, or ``"UNKNOWN"``
+    when the value is missing or cannot be parsed. Never coerces missing or
+    malformed data to ``0.0`` — that erases the difference between the leader,
+    lapped cars, and unavailable data.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return _UNKNOWN_GAP
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return _UNKNOWN_GAP
+    match = _LAP_GAP_PATTERN.match(text)
+    if match:
+        suffix = "LAPS" if text.upper().endswith("LAPS") else "LAP"
+        return f"+{int(match.group(1))} {suffix}"
+    try:
+        return float(text)
+    except ValueError:
+        return _UNKNOWN_GAP
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    """Parse an OpenF1 ISO timestamp to a timezone-aware datetime (or None)."""
+    if not value:
+        return None
+    text = str(value).replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _interval_is_stale(
+    int_row: dict[str, Any], lap_row: dict[str, Any] | None
+) -> bool:
+    """
+    An interval sample is stale when it predates the driver's current lap.
+
+    The freshness reference is the lap ``date_start`` already stored in the
+    buffer (not wall-clock), so replay and test data with historical
+    timestamps behave identically to a live session.
+    """
+    if not int_row or not lap_row:
+        return False
+    interval_ts = _parse_timestamp(int_row.get("date"))
+    lap_start = _parse_timestamp(lap_row.get("date_start"))
+    if interval_ts is None or lap_start is None:
+        return False
+    return interval_ts < lap_start
 
 
 def drivers_from_live(state: LiveState) -> list[DriverState] | None:
@@ -142,17 +209,21 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
 
         pos_row = positions.get(num)
         int_row = intervals.get(num)
-        gap = int_row.get("gap_to_leader") if int_row else None
         interval = int_row.get("interval") if int_row else None
         # OpenF1 uses None / "+1 LAP" style strings sometimes — coerce gently.
-        try:
-            gap_f = float(gap) if gap is not None else 0.0
-        except (TypeError, ValueError):
-            gap_f = 0.0
         try:
             interval_f = float(interval) if interval is not None else None
         except (TypeError, ValueError):
             interval_f = None
+
+        # gap_to_leader keeps its semantic state: number, null (leader),
+        # lap-count string, or "UNKNOWN" (missing/stale/malformed).
+        if int_row is None:
+            gap_value: float | str | None = _UNKNOWN_GAP
+        elif _interval_is_stale(int_row, lap_row):
+            gap_value = _UNKNOWN_GAP
+        else:
+            gap_value = _normalize_gap(int_row.get("gap_to_leader"))
 
         pit_stops = sum(1 for p in pits if int(p.get("driver_number", -1)) == num)
 
@@ -174,7 +245,7 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
                 compound=compound,
                 tyre_age=tyre_age,
                 last_lap_time=last_lap_time,
-                gap_to_leader=gap_f,
+                gap_to_leader=gap_value,
                 interval_ahead=interval_f,
                 interval_behind=None,  # derived later if we sort the grid
                 pit_stops=pit_stops,

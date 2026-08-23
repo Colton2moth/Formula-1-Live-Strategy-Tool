@@ -77,6 +77,13 @@ Returns the current state of every driver.
 `x` / `y` are raw OpenF1 track coordinates and `null` when the car has
 no live telemetry.
 
+`gap_to_leader` is one of:
+
+- a number — the gap in seconds, e.g. `3.8`
+- `null` — the leader
+- a lap-count string — a lapped car, e.g. `"+1 LAP"` or `"+2 LAPS"`
+- `"UNKNOWN"` — no interval sample, a malformed value, or stale data
+
 ### GET `/api/drivers/{driver_number}`
 
 Returns the current state of one driver (same shape as `/api/drivers`).
@@ -295,6 +302,9 @@ instead of teleporting to the raw target.
   "pit_stops": 1
 }
 ```
+
+`gap_to_leader` uses the same states as `/api/drivers`: a number, `null`
+(leader), a lap-count string such as `"+1 LAP"`, or `"UNKNOWN"`.
 
 ### Prediction update
 
