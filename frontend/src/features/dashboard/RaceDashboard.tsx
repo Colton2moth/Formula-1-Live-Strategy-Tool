@@ -6,6 +6,7 @@ import { Leaderboard } from "../leaderboard/Leaderboard";
 import { RaceHeader } from "../race-header/RaceHeader";
 import { StrategyPanel } from "../strategy-panel/StrategyPanel";
 import { TrackMap } from "../track-map/TrackMap";
+import type { MarkerClock } from "../track-map/useInterpolatedDriverLocations";
 import type { ResourceStatus } from "./useRaceData";
 
 type RaceDashboardProps = {
@@ -13,9 +14,10 @@ type RaceDashboardProps = {
   track: TrackState | null;
   trackStatus: ResourceStatus;
   source: DashboardSource;
+  clock?: MarkerClock;
 };
 
-export function RaceDashboard({ raceState, track, trackStatus, source }: RaceDashboardProps) {
+export function RaceDashboard({ raceState, track, trackStatus, source, clock }: RaceDashboardProps) {
   const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
 
   const stream = useRaceStream(raceState, source);
@@ -59,6 +61,7 @@ export function RaceDashboard({ raceState, track, trackStatus, source }: RaceDas
             locations={stream.locations}
             selectedDriver={selectedDriver}
             onSelectDriver={toggleSelectedDriver}
+            clock={clock}
           />
         </div>
       </div>

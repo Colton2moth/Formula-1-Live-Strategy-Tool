@@ -8,6 +8,7 @@ export type LocationUpdate = {
   y: number | null;
   map_x: number | null;
   map_y: number | null;
+  timestamp: number | null;
 };
 
 export type DriverUpdate = {
@@ -76,6 +77,17 @@ function toNullableNumber(value: unknown): number | null {
   return isNumber(value) ? value : null;
 }
 
+function toTimestampMs(value: unknown): number | null {
+  if (isNumber(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const ms = Date.parse(value);
+    return Number.isFinite(ms) ? ms : null;
+  }
+  return null;
+}
+
 function parseCompoundProbabilities(value: unknown): ApiCompoundProbabilities | null {
   if (value === null || !isRecord(value)) {
     return null;
@@ -100,6 +112,7 @@ function parseLocationUpdate(value: Record<string, unknown>): LocationUpdate | n
     y: isNumber(value.y) ? value.y : null,
     map_x: isNumber(value.map_x) ? value.map_x : null,
     map_y: isNumber(value.map_y) ? value.map_y : null,
+    timestamp: toTimestampMs(value.timestamp),
   };
 }
 

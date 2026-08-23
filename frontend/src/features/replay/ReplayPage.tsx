@@ -7,6 +7,7 @@ import { Panel } from "../../components/Panel";
 import { RaceDashboard } from "../dashboard/RaceDashboard";
 import { useRaceData } from "../dashboard/useRaceData";
 import { replaySourceFor } from "../../hooks/useLiveState";
+import type { MarkerClock } from "../track-map/useInterpolatedDriverLocations";
 import { ReplayControls } from "./ReplayControls";
 import { ReplayProgress } from "./ReplayProgress";
 import { grandPrixName, useReplay } from "./useReplay";
@@ -19,6 +20,10 @@ export function ReplayPage() {
   const source = useMemo(
     () => (replay.replayId ? replaySourceFor(replay.replayId) : null),
     [replay.replayId],
+  );
+  const markerClock = useMemo<MarkerClock>(
+    () => ({ speed: replay.speed, paused: replay.status !== "running" }),
+    [replay.speed, replay.status],
   );
   const { raceState, track, trackStatus, raceStateStatus, raceStateError } = useRaceData(reloadKey, source, false);
 
@@ -83,7 +88,7 @@ export function ReplayPage() {
             </div>
           </Panel>
         ) : (
-          <RaceDashboard raceState={raceState} track={track} trackStatus={trackStatus} source={source} />
+          <RaceDashboard raceState={raceState} track={track} trackStatus={trackStatus} source={source} clock={markerClock} />
         )}
       </div>
       <Footer />

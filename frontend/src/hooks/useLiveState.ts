@@ -10,7 +10,7 @@ import {
 import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../features/activity/useActivity";
 import type { ApiDriver, ApiPrediction, ApiSession, RaceState, TrackState } from "../types/race";
 
-export type DriverLocation = { map_x: number; map_y: number };
+export type DriverLocation = { map_x: number; map_y: number; timestamp: number };
 
 export type DashboardSource = {
   socketPath: string;
@@ -99,7 +99,11 @@ export function useRaceStream(
               return next;
             }
             const next = new Map(prev);
-            next.set(event.driver_number, { map_x: event.map_x, map_y: event.map_y });
+            next.set(event.driver_number, {
+              map_x: event.map_x,
+              map_y: event.map_y,
+              timestamp: event.timestamp ?? Date.now(),
+            });
             return next;
           });
           break;

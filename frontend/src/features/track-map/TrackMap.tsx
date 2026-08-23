@@ -4,6 +4,8 @@ import type { ApiDriver, ApiSession, TrackState } from "../../types/race";
 import type { DriverLocation } from "../../hooks/useLiveState";
 import type { ResourceStatus } from "../dashboard/useRaceData";
 import { START_FINISH_SQUARE_SIZE, startFinishSquares, trackPath } from "./geometry";
+import { LIVE_MARKER_CLOCK, useInterpolatedDriverLocations } from "./useInterpolatedDriverLocations";
+import type { MarkerClock } from "./useInterpolatedDriverLocations";
 
 type TrackMapProps = {
   track: TrackState | null;
@@ -13,9 +15,11 @@ type TrackMapProps = {
   locations: ReadonlyMap<number, DriverLocation>;
   selectedDriver: ApiDriver | null;
   onSelectDriver: (driverNumber: number) => void;
+  clock?: MarkerClock;
 };
 
-export function TrackMap({ track, trackStatus, session, drivers, locations, selectedDriver, onSelectDriver }: TrackMapProps) {
+export function TrackMap({ track, trackStatus, session, drivers, locations, selectedDriver, onSelectDriver, clock = LIVE_MARKER_CLOCK }: TrackMapProps) {
+  const { registerMarker } = useInterpolatedDriverLocations(locations, clock);
   const label = `${session.meeting_name.toUpperCase()} | ${session.session_name.toUpperCase()}`;
   const mapPath = track ? trackPath(track.display_path) : "";
   const pitLanePath = track?.pit_lane?.path?.length ? trackPath(track.pit_lane.path) : null;
@@ -69,12 +73,12 @@ export function TrackMap({ track, trackStatus, session, drivers, locations, sele
               const isSelected = driver.driver_number === selectedDriver?.driver_number;
               const markerStyle = {
                 "--driver-colour": `#${driver.team_colour}`,
-                transform: `translate(${location.map_x}px, ${location.map_y}px)`,
               } as CSSProperties;
 
               return (
                 <g
                   key={driver.driver_number}
+                  ref={registerMarker(driver.driver_number)}
                   role="button"
                   tabIndex={0}
                   className={`track-map-marker ${isSelected ? "track-map-marker--selected" : ""}`}
