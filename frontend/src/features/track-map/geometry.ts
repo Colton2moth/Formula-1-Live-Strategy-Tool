@@ -24,6 +24,22 @@ export function trackPath(points: TrackPoint[]): string {
     .join(" ");
 }
 
+export function displayPathPoint(points: TrackPoint[], progress: number): SvgPoint | null {
+  if (!points.length) {
+    return null;
+  }
+  const normalized = ((progress % 1) + 1) % 1;
+  const position = normalized * points.length;
+  const index = Math.floor(position) % points.length;
+  const fraction = position - Math.floor(position);
+  const a = points[index];
+  const b = points[(index + 1) % points.length];
+  return {
+    x: a.x + (b.x - a.x) * fraction,
+    y: a.y + (b.y - a.y) * fraction,
+  };
+}
+
 export function startFinishSquares(point: SvgPoint): StartFinishSquare[] {
   const squareCount = Math.max(
     2,

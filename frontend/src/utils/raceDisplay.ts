@@ -13,8 +13,8 @@ export function formatLapTime(seconds: number) {
 }
 
 export function formatGap(value: number | null) {
-  if (value === null || value === 0) {
-    return "Leader";
+  if (value === null) {
+    return "—";
   }
   return `+${value.toFixed(3)}`;
 }

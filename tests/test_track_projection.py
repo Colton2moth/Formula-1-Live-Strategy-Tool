@@ -45,6 +45,23 @@ def test_display_position_stays_in_view(silverstone):
         assert 0.0 <= y <= 85.0
 
 
+def test_display_position_interpolates_between_points(silverstone):
+    projector = Projector(silverstone)
+    start = projector.display_position(0.0)
+    quarter = projector.display_position(0.25)
+    assert start != quarter
+    assert 0.0 <= quarter[0] <= 100.0
+    assert 0.0 <= quarter[1] <= 85.0
+
+
+def test_display_position_wraps_to_start(silverstone):
+    projector = Projector(silverstone)
+    start = projector.display_position(0.0)
+    wrapped = projector.display_position(0.9999)
+    distance = ((wrapped[0] - start[0]) ** 2 + (wrapped[1] - start[1]) ** 2) ** 0.5
+    assert distance < 1.0
+
+
 def test_location_projector_tracks_per_driver(silverstone):
     projector = LocationProjector(silverstone)
     point = silverstone.reference_path[100]
@@ -57,3 +74,44 @@ def test_location_projector_tracks_per_driver(silverstone):
     again = projector.project_location(4, point.x, point.y)
     assert again is not None
     assert abs(again[0] - progress) < 1e-6
+
+
+def test_location_projector_limits_impossible_timed_jump(silverstone):
+    projector = LocationProjector(silverstone)
+    start = silverstone.reference_path[100]
+    teleport = silverstone.reference_path[600]
+
+    first = projector.project_location(4, start.x, start.y, 0.0)
+    limited = projector.project_location(4, teleport.x, teleport.y, 1.0)
+
+    assert first is not None
+    assert limited is not None
+    delta = (limited[0] - first[0]) % 1.0
+    assert 0 < delta <= 0.02 + 1e-9
+
+
+def test_location_projector_limits_teleport_after_long_gap(silverstone):
+    projector = LocationProjector(silverstone)
+    start = silverstone.reference_path[100]
+    teleport = silverstone.reference_path[600]
+
+    first = projector.project_location(4, start.x, start.y, 0.0)
+    limited = projector.project_location(4, teleport.x, teleport.y, 60.0)
+
+    assert first is not None
+    assert limited is not None
+    delta = (limited[0] - first[0]) % 1.0
+    assert 0 < delta <= 0.02 + 1e-9
+
+
+def test_location_projector_accepts_timed_lap_wrap(silverstone):
+    projector = LocationProjector(silverstone)
+    before_line = silverstone.reference_path[990]
+    after_line = silverstone.reference_path[10]
+
+    first = projector.project_location(4, before_line.x, before_line.y, 0.0)
+    wrapped = projector.project_location(4, after_line.x, after_line.y, 1.0)
+
+    assert first is not None
+    assert wrapped is not None
+    assert wrapped[0] < first[0]

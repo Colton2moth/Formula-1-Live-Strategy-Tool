@@ -1,21 +1,24 @@
 import type { CSSProperties } from "react";
 import { Panel } from "../../components/Panel";
 import type { ApiDriver, ApiSession, TrackState } from "../../types/race";
-import type { DriverLocation } from "../../hooks/useLiveState";
+import type { DriverTrackProgress } from "../../hooks/useLiveState";
 import type { ResourceStatus } from "../dashboard/useRaceData";
 import { START_FINISH_SQUARE_SIZE, startFinishSquares, trackPath } from "./geometry";
+import { useDriverMarkers } from "./useDriverMarkers";
 
 type TrackMapProps = {
   track: TrackState | null;
   trackStatus: ResourceStatus;
   session: ApiSession;
   drivers: ApiDriver[];
-  locations: ReadonlyMap<number, DriverLocation>;
+  progress: ReadonlyMap<number, DriverTrackProgress>;
   selectedDriver: ApiDriver | null;
   onSelectDriver: (driverNumber: number) => void;
 };
 
-export function TrackMap({ track, trackStatus, session, drivers, locations, selectedDriver, onSelectDriver }: TrackMapProps) {
+export function TrackMap({ track, trackStatus, session, drivers, progress, selectedDriver, onSelectDriver }: TrackMapProps) {
+  const displayPath = track?.display_path ?? [];
+  const { registerMarker } = useDriverMarkers(displayPath, progress);
   const label = `${session.meeting_name.toUpperCase()} | ${session.session_name.toUpperCase()}`;
   const mapPath = track ? trackPath(track.display_path) : "";
   const pitLanePath = track?.pit_lane?.path?.length ? trackPath(track.pit_lane.path) : null;
@@ -62,19 +65,19 @@ export function TrackMap({ track, trackStatus, session, drivers, locations, sele
               ))}
             </g>
             {drivers.map((driver) => {
-              const location = locations.get(driver.driver_number);
-              if (!location) {
+              const entry = progress.get(driver.driver_number);
+              if (!entry) {
                 return null;
               }
               const isSelected = driver.driver_number === selectedDriver?.driver_number;
               const markerStyle = {
                 "--driver-colour": `#${driver.team_colour}`,
-                transform: `translate(${location.map_x}px, ${location.map_y}px)`,
               } as CSSProperties;
 
               return (
                 <g
                   key={driver.driver_number}
+                  ref={registerMarker(driver.driver_number)}
                   role="button"
                   tabIndex={0}
                   className={`track-map-marker ${isSelected ? "track-map-marker--selected" : ""}`}

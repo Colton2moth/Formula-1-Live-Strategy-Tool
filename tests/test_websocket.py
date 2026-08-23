@@ -68,8 +68,91 @@ def test_websocket_receives_location_and_driver_updates():
             assert location["driver_number"] == 4
             assert location["x"] == 100.0
             assert location["y"] == 200.0
+            assert location["progress"] is None
+            assert "map_x" not in location
+            assert "map_y" not in location
             driver = by_type["driver_update"]
             assert driver["driver_number"] == 4
+
+
+def test_location_update_exposes_progress():
+    from formula1_strategy_tool.track.models import load_layout
+
+    layout = load_layout(2)
+    assert layout is not None
+    ref = layout.reference_path[100]
+    LIVE_STATE.update(
+        "v1/sessions",
+        {"circuit_key": 2, "circuit_short_name": "Silverstone", "session_name": "Race"},
+    )
+    LIVE_STATE.update(
+        "v1/location",
+        {"driver_number": 4, "x": ref.x, "y": ref.y, "date": "2025-07-06T14:00:00"},
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws/live") as websocket:
+            time.sleep(1.0)
+            event = websocket.receive_json()
+            assert event["type"] == "location_update"
+            assert isinstance(event["progress"], float)
+            assert 0.0 <= event["progress"] < 1.0
+            assert "map_x" not in event
+            assert "map_y" not in event
+
+
+def test_location_update_null_progress_when_unprojectable():
+    LIVE_STATE.update(
+        "v1/sessions",
+        {"circuit_key": 2, "circuit_short_name": "Silverstone", "session_name": "Race"},
+    )
+    LIVE_STATE.update(
+        "v1/location",
+        {"driver_number": 4, "x": 1e7, "y": 1e7, "date": "2025-07-06T14:00:00"},
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws/live") as websocket:
+            time.sleep(1.0)
+            event = websocket.receive_json()
+            assert event["type"] == "location_update"
+            assert event["progress"] is None
+
+
+def test_location_update_limits_impossible_timed_jump():
+    from formula1_strategy_tool.track.models import load_layout
+
+    layout = load_layout(2)
+    assert layout is not None
+    start = layout.reference_path[100]
+    teleport = layout.reference_path[600]
+    LIVE_STATE.update("v1/sessions", {"circuit_key": 2, "session_name": "Race"})
+    LIVE_STATE.update(
+        "v1/location",
+        {
+            "driver_number": 4,
+            "x": start.x,
+            "y": start.y,
+            "date": "2025-07-06T14:00:00",
+        },
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws/live") as websocket:
+            time.sleep(1.0)
+            first = websocket.receive_json()
+            LIVE_STATE.update(
+                "v1/location",
+                {
+                    "driver_number": 4,
+                    "x": teleport.x,
+                    "y": teleport.y,
+                    "date": "2025-07-06T14:00:01",
+                },
+            )
+            time.sleep(1.0)
+            limited = websocket.receive_json()
+
+    assert first["progress"] is not None
+    assert limited["progress"] is not None
+    assert 0 < (limited["progress"] - first["progress"]) % 1.0 <= 0.02 + 1e-9
 
 
 def test_websocket_streams_only_changed_locations():

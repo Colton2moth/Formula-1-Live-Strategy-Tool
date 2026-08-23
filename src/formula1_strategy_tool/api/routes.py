@@ -21,7 +21,10 @@ from formula1_strategy_tool.acquisition.live_features import (
     features_from_live,
     latest_lap_rows,
 )
-from formula1_strategy_tool.acquisition.live_session import session_from_live
+from formula1_strategy_tool.acquisition.live_session import (
+    latest_session_doc,
+    session_from_live,
+)
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
 from formula1_strategy_tool.acquisition.replay_registry import ReplayRuntime, registry
 from formula1_strategy_tool.api.schemas import (
@@ -78,10 +81,10 @@ def _session(state: LiveState) -> SessionState:
 
 def _circuit_key(state: LiveState) -> int | None:
     """circuit_key of the ingested session, or None before data arrives."""
-    sessions = state.docs_for("v1/sessions")
-    if not sessions:
+    session = latest_session_doc(state)
+    if session is None:
         return None
-    key = sessions[0].get("circuit_key")
+    key = session.get("circuit_key")
     return int(key) if key is not None else None
 
 

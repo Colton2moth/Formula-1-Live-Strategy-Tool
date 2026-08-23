@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from xgboost import XGBClassifier
 
@@ -151,7 +152,9 @@ def predict_feature_rows(
     if booster_names:
         for name in booster_names:
             if name not in X.columns:
-                X[name] = pd.NA
+                # np.nan keeps float dtype; pd.NA becomes object dtype and breaks
+                # XGBoost's sklearn API when weather/interval columns are absent.
+                X[name] = np.nan
         X = X[list(booster_names)]
 
     meta = feature_df[["driver_number", "lap_number"]].reset_index(drop=True)

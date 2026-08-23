@@ -4,9 +4,14 @@ In-memory buffer for live OpenF1 MQTT messages.
 Input:  topic string + parsed JSON dict from a push message
 Output: latest document per (topic, key), plus message counts
 
-OpenF1 includes ``_key`` on streamed messages so updates to the same underlying
-row (e.g. one driver's current lap) replace the previous version. We key the
-store on ``_key`` when present, otherwise fall back to driver_number / "last".
+Rows are keyed by *domain identity* (driver_number, plus stint/pit/lap number
+when present) so the same underlying row always maps to the same store key no
+matter where it came from. This matters because rows arrive from two sources:
+the REST bootstrap (no ``_key`` field) and MQTT pushes (which carry ``_key``).
+Keying on ``_key`` first duplicated every bootstrap-seeded row the moment its
+MQTT twin arrived — one car became two on the leaderboard and track map.
+``_key`` is only used for topics without a driver identity (e.g. race control),
+with "last" as the final fallback.
 
 ``v1/location`` is a special case: it is a high-frequency time series, so only
 the latest sample per driver is retained (never one entry per message).
@@ -65,10 +70,13 @@ class LiveState:
             number = payload.get("driver_number")
             return f"driver:{number}" if number is not None else "last"
 
-        key = payload.get("_key")
-        if key is not None:
-            return str(key)
-
+        # Domain identity FIRST, before MQTT's _key: REST bootstrap rows have no
+        # _key, so keying MQTT rows by _key stored the same underlying row twice
+        # (once per source) and duplicated cars during live sessions. Deriving
+        # the key from driver/stint/pit/lap identity makes an MQTT update
+        # *replace* its bootstrap-seeded twin instead of sitting next to it.
+        # It also collapses per-update-_key streams (position/intervals) to one
+        # row per driver, keeping the buffer bounded over a full race.
         if payload.get("driver_number") is not None:
             number = payload["driver_number"]
             if payload.get("stint_number") is not None:
@@ -79,6 +87,12 @@ class LiveState:
                 # Keep every lap — pace features need a short history per driver.
                 return f"lap:{number}:{payload['lap_number']}"
             return f"driver:{number}"
+
+        # No driver identity (weather, race control, session context): _key is
+        # the only stable row id MQTT gives us, so use it when present.
+        key = payload.get("_key")
+        if key is not None:
+            return str(key)
 
         if payload.get("meeting_name") is not None:
             return f"meeting:{payload.get('meeting_key', 'last')}"

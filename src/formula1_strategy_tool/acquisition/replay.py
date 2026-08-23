@@ -111,13 +111,23 @@ def fetch_replay_sessions(
 
 
 _sessions_cache: list[dict[str, Any]] | None = None
+_sessions_cache_at: float | None = None
+# Refresh periodically so newly completed races appear without a server restart.
+_SESSIONS_CACHE_TTL_SECONDS = 3600.0
 
 
 def list_replay_sessions() -> list[dict[str, Any]]:
     """Return completed Race sessions, fetching (and caching) on first call."""
-    global _sessions_cache
-    if _sessions_cache is None:
+    global _sessions_cache, _sessions_cache_at
+    now = time.monotonic()
+    stale = (
+        _sessions_cache is None
+        or _sessions_cache_at is None
+        or now - _sessions_cache_at > _SESSIONS_CACHE_TTL_SECONDS
+    )
+    if stale:
         _sessions_cache = fetch_replay_sessions(OpenF1Client())
+        _sessions_cache_at = now
     return _sessions_cache
 
 
@@ -293,7 +303,10 @@ def _download_location(
 
 def _event_offset(value: Any, t0: datetime) -> float | None:
     """Race-clock offset in seconds for one timestamp, or None if unparseable."""
-    dt = parse_openf1_datetime(value)
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        dt = parse_openf1_datetime(value)
     if dt is None:
         return None
     return max(0.0, (dt - t0).total_seconds())
@@ -338,6 +351,28 @@ def _lap_start_index(laps: list[dict[str, Any]]) -> dict[tuple[int, int], Any]:
     return index
 
 
+def _lap_finish_time(row: dict[str, Any]) -> datetime | None:
+    """
+    When a lap completed, for replay scheduling.
+
+    OpenF1 lap rows usually lack ``date_end``; derive finish from
+    ``date_start + lap_duration`` so laps are not exposed at lap *start*
+    (future-data leak). Falls back to ``date_start`` only when duration is
+    missing.
+    """
+    end = parse_openf1_datetime(row.get("date_end"))
+    if end is not None:
+        return end
+    start = parse_openf1_datetime(row.get("date_start"))
+    duration = row.get("lap_duration")
+    if start is not None and duration is not None:
+        try:
+            return start + timedelta(seconds=float(duration))
+        except (TypeError, ValueError):
+            pass
+    return start
+
+
 def build_timeline(data: dict[str, Any]) -> list[tuple[float, str, dict[str, Any]]]:
     """
     Normalize one session's rows into a chronological (offset, topic, payload)
@@ -347,9 +382,10 @@ def build_timeline(data: dict[str, Any]) -> list[tuple[float, str, dict[str, Any
     t0 = _reference_time(data["session"], data["laps"])
     events: list[tuple[float, str, dict[str, Any]]] = []
 
-    # Laps become known only when they finish (date_end) — never early.
+    # Laps become known only when they finish — never at date_start alone.
     for row in data["laps"]:
-        offset = _event_offset(row.get("date_end") or row.get("date_start"), t0)
+        finish = _lap_finish_time(row)
+        offset = _event_offset(finish, t0)
         if offset is not None:
             events.append((offset, "v1/laps", row))
 
@@ -1050,6 +1086,9 @@ class ReplayController:
                 speed_holder=speed_holder,
             )
         except Exception as exc:  # noqa: BLE001 — keep API up if replay dies
+            # A superseded worker must not clobber a newer replay's status.
+            if stop_event.is_set():
+                return
             self.error = str(exc)
             self.status = "error"
             print(f"Replay worker exited: {exc}")

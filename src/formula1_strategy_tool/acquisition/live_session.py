@@ -18,6 +18,35 @@ def _docs(state: LiveState, topic: str) -> list[dict[str, Any]]:
     return state.docs_for(topic)
 
 
+def latest_session_doc(state: LiveState) -> dict[str, Any] | None:
+    """
+    Return the session document with the highest session_key.
+
+    The buffer can briefly hold more than one session row (bootstrap seed plus
+    an MQTT push for the next session before the session monitor swaps state).
+    ``sessions[0]`` would then return stale metadata; max session_key is safe.
+    """
+    sessions = _docs(state, "v1/sessions")
+    if not sessions:
+        return None
+    return max(sessions, key=lambda row: int(row.get("session_key") or 0))
+
+
+def _latest_meeting_doc(
+    state: LiveState, session: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Pick the meeting row matching the session's meeting_key when possible."""
+    meetings = _docs(state, "v1/meetings")
+    if not meetings:
+        return None
+    meeting_key = session.get("meeting_key")
+    if meeting_key is not None:
+        for row in meetings:
+            if row.get("meeting_key") == meeting_key:
+                return row
+    return max(meetings, key=lambda row: int(row.get("meeting_key") or 0))
+
+
 def _parse_dt(value: Any) -> datetime | None:
     if not value:
         return None
@@ -86,19 +115,16 @@ def session_from_live(
     pass nothing because OpenF1's live session object carries no lap count, so
     the value stays null rather than inventing a denominator.
     """
-    sessions = _docs(state, "v1/sessions")
-    if not sessions:
+    session = latest_session_doc(state)
+    if session is None:
         return None
-    session = sessions[0]
 
-    meetings = _docs(state, "v1/meetings")
+    meeting = _latest_meeting_doc(state, session)
     meeting_name = (
         session.get("circuit_short_name") or session.get("location") or "Unknown"
     )
-    if meetings:
-        meeting_name = str(
-            meetings[0].get("meeting_name") or meeting_name
-        )
+    if meeting:
+        meeting_name = str(meeting.get("meeting_name") or meeting_name)
 
     weather = _latest_weather(state)
     track_temp = float(weather.get("track_temperature") or 0.0) if weather else 0.0

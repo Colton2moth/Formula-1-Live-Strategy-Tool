@@ -21,6 +21,11 @@ _DM_PER_M = 10.0
 _WINDOW = 40
 _LOCAL_ACCEPT_DM = 50.0 * _DM_PER_M
 _MAX_DISTANCE_DM = 300.0 * _DM_PER_M
+# Generous physical envelope; the per-update cap prevents large visual jumps.
+_MAX_FORWARD_SPEED_MPS = 150.0
+_CONTINUITY_SLACK_M = 75.0
+_MAX_BACKWARD_PROGRESS = 0.005
+_MAX_PROGRESS_STEP = 0.02
 
 
 class Projector:
@@ -68,6 +73,10 @@ class Projector:
             a[1] + (b[1] - a[1]) * frac,
         )
 
+    @property
+    def lap_length_m(self) -> float:
+        return self._total / _DM_PER_M
+
     def _nearest(
         self, x: float, y: float, start_seg: int, count: int
     ) -> tuple[float, float] | None:
@@ -92,21 +101,44 @@ class Projector:
 
 
 class LocationProjector:
-    """Per-runtime projector that keeps one previous progress per driver."""
+    """Per-runtime projector that continuity-limits progress per driver."""
 
     def __init__(self, layout: CircuitLayout) -> None:
         self._projector = Projector(layout)
-        self._previous: dict[int, float] = {}
+        self._previous: dict[int, tuple[float, float | None]] = {}
 
     def project_location(
-        self, driver_number: int, x: float, y: float
+        self, driver_number: int, x: float, y: float, timestamp: float | None = None
     ) -> tuple[float, float, Point] | None:
         """Return (progress, distance_m, display point) or None to hold."""
-        result = self._projector.project(x, y, self._previous.get(driver_number))
+        previous = self._previous.get(driver_number)
+        previous_progress = previous[0] if previous is not None else None
+        result = self._projector.project(x, y, previous_progress)
         if result is None:
             return None
         progress, distance = result
-        self._previous[driver_number] = progress
+        if previous is not None and timestamp is not None and previous[1] is not None:
+            elapsed = timestamp - previous[1]
+            if elapsed <= 0:
+                return None
+            limit = (
+                _MAX_FORWARD_SPEED_MPS * elapsed + _CONTINUITY_SLACK_M
+            ) / self._projector.lap_length_m
+            delta = progress - previous_progress
+            if delta > 0.5:
+                delta -= 1.0
+            elif delta < -0.5:
+                delta += 1.0
+            limit = min(limit, _MAX_PROGRESS_STEP)
+            if delta < -_MAX_BACKWARD_PROGRESS:
+                forward_delta = (progress - previous_progress) % 1.0
+                progress = (previous_progress + min(forward_delta, limit)) % 1.0
+            elif delta < 0:
+                self._previous[driver_number] = (previous_progress, timestamp)
+                return None
+            elif delta > limit:
+                progress = (previous_progress + limit) % 1.0
+        self._previous[driver_number] = (progress, timestamp)
         display = self._projector.display_position(progress)
         return progress, distance, display
 

@@ -10,7 +10,7 @@ import {
 import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../features/activity/useActivity";
 import type { ApiDriver, ApiPrediction, ApiSession, RaceState, TrackState } from "../types/race";
 
-export type DriverLocation = { map_x: number; map_y: number };
+export type DriverTrackProgress = { progress: number };
 
 export type DashboardSource = {
   socketPath: string;
@@ -37,7 +37,7 @@ export type RaceStreamResult = {
   session: ApiSession | null;
   drivers: ApiDriver[];
   predictions: ReadonlyMap<number, ApiPrediction>;
-  locations: ReadonlyMap<number, DriverLocation>;
+  progress: ReadonlyMap<number, DriverTrackProgress>;
   refreshing: boolean;
   stale: boolean;
 };
@@ -59,7 +59,7 @@ export function useRaceStream(
   const [session, setSession] = useState<ApiSession | null>(snapshot?.session ?? null);
   const [drivers, setDrivers] = useState<ApiDriver[]>(snapshot?.drivers ?? []);
   const [predictions, setPredictions] = useState<ReadonlyMap<number, ApiPrediction>>(() => toPredictionMap(snapshot));
-  const [locations, setLocations] = useState<ReadonlyMap<number, DriverLocation>>(() => new Map());
+  const [progress, setProgress] = useState<ReadonlyMap<number, DriverTrackProgress>>(() => new Map());
   const [status, setStatus] = useState<LiveSocketStatus>("connecting");
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState(false);
@@ -72,7 +72,7 @@ export function useRaceStream(
       setSession(snapshot.session);
       setDrivers(snapshot.drivers);
       setPredictions(toPredictionMap(snapshot));
-      setLocations(new Map());
+      setProgress(new Map());
       setStale(false);
     }
   }
@@ -80,6 +80,7 @@ export function useRaceStream(
   const hasConnectedRef = useRef(false);
   const recoveryTimerRef = useRef<number | null>(null);
   const recoveryAttemptRef = useRef(0);
+  const recoveryGenerationRef = useRef(0);
 
   useEffect(() => {
     if (!snapshot) {
@@ -89,17 +90,12 @@ export function useRaceStream(
     const applyEvent = (event: LiveEvent) => {
       switch (event.type) {
         case "location_update": {
-          setLocations((prev) => {
-            if (event.map_x === null || event.map_y === null) {
-              if (!prev.has(event.driver_number)) {
-                return prev;
-              }
-              const next = new Map(prev);
-              next.delete(event.driver_number);
-              return next;
+          setProgress((prev) => {
+            if (event.progress === null) {
+              return prev;
             }
             const next = new Map(prev);
-            next.set(event.driver_number, { map_x: event.map_x, map_y: event.map_y });
+            next.set(event.driver_number, { progress: event.progress });
             return next;
           });
           break;
@@ -169,14 +165,19 @@ export function useRaceStream(
     };
 
     const recoverSnapshot = async () => {
+      const generation = ++recoveryGenerationRef.current;
       setRefreshing(true);
       activity.set(ACTIVITY_IDS.snapshotRefresh, ACTIVITY_MESSAGES.snapshotRefresh);
       try {
         const fresh = await source.fetchRaceState();
+        // Ignore stale fetches — WS events may have arrived while we waited.
+        if (generation !== recoveryGenerationRef.current) {
+          return;
+        }
         setSession(fresh.session);
         setDrivers(fresh.drivers);
         setPredictions(toPredictionMap(fresh));
-        setLocations(new Map());
+        // Keep live map positions; clearing here caused cars to vanish on reconnect.
         setStale(false);
         recoveryAttemptRef.current = 0;
         activity.clear(ACTIVITY_IDS.snapshotRefresh);
@@ -238,5 +239,5 @@ export function useRaceStream(
     return { ...session, current_lap: liveLap };
   }, [session, drivers]);
 
-  return { status, session: liveSession, drivers, predictions, locations, refreshing, stale };
+  return { status, session: liveSession, drivers, predictions, progress, refreshing, stale };
 }

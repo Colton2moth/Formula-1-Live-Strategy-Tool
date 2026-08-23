@@ -263,16 +263,20 @@ reconnect and refetch `/api/race-state` to resync to the new session.
   "driver_number": 4,
   "x": 1245,
   "y": -438,
-  "map_x": 45.2,
-  "map_y": 30.1,
+  "progress": 0.6274,
   "timestamp": "2026-06-14T18:34:10Z"
 }
 ```
 
-`x` / `y` are the raw OpenF1 coordinates (kept for debugging). `map_x` /
-`map_y` are the projected display positions the frontend should use to place
-the marker; they are `null` when the sample cannot be projected onto the
-circuit, so the frontend should hold or hide the marker.
+`x` / `y` are the raw OpenF1 coordinates, retained for debugging. `progress`
+is the projected normalized position around the main circuit, from `0.0`
+inclusive to `1.0` exclusive. The frontend maps `progress` onto `display_path`
+to place the marker, so the backend no longer supplies display-specific
+`map_x` / `map_y` coordinates. `progress` is `null` when the sample cannot be
+projected reliably; the frontend should retain the last valid position.
+When a timestamped sample implies physically impossible movement, the backend
+advances progress by at most 2% of a lap so markers recover continuously
+instead of teleporting to the raw target.
 
 ### Driver state update
 
