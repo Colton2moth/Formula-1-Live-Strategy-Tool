@@ -41,3 +41,36 @@ def test_add_stint_features_keeps_open_stint():
     assert len(out) == 3
     assert (out["current_compound"] == "MEDIUM").all()
     assert list(out["tyre_age"]) == [0, 1, 2]
+
+
+def test_add_stint_features_pit_lap_overlap_keeps_new_stint():
+    spine = build_spine(_spine(), 2025)
+    stints = pd.DataFrame(
+        [
+            {
+                "meeting_key": 1,
+                "session_key": 9979,
+                "driver_number": 4,
+                "stint_number": 1,
+                "lap_start": 1,
+                "lap_end": 2,
+                "compound": "MEDIUM",
+                "tyre_age_at_start": 0,
+            },
+            {
+                "meeting_key": 1,
+                "session_key": 9979,
+                "driver_number": 4,
+                "stint_number": 2,
+                "lap_start": 2,
+                "lap_end": 3,
+                "compound": "HARD",
+                "tyre_age_at_start": 0,
+            },
+        ]
+    )
+    out = add_stint_features(spine, stints)
+    assert len(out) == 3
+    lap2 = out.loc[out["lap_number"] == 2].iloc[0]
+    assert lap2["current_compound"] == "HARD"
+    assert lap2["current_stint_number"] == 2

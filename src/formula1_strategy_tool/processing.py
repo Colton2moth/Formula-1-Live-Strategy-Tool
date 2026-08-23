@@ -99,6 +99,16 @@ def add_stint_features(spine: pd.DataFrame, stints: pd.DataFrame) -> pd.DataFram
         merged["lap_number"] <= merged["lap_end"]
     )
     out = merged.loc[in_stint].copy()
+    # Pit-lap overlap: stint N ends and stint N+1 starts on the same lap_number.
+    # Keep the higher stint_number so each spine row maps to exactly one stint.
+    out = (
+        out.sort_values("stint_number")
+        .groupby(
+            ["meeting_key", "session_key", "driver_number", "lap_number"],
+            as_index=False,
+        )
+        .tail(1)
+    )
     out = out.rename(
         columns={
             "compound": "current_compound",

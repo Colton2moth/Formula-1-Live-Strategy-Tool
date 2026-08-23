@@ -28,6 +28,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from formula1_strategy_tool.acquisition.live_drivers import drivers_from_live
+from formula1_strategy_tool.acquisition.live_session import latest_session_doc
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
 from formula1_strategy_tool.track.models import load_layout
 from formula1_strategy_tool.track.projection import LocationProjector
@@ -172,10 +173,10 @@ class Broadcaster:
         self._projector_circuit = None
 
     def _projector_for_state(self) -> LocationProjector | None:
-        sessions = self.state.docs_for("v1/sessions")
-        if not sessions:
+        session = latest_session_doc(self.state)
+        if session is None:
             return None
-        key = sessions[0].get("circuit_key")
+        key = session.get("circuit_key")
         circuit_key = int(key) if key is not None else None
         if circuit_key is None:
             return None

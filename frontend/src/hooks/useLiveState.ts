@@ -80,6 +80,7 @@ export function useRaceStream(
   const hasConnectedRef = useRef(false);
   const recoveryTimerRef = useRef<number | null>(null);
   const recoveryAttemptRef = useRef(0);
+  const recoveryGenerationRef = useRef(0);
 
   useEffect(() => {
     if (!snapshot) {
@@ -169,14 +170,19 @@ export function useRaceStream(
     };
 
     const recoverSnapshot = async () => {
+      const generation = ++recoveryGenerationRef.current;
       setRefreshing(true);
       activity.set(ACTIVITY_IDS.snapshotRefresh, ACTIVITY_MESSAGES.snapshotRefresh);
       try {
         const fresh = await source.fetchRaceState();
+        // Ignore stale fetches — WS events may have arrived while we waited.
+        if (generation !== recoveryGenerationRef.current) {
+          return;
+        }
         setSession(fresh.session);
         setDrivers(fresh.drivers);
         setPredictions(toPredictionMap(fresh));
-        setLocations(new Map());
+        // Keep live map positions; clearing here caused cars to vanish on reconnect.
         setStale(false);
         recoveryAttemptRef.current = 0;
         activity.clear(ACTIVITY_IDS.snapshotRefresh);
