@@ -32,13 +32,20 @@ any live session has been ingested.
   "session_name": "Race",
   "session_status": "active",
   "current_lap": 25,
-  "total_laps": 70,
+  "total_laps": null,
   "track_temperature": 34.2,
   "air_temperature": 21.5,
   "rainfall": false,
   "race_control_status": "GREEN"
 }
 ```
+
+`total_laps` is the scheduled race distance when it is authoritatively
+known, and `null` when it is not. OpenF1's live session object does not carry
+a lap count, so the live endpoints return `null` rather than inventing a
+denominator. A completed replay that knows the final lap count from its
+prepared timeline returns a real number. The frontend shows `14` when the
+total is unknown and `14 / 72` when it is known.
 
 ### GET `/api/drivers`
 
@@ -108,6 +115,12 @@ Three pit-window probabilities (3 / 5 / 7 laps) plus next-compound multiclass:
 `null`). `compound_probabilities` may be `null` when no prediction is
 available. `predicted_pit_window_start` / `predicted_pit_window_end` are a
 placeholder window for the strategy panel (not from a dedicated model yet).
+
+Live predictions are scored only from the current live session's features.
+When live inference cannot produce a prediction, the endpoint returns `[]`
+(and the single-driver endpoint returns `404`) rather than substituting a
+historical CSV snapshot. A historical snapshot is used only when the backend's
+opt-in `INFERENCE_CSV_FALLBACK` development flag is set.
 
 ### GET `/api/drivers/{driver_number}/prediction`
 
@@ -237,6 +250,10 @@ Connect to:
 
 Every event contains a `type` field. Events are pushed only when the relevant
 value changes.
+
+When OpenF1 moves to a new session, the backend resets its live buffer and
+closes `/ws/live` connections. Clients should treat the close as a normal
+reconnect and refetch `/api/race-state` to resync to the new session.
 
 ### Location update
 

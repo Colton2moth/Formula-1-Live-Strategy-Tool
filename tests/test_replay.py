@@ -94,6 +94,26 @@ def test_timeline_schedules_lap_at_date_end():
     assert lap_events[0][1]["lap_number"] == 1
 
 
+def test_timeline_schedules_lap_at_start_plus_duration_without_date_end():
+    data = _data()
+    data["laps"] = [
+        {
+            "driver_number": 4,
+            "lap_number": 1,
+            "date_start": "2026-07-26T13:00:00+00:00",
+            "lap_duration": 90.0,
+        }
+    ]
+    events = build_timeline(data)
+    lap_events = [
+        (offset, payload)
+        for offset, topic, payload in events
+        if topic == "v1/laps"
+    ]
+    assert len(lap_events) == 1
+    assert lap_events[0][0] == 90.0
+
+
 def test_stint_opens_with_null_lap_end():
     events = build_timeline(_data())
     stint_payloads = [payload for _, topic, payload in events if topic == "v1/stints"]

@@ -76,7 +76,9 @@ export function RaceHeader({ session, connectionStatus, stale = false }: RaceHea
               laps
             </span>
             <span className="race-header-stat-value race-header-stat-value--numeric">
-              {session.current_lap} / {session.total_laps}
+              {session.total_laps != null
+                ? `${session.current_lap} / ${session.total_laps}`
+                : session.current_lap}
             </span>
           </span>
         </div>

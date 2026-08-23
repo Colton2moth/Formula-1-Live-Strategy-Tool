@@ -3,7 +3,7 @@ export type ApiSession = {
   session_name: string;
   session_status: string;
   current_lap: number;
-  total_laps: number;
+  total_laps: number | null;
   track_temperature: number;
   air_temperature: number;
   rainfall: boolean;
