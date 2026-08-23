@@ -96,8 +96,10 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
     stints = _docs(state, "v1/stints")
     pits = _docs(state, "v1/pit")
 
-    # Latest completed lap per driver (max lap_number).
+    # Track the newest observed lap separately from the newest completed lap.
+    # OpenF1 creates the current lap row before lap_duration is available.
     latest_lap: dict[int, dict[str, Any]] = {}
+    latest_completed_lap: dict[int, dict[str, Any]] = {}
     for row in laps:
         num = row.get("driver_number")
         if num is None:
@@ -108,13 +110,25 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
             prev.get("lap_number") or 0
         ):
             latest_lap[num_i] = row
+        completed = latest_completed_lap.get(num_i)
+        if row.get("lap_duration") is not None and (
+            completed is None
+            or int(row.get("lap_number") or 0)
+            >= int(completed.get("lap_number") or 0)
+        ):
+            latest_completed_lap[num_i] = row
 
     results: list[DriverState] = []
     for d in driver_rows.values():
         num = int(d["driver_number"])
         lap_row = latest_lap.get(num)
+        completed_lap_row = latest_completed_lap.get(num)
         current_lap = int(lap_row.get("lap_number") or 0) if lap_row else 0
-        last_lap_time = float(lap_row.get("lap_duration") or 0.0) if lap_row else 0.0
+        last_lap_time = (
+            float(completed_lap_row["lap_duration"])
+            if completed_lap_row is not None
+            else 0.0
+        )
 
         stint = _current_stint(stints, num, max(current_lap, 1))
         compound = str(stint.get("compound") or "UNKNOWN") if stint else "UNKNOWN"

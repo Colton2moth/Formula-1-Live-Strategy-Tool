@@ -77,6 +77,25 @@ def test_driver_rows_deduplicate_bootstrap_and_mqtt_versions():
     assert drivers[0].name == "MQTT Driver"
 
 
+def test_driver_uses_last_completed_lap_time_while_current_lap_is_running():
+    state = LiveState()
+    state.update("v1/drivers", {"driver_number": 1, "full_name": "Driver One"})
+    state.update(
+        "v1/laps",
+        {"driver_number": 1, "lap_number": 10, "lap_duration": 75.421},
+    )
+    state.update(
+        "v1/laps",
+        {"driver_number": 1, "lap_number": 11, "lap_duration": None},
+    )
+
+    drivers = drivers_from_live(state)
+
+    assert drivers is not None
+    assert drivers[0].current_lap == 11
+    assert drivers[0].last_lap_time == 75.421
+
+
 def test_snapshot_and_replace_docs_roundtrip():
     state = LiveState()
     state.update("v1/laps", {"driver_number": 1, "lap_number": 1, "lap_duration": 90.0})
