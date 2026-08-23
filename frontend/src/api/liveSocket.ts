@@ -6,8 +6,7 @@ export type LocationUpdate = {
   driver_number: number;
   x: number | null;
   y: number | null;
-  map_x: number | null;
-  map_y: number | null;
+  progress: number | null;
 };
 
 export type DriverUpdate = {
@@ -76,6 +75,13 @@ function toNullableNumber(value: unknown): number | null {
   return isNumber(value) ? value : null;
 }
 
+function toProgress(value: unknown): number | null {
+  if (!isNumber(value) || value < 0 || value >= 1) {
+    return null;
+  }
+  return value;
+}
+
 function parseCompoundProbabilities(value: unknown): ApiCompoundProbabilities | null {
   if (value === null || !isRecord(value)) {
     return null;
@@ -98,8 +104,7 @@ function parseLocationUpdate(value: Record<string, unknown>): LocationUpdate | n
     driver_number: value.driver_number,
     x: isNumber(value.x) ? value.x : null,
     y: isNumber(value.y) ? value.y : null,
-    map_x: isNumber(value.map_x) ? value.map_x : null,
-    map_y: isNumber(value.map_y) ? value.map_y : null,
+    progress: toProgress(value.progress),
   };
 }
 

@@ -1,6 +1,7 @@
 """Tests for LiveState retention, thread-safe accessors, and location helpers."""
 
 from formula1_strategy_tool.acquisition.live_state import LiveState, location_xy
+from formula1_strategy_tool.acquisition.live_drivers import drivers_from_live
 
 
 def _location(driver_number, x, y, date="2026-01-01T00:00:00", key=None):
@@ -56,6 +57,24 @@ def test_other_topics_still_use_key():
         {"_key": "b", "driver_number": 1, "lap_number": 2, "lap_duration": 89.0},
     )
     assert len(state.docs_for("v1/laps")) == 2
+
+
+def test_driver_rows_deduplicate_bootstrap_and_mqtt_versions():
+    state = LiveState()
+    state.update(
+        "v1/drivers",
+        {"driver_number": 1, "full_name": "Bootstrap Driver"},
+    )
+    state.update(
+        "v1/drivers",
+        {"_key": "mqtt:1", "driver_number": 1, "full_name": "MQTT Driver"},
+    )
+
+    drivers = drivers_from_live(state)
+
+    assert drivers is not None
+    assert len(drivers) == 1
+    assert drivers[0].name == "MQTT Driver"
 
 
 def test_snapshot_and_replace_docs_roundtrip():

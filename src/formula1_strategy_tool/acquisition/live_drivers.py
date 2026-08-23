@@ -85,7 +85,7 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
     Missing timing fields fall back to safe zeros/defaults so the FE still gets
     a full object per driver.
     """
-    driver_rows = _docs(state, "v1/drivers")
+    driver_rows = _latest_by_driver(_docs(state, "v1/drivers"))
     if not driver_rows:
         return None
 
@@ -110,7 +110,7 @@ def drivers_from_live(state: LiveState) -> list[DriverState] | None:
             latest_lap[num_i] = row
 
     results: list[DriverState] = []
-    for d in driver_rows:
+    for d in driver_rows.values():
         num = int(d["driver_number"])
         lap_row = latest_lap.get(num)
         current_lap = int(lap_row.get("lap_number") or 0) if lap_row else 0

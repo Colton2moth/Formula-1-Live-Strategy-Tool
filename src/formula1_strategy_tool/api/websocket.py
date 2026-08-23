@@ -27,6 +27,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from formula1_strategy_tool.acquisition.downloader import parse_openf1_datetime
 from formula1_strategy_tool.acquisition.live_drivers import drivers_from_live
 from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
 from formula1_strategy_tool.track.models import load_layout
@@ -207,22 +208,24 @@ class Broadcaster:
             if self._last_locations.get(number) == key:
                 continue
             self._last_locations[number] = key
-            map_x = map_y = None
+            progress = None
             x = location.get("x")
             y = location.get("y")
             if projector is not None and x is not None and y is not None:
-                result = projector.project_location(number, float(x), float(y))
+                parsed_date = parse_openf1_datetime(location.get("date"))
+                timestamp = parsed_date.timestamp() if parsed_date is not None else None
+                result = projector.project_location(
+                    number, float(x), float(y), timestamp
+                )
                 if result is not None:
-                    _, _, display = result
-                    map_x, map_y = display
+                    progress = result[0]
             await self.manager.broadcast(
                 {
                     "type": "location_update",
                     "driver_number": number,
                     "x": location["x"],
                     "y": location["y"],
-                    "map_x": map_x,
-                    "map_y": map_y,
+                    "progress": progress,
                     "timestamp": location["date"],
                 }
             )
