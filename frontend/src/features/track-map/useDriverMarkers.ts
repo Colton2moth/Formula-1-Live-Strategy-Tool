@@ -7,7 +7,13 @@ import { displayPathPoint } from "./geometry";
 // median source gap of 0.24 s (~4 Hz); live streams at ~1 Hz. The render delay
 // below is derived from the observed per-driver source cadence, not a fixed
 // interval.
-const DISCONTINUITY_LAP_DELTA = 0.1;
+//
+// Forward-motion continuity: incoming progress is normalized 0..1, so a
+// long-gap sample can legitimately advance more than half a lap. Movement is
+// resolved forward-only and rejected only when it implies a faster lap than
+// MIN_PLAUSIBLE_LAP_MS — an anomaly guard, not a lap-time prediction model.
+const MIN_PLAUSIBLE_LAP_MS = 30000;
+const PROGRESS_GAP_SLACK = 0.05;
 const NO_MOVEMENT_EPSILON = 1e-9;
 
 // Fallback projection, used only when no future sample brackets the render time.
@@ -48,11 +54,15 @@ function normalize(progress: number): number {
   return value < 0 ? value + 1 : value;
 }
 
-function unwrapDelta(progress: number, authoritativeProgress: number): number {
-  let delta = progress - normalize(authoritativeProgress);
-  if (delta > 0.5) delta -= 1;
-  if (delta < -0.5) delta += 1;
-  return delta;
+function sampleHistory(samples: Sample[]): { sourceTimeMs: number; progress: number }[] {
+  return samples.map((sample) => ({ sourceTimeMs: sample.sourceTimeMs, progress: sample.progress }));
+}
+
+function motionLog(kind: "implausible" | "out-of-order", payload: Record<string, unknown>): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+  console.warn(`[track-motion] ${kind}`, payload);
 }
 
 function createMotion(progress: number, sourceTimeMs: number, now: number): DriverMotion {
@@ -68,21 +78,8 @@ function createMotion(progress: number, sourceTimeMs: number, now: number): Driv
   };
 }
 
-function resetProgress(
-  state: DriverMotion,
-  progress: number,
-  sourceTimeMs: number,
-  now: number,
-): void {
-  state.samples = [{ sourceTimeMs, progress }];
-  state.visualProgress = progress;
-  state.authoritativeProgress = progress;
-  state.anchorTime = now;
-  state.estimatedProgressRate = 0;
-  state.sampleIntervalMs = 0;
-}
-
 function advanceMotion(
+  driverNumber: number,
   state: DriverMotion,
   progress: number,
   now: number,
@@ -90,40 +87,63 @@ function advanceMotion(
 ): void {
   const last = state.samples[state.samples.length - 1];
   if (last && sourceTimeMs <= last.sourceTimeMs) {
+    motionLog("out-of-order", {
+      driverNumber,
+      sourceTimeMs,
+      previousSourceTimeMs: last.sourceTimeMs,
+      history: sampleHistory(state.samples),
+    });
     return;
   }
+
+  const previousNormalized = normalize(state.authoritativeProgress);
+  const rawDiff = progress - previousNormalized;
+  const forwardDelta = Math.abs(rawDiff) < NO_MOVEMENT_EPSILON ? 0 : (rawDiff + 1) % 1;
+
+  const sourceGapMs = last ? sourceTimeMs - last.sourceTimeMs : 0;
+  const maxPlausible = Math.min(1, sourceGapMs / MIN_PLAUSIBLE_LAP_MS + PROGRESS_GAP_SLACK);
+  if (forwardDelta > maxPlausible) {
+    motionLog("implausible", {
+      driverNumber,
+      previousProgress: state.authoritativeProgress,
+      incomingProgress: progress,
+      forwardDelta,
+      maxPlausible,
+      sourceTimeMs,
+      previousSourceTimeMs: last?.sourceTimeMs ?? null,
+      history: sampleHistory(state.samples),
+    });
+    return;
+  }
+
   if (last) {
-    const srcDelta = sourceTimeMs - last.sourceTimeMs;
     const localDelta = now - state.anchorTime;
-    if (srcDelta > 0 && localDelta > 0) {
-      const rate = srcDelta / localDelta;
+    if (sourceGapMs > 0 && localDelta > 0) {
+      const rate = sourceGapMs / localDelta;
       state.sourceRate =
         state.sourceRate === null
           ? rate
           : state.sourceRate * (1 - SOURCE_RATE_SMOOTHING) + rate * SOURCE_RATE_SMOOTHING;
       state.cadenceMs =
         state.cadenceMs === 0
-          ? srcDelta
-          : state.cadenceMs * (1 - CADENCE_SMOOTHING) + srcDelta * CADENCE_SMOOTHING;
+          ? sourceGapMs
+          : state.cadenceMs * (1 - CADENCE_SMOOTHING) + sourceGapMs * CADENCE_SMOOTHING;
     }
   }
-  state.samples.push({ sourceTimeMs, progress });
+
+  const newUnwrapped = state.authoritativeProgress + forwardDelta;
+  state.samples.push({ sourceTimeMs, progress: newUnwrapped });
   if (state.samples.length > MAX_HISTORY) {
     state.samples.shift();
   }
 
-  const delta = unwrapDelta(progress, state.authoritativeProgress);
-  if (Math.abs(delta) < NO_MOVEMENT_EPSILON) {
+  if (forwardDelta === 0) {
     state.anchorTime = now;
     state.estimatedProgressRate = 0;
     return;
   }
-  if (delta < 0 || delta > DISCONTINUITY_LAP_DELTA) {
-    resetProgress(state, progress, sourceTimeMs, now);
-    return;
-  }
   const elapsed = now - state.anchorTime;
-  const instantRate = elapsed > 0 ? delta / elapsed : 0;
+  const instantRate = elapsed > 0 ? forwardDelta / elapsed : 0;
   state.estimatedProgressRate =
     state.estimatedProgressRate > 0
       ? state.estimatedProgressRate * (1 - RATE_SMOOTHING) + instantRate * RATE_SMOOTHING
@@ -132,7 +152,7 @@ function advanceMotion(
     state.sampleIntervalMs > 0
       ? state.sampleIntervalMs * (1 - INTERVAL_SMOOTHING) + elapsed * INTERVAL_SMOOTHING
       : elapsed;
-  state.authoritativeProgress += delta;
+  state.authoritativeProgress = newUnwrapped;
   state.anchorTime = now;
 }
 
@@ -153,7 +173,7 @@ function interpolate(samples: Sample[], renderTimeMs: number): number | null {
         return null;
       }
       const factor = Math.min(1, Math.max(0, (renderTimeMs - a.sourceTimeMs) / span));
-      return a.progress + unwrapDelta(b.progress, a.progress) * factor;
+      return a.progress + (b.progress - a.progress) * factor;
     }
   }
   return null;
@@ -182,7 +202,7 @@ function computeTarget(state: DriverMotion, now: number): number {
     latest.sourceTimeMs + (now - state.anchorTime) * state.sourceRate - delayMs(state.cadenceMs);
   const interp = interpolate(state.samples, renderTimeMs);
   if (interp !== null) {
-    return state.visualProgress + unwrapDelta(interp, state.visualProgress);
+    return interp;
   }
   return projectTarget(state, now);
 }
@@ -228,7 +248,7 @@ export function useDriverMarkers(
       if (!state) {
         states.set(number, createMotion(entry.progress, sourceTimeMs, now));
       } else {
-        advanceMotion(state, entry.progress, now, sourceTimeMs);
+        advanceMotion(number, state, entry.progress, now, sourceTimeMs);
       }
     }
     for (const number of states.keys()) {

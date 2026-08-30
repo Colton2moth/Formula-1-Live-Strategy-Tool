@@ -53,6 +53,87 @@ function recoveryDelay(attempt: number): number {
   return Math.min(1000 * 2 ** attempt, MAX_RECOVERY_DELAY_MS);
 }
 
+function rawWrappedDelta(incoming: number, previous: number): number {
+  let delta = incoming - previous;
+  if (delta > 0.5) delta -= 1;
+  if (delta < -0.5) delta += 1;
+  return delta;
+}
+
+function rawLog(kind: string, payload: Record<string, unknown>, level: "warn" | "debug" = "warn"): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+  if (level === "debug") {
+    console.debug(`[track-raw] ${kind}`, payload);
+  } else {
+    console.warn(`[track-raw] ${kind}`, payload);
+  }
+}
+
+function diagnoseRawEvent(
+  driverNumber: number,
+  incomingProgress: number,
+  incomingTimeMs: number | null,
+  rawPrevious: Map<number, DriverTrackProgress>,
+  pending: DriverTrackProgress | undefined,
+): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+  if (pending) {
+    rawLog(
+      "coalesced",
+      {
+        driverNumber,
+        replacedProgress: pending.progress,
+        replacementProgress: incomingProgress,
+        replacedTimestamp: pending.sampleTimeMs,
+        replacementTimestamp: incomingTimeMs,
+      },
+      "debug",
+    );
+  }
+  const prev = rawPrevious.get(driverNumber);
+  if (!prev) {
+    return;
+  }
+  const delta = rawWrappedDelta(incomingProgress, prev.progress);
+  const base = {
+    driverNumber,
+    previousProgress: prev.progress,
+    incomingProgress,
+    delta,
+    previousTimestamp: prev.sampleTimeMs,
+    incomingTimestamp: incomingTimeMs,
+    replacesPendingSample: pending !== undefined,
+    pendingProgress: pending?.progress,
+    pendingTimestamp: pending?.sampleTimeMs,
+  };
+  if (delta < 0) {
+    rawLog("backward", base);
+  } else if (delta > 0.1) {
+    rawLog("large-forward", base);
+  }
+  if (incomingTimeMs !== null && prev.sampleTimeMs !== null) {
+    if (incomingTimeMs === prev.sampleTimeMs) {
+      rawLog("timestamp", {
+        driverNumber,
+        kind: "duplicate-timestamp",
+        previousTimestamp: prev.sampleTimeMs,
+        incomingTimestamp: incomingTimeMs,
+      });
+    } else if (incomingTimeMs < prev.sampleTimeMs) {
+      rawLog("timestamp", {
+        driverNumber,
+        kind: "older-timestamp",
+        previousTimestamp: prev.sampleTimeMs,
+        incomingTimestamp: incomingTimeMs,
+      });
+    }
+  }
+}
+
 export function useRaceStream(
   snapshot: RaceState | null,
   source: DashboardSource,
@@ -91,6 +172,7 @@ export function useRaceStream(
     }
 
     const pendingProgress = new Map<number, DriverTrackProgress>();
+    const rawPrevious = new Map<number, DriverTrackProgress>();
     let progressFrame: number | null = null;
     const flushProgress = () => {
       progressFrame = null;
@@ -109,10 +191,19 @@ export function useRaceStream(
         case "location_update": {
           if (event.progress !== null) {
             const parsedTime = event.timestamp === null ? Number.NaN : Date.parse(event.timestamp);
+            const sampleTimeMs = Number.isFinite(parsedTime) ? parsedTime : null;
+            diagnoseRawEvent(
+              event.driver_number,
+              event.progress,
+              sampleTimeMs,
+              rawPrevious,
+              pendingProgress.get(event.driver_number),
+            );
             pendingProgress.set(event.driver_number, {
               progress: event.progress,
-              sampleTimeMs: Number.isFinite(parsedTime) ? parsedTime : null,
+              sampleTimeMs,
             });
+            rawPrevious.set(event.driver_number, { progress: event.progress, sampleTimeMs });
             progressFrame ??= window.requestAnimationFrame(flushProgress);
           }
           break;
