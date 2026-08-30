@@ -3,6 +3,10 @@ import type { DriverTrackProgress } from "../../hooks/useLiveState";
 import type { TrackPoint } from "../../types/race";
 import { displayPathPoint } from "./geometry";
 
+export type MarkerAnimationMode =
+  | { type: "live" }
+  | { type: "replay"; speed: number; playing: boolean };
+
 // Cadence basis: cached replay location samples (2025 season) arrive at a
 // median source gap of 0.24 s (~4 Hz); live streams at ~1 Hz. The render delay
 // below is derived from the observed per-driver source cadence, not a fixed
@@ -16,7 +20,8 @@ const MIN_PLAUSIBLE_LAP_MS = 30000;
 const PROGRESS_GAP_SLACK = 0.05;
 const NO_MOVEMENT_EPSILON = 1e-9;
 
-// Fallback projection, used only when no future sample brackets the render time.
+// Fallback projection, used only by the live path when no future sample
+// brackets the render time. Replay never projects.
 const PROJECTION_MAX_MS = 3000;
 const PROJECTION_LEAD_SAMPLES = 2.5;
 const PROJECTION_MAX_DELTA = 0.04;
@@ -32,6 +37,15 @@ const MIN_DELAY_MS = 80;
 const MAX_DELAY_MS = 2000;
 const SOURCE_RATE_SMOOTHING = 0.3;
 const CADENCE_SMOOTHING = 0.3;
+
+// Replay renders from a deliberately buffered, monotonic source-time cursor
+// instead of guessing. The buffer is race/source time (not wall time) and
+// exceeds the ~3.4 s source gap observed between coalesced replay samples so a
+// future bracketing sample normally exists. The history window covers the
+// buffer plus the largest observed gap so the immediate predecessor sample is
+// retained.
+const REPLAY_BUFFER_MS = 5000;
+const REPLAY_HISTORY_WINDOW_MS = 10000;
 
 type Sample = {
   sourceTimeMs: number;
@@ -49,6 +63,11 @@ type DriverMotion = {
   cadenceMs: number;
 };
 
+type ReplayClock = {
+  sourceTimeMs: number | null;
+  underrun: boolean;
+};
+
 function normalize(progress: number): number {
   const value = progress % 1;
   return value < 0 ? value + 1 : value;
@@ -63,6 +82,13 @@ function motionLog(kind: "implausible" | "out-of-order", payload: Record<string,
     return;
   }
   console.warn(`[track-motion] ${kind}`, payload);
+}
+
+function replayLog(kind: string, payload: Record<string, unknown>): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+  console.warn(`[track-replay] ${kind}`, payload);
 }
 
 function createMotion(progress: number, sourceTimeMs: number, now: number): DriverMotion {
@@ -84,15 +110,19 @@ function advanceMotion(
   progress: number,
   now: number,
   sourceTimeMs: number,
+  historyWindowMs: number | null,
 ): void {
   const last = state.samples[state.samples.length - 1];
-  if (last && sourceTimeMs <= last.sourceTimeMs) {
+  if (last && sourceTimeMs < last.sourceTimeMs) {
     motionLog("out-of-order", {
       driverNumber,
       sourceTimeMs,
       previousSourceTimeMs: last.sourceTimeMs,
       history: sampleHistory(state.samples),
     });
+    return;
+  }
+  if (last && sourceTimeMs === last.sourceTimeMs) {
     return;
   }
 
@@ -133,7 +163,12 @@ function advanceMotion(
 
   const newUnwrapped = state.authoritativeProgress + forwardDelta;
   state.samples.push({ sourceTimeMs, progress: newUnwrapped });
-  if (state.samples.length > MAX_HISTORY) {
+  if (historyWindowMs !== null) {
+    const cutoff = sourceTimeMs - historyWindowMs;
+    while (state.samples.length > 1 && state.samples[0].sourceTimeMs < cutoff) {
+      state.samples.shift();
+    }
+  } else if (state.samples.length > MAX_HISTORY) {
     state.samples.shift();
   }
 
@@ -193,7 +228,7 @@ function projectTarget(state: DriverMotion, now: number): number {
   return state.authoritativeProgress + Math.min(timeDelta, lead);
 }
 
-function computeTarget(state: DriverMotion, now: number): number {
+function computeLiveTarget(state: DriverMotion, now: number): number {
   const latest = state.samples[state.samples.length - 1];
   if (!latest || state.sourceRate === null) {
     return state.visualProgress;
@@ -207,10 +242,65 @@ function computeTarget(state: DriverMotion, now: number): number {
   return projectTarget(state, now);
 }
 
+function computeReplayTarget(state: DriverMotion, renderSourceTimeMs: number | null): number {
+  if (renderSourceTimeMs === null) {
+    return state.visualProgress;
+  }
+  const interp = interpolate(state.samples, renderSourceTimeMs);
+  if (interp !== null) {
+    return interp;
+  }
+  const first = state.samples[0];
+  const last = state.samples[state.samples.length - 1];
+  if (!first || !last) {
+    return state.visualProgress;
+  }
+  if (renderSourceTimeMs <= first.sourceTimeMs) {
+    return first.progress;
+  }
+  return last.progress;
+}
+
+function setReplayUnderrun(clock: ReplayClock, underrun: boolean): void {
+  if (clock.underrun === underrun) {
+    return;
+  }
+  clock.underrun = underrun;
+  replayLog(underrun ? "buffer-underrun" : "buffer-restored", {
+    sourceTimeMs: clock.sourceTimeMs,
+  });
+}
+
+function advanceReplayClock(
+  clock: ReplayClock,
+  latestSourceTimeMs: number | null,
+  speed: number,
+  playing: boolean,
+  frameDeltaMs: number,
+): void {
+  if (!playing || latestSourceTimeMs === null) {
+    return;
+  }
+  const safeMaximum = latestSourceTimeMs - REPLAY_BUFFER_MS;
+  if (clock.sourceTimeMs === null) {
+    clock.sourceTimeMs = Math.max(0, safeMaximum);
+    setReplayUnderrun(clock, safeMaximum < 0);
+    return;
+  }
+  if (safeMaximum < clock.sourceTimeMs) {
+    setReplayUnderrun(clock, true);
+    return;
+  }
+  setReplayUnderrun(clock, false);
+  const desired = clock.sourceTimeMs + frameDeltaMs * speed;
+  clock.sourceTimeMs = Math.min(desired, safeMaximum);
+}
+
 export function useDriverMarkers(
   displayPath: TrackPoint[],
   progress: ReadonlyMap<number, DriverTrackProgress>,
   resetGeneration = 0,
+  animationMode: MarkerAnimationMode = { type: "live" },
 ) {
   const displayPathRef = useRef(displayPath);
   displayPathRef.current = displayPath;
@@ -218,10 +308,15 @@ export function useDriverMarkers(
   const progressRef = useRef(progress);
   progressRef.current = progress;
 
+  const modeRef = useRef(animationMode);
+  modeRef.current = animationMode;
+
   const statesRef = useRef<Map<number, DriverMotion>>(new Map());
   const elementsRef = useRef<Map<number, SVGGElement>>(new Map());
   const lastTransformRef = useRef<Map<number, string>>(new Map());
   const rafRef = useRef(0);
+  const renderClockRef = useRef<ReplayClock>({ sourceTimeMs: null, underrun: false });
+  const latestSourceTimeRef = useRef<number | null>(null);
 
   const resetGenerationRef = useRef(resetGeneration);
   useEffect(() => {
@@ -230,26 +325,41 @@ export function useDriverMarkers(
     }
     resetGenerationRef.current = resetGeneration;
     statesRef.current.clear();
+    renderClockRef.current = { sourceTimeMs: null, underrun: false };
+    latestSourceTimeRef.current = null;
   }, [resetGeneration]);
 
   useEffect(() => {
     if (progress.size === 0) {
       statesRef.current.clear();
+      renderClockRef.current = { sourceTimeMs: null, underrun: false };
+      latestSourceTimeRef.current = null;
       return;
     }
     const now = performance.now();
     const states = statesRef.current;
+    const historyWindowMs = modeRef.current.type === "replay" ? REPLAY_HISTORY_WINDOW_MS : null;
+    let maxSourceTime = 0;
     for (const [number, entry] of progress) {
       if (!Number.isFinite(entry.progress)) {
         continue;
       }
       const sourceTimeMs = entry.sampleTimeMs ?? now;
+      if (sourceTimeMs > maxSourceTime) {
+        maxSourceTime = sourceTimeMs;
+      }
       const state = states.get(number);
       if (!state) {
         states.set(number, createMotion(entry.progress, sourceTimeMs, now));
       } else {
-        advanceMotion(number, state, entry.progress, now, sourceTimeMs);
+        advanceMotion(number, state, entry.progress, now, sourceTimeMs, historyWindowMs);
       }
+    }
+    if (maxSourceTime > 0) {
+      latestSourceTimeRef.current =
+        latestSourceTimeRef.current === null
+          ? maxSourceTime
+          : Math.max(latestSourceTimeRef.current, maxSourceTime);
     }
     for (const number of states.keys()) {
       if (!progress.has(number)) {
@@ -277,12 +387,27 @@ export function useDriverMarkers(
       const alpha = 1 - Math.exp(
         -Math.min(frameDeltaMs, PROJECTION_SMOOTHING_MAX_FRAME_MS) / PROJECTION_SMOOTHING_TAU_MS,
       );
+      const mode = modeRef.current;
+      let renderSourceTimeMs: number | null = null;
+      if (mode.type === "replay") {
+        advanceReplayClock(
+          renderClockRef.current,
+          latestSourceTimeRef.current,
+          mode.speed,
+          mode.playing,
+          frameDeltaMs,
+        );
+        renderSourceTimeMs = renderClockRef.current.sourceTimeMs;
+      }
       const states = statesRef.current;
       const lastTransforms = lastTransformRef.current;
       for (const [number, element] of elements) {
         const state = states.get(number);
         if (!state) continue;
-        const target = computeTarget(state, now);
+        const target =
+          mode.type === "replay"
+            ? computeReplayTarget(state, renderSourceTimeMs)
+            : computeLiveTarget(state, now);
         state.visualProgress += (target - state.visualProgress) * alpha;
         const point = displayPathPoint(path, state.visualProgress);
         if (!point) continue;

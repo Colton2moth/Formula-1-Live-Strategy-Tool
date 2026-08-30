@@ -24,7 +24,7 @@ function clampSpeed(value: number): number {
 
 function defaultSpeed(): number {
   const env = Number(import.meta.env.VITE_REPLAY_SPEED);
-  return (SPEED_PRESETS as readonly number[]).includes(env) ? env : 10;
+  return (SPEED_PRESETS as readonly number[]).includes(env) ? env : 1;
 }
 
 export type ReplayProgress = {

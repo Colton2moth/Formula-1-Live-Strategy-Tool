@@ -5,6 +5,7 @@ import type { DriverTrackProgress } from "../../hooks/useLiveState";
 import type { ResourceStatus } from "../dashboard/useRaceData";
 import { START_FINISH_SQUARE_SIZE, startFinishSquares, trackPath } from "./geometry";
 import { useDriverMarkers } from "./useDriverMarkers";
+import type { MarkerAnimationMode } from "./useDriverMarkers";
 
 type TrackMapProps = {
   track: TrackState | null;
@@ -13,13 +14,14 @@ type TrackMapProps = {
   drivers: ApiDriver[];
   progress: ReadonlyMap<number, DriverTrackProgress>;
   resetGeneration: number;
+  animationMode?: MarkerAnimationMode;
   selectedDriver: ApiDriver | null;
   onSelectDriver: (driverNumber: number) => void;
 };
 
-export function TrackMap({ track, trackStatus, session, drivers, progress, resetGeneration, selectedDriver, onSelectDriver }: TrackMapProps) {
+export function TrackMap({ track, trackStatus, session, drivers, progress, resetGeneration, animationMode = { type: "live" }, selectedDriver, onSelectDriver }: TrackMapProps) {
   const displayPath = track?.display_path ?? [];
-  const { registerMarker } = useDriverMarkers(displayPath, progress, resetGeneration);
+  const { registerMarker } = useDriverMarkers(displayPath, progress, resetGeneration, animationMode);
   const label = `${session.meeting_name.toUpperCase()} | ${session.session_name.toUpperCase()}`;
   const mapPath = track ? trackPath(track.display_path) : "";
   const pitLanePath = track?.pit_lane?.path?.length ? trackPath(track.pit_lane.path) : null;

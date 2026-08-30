@@ -6,6 +6,7 @@ import { Leaderboard } from "../leaderboard/Leaderboard";
 import { RaceHeader } from "../race-header/RaceHeader";
 import { StrategyPanel } from "../strategy-panel/StrategyPanel";
 import { TrackMap } from "../track-map/TrackMap";
+import type { MarkerAnimationMode } from "../track-map/useDriverMarkers";
 import type { ResourceStatus } from "./useRaceData";
 
 type RaceDashboardProps = {
@@ -13,9 +14,10 @@ type RaceDashboardProps = {
   track: TrackState | null;
   trackStatus: ResourceStatus;
   source: DashboardSource;
+  animationMode?: MarkerAnimationMode;
 };
 
-export function RaceDashboard({ raceState, track, trackStatus, source }: RaceDashboardProps) {
+export function RaceDashboard({ raceState, track, trackStatus, source, animationMode = { type: "live" } }: RaceDashboardProps) {
   const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
 
   const stream = useRaceStream(raceState, source);
@@ -58,6 +60,7 @@ export function RaceDashboard({ raceState, track, trackStatus, source }: RaceDas
             drivers={sortedDrivers}
             progress={stream.progress}
             resetGeneration={stream.resetGeneration}
+            animationMode={animationMode}
             selectedDriver={selectedDriver}
             onSelectDriver={toggleSelectedDriver}
           />
