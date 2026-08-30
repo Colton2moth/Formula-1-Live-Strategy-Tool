@@ -4,11 +4,13 @@ import type { TrackPoint } from "../../types/race";
 import { displayPathPoint } from "./geometry";
 
 // Cadence basis: cached replay location samples (2025 season) arrive at a
-// median gap of 0.24 s (~4 Hz), p90 0.38 s, p95 0.42 s, p99 0.52 s, with the
-// longest normal gap ~1.9 s, no gaps over 2 s, and effectively no duplicate
-// timestamps. Live location streams at ~1 Hz. The backend caps each accepted
-// update at 2% of a lap and suppresses backwards corrections under 0.5%.
+// median source gap of 0.24 s (~4 Hz); live streams at ~1 Hz. The render delay
+// below is derived from the observed per-driver source cadence, not a fixed
+// interval.
 const DISCONTINUITY_LAP_DELTA = 0.1;
+const NO_MOVEMENT_EPSILON = 1e-9;
+
+// Fallback projection, used only when no future sample brackets the render time.
 const PROJECTION_MAX_MS = 3000;
 const PROJECTION_LEAD_SAMPLES = 2.5;
 const PROJECTION_MAX_DELTA = 0.04;
@@ -17,16 +19,28 @@ const PROJECTION_SMOOTHING_MAX_FRAME_MS = 100;
 const RATE_SMOOTHING = 0.4;
 const INTERVAL_SMOOTHING = 0.2;
 
+// Delayed two-sample interpolation.
+const MAX_HISTORY = 4;
+const DELAY_FACTOR = 1.0;
+const MIN_DELAY_MS = 80;
+const MAX_DELAY_MS = 2000;
+const SOURCE_RATE_SMOOTHING = 0.3;
+const CADENCE_SMOOTHING = 0.3;
+
+type Sample = {
+  sourceTimeMs: number;
+  progress: number;
+};
+
 type DriverMotion = {
+  samples: Sample[];
+  visualProgress: number;
   authoritativeProgress: number;
   anchorTime: number;
-  visualProgress: number;
-  previousProgress: number | null;
-  previousTime: number | null;
   estimatedProgressRate: number;
   sampleIntervalMs: number;
-  lastSampleTime: number;
-  sourceSampleTimeMs: number | null;
+  sourceRate: number | null;
+  cadenceMs: number;
 };
 
 function normalize(progress: number): number {
@@ -41,67 +55,74 @@ function unwrapDelta(progress: number, authoritativeProgress: number): number {
   return delta;
 }
 
-function createMotion(progress: number, now: number, sourceSampleTimeMs: number | null): DriverMotion {
+function createMotion(progress: number, sourceTimeMs: number, now: number): DriverMotion {
   return {
+    samples: [{ sourceTimeMs, progress }],
+    visualProgress: progress,
     authoritativeProgress: progress,
     anchorTime: now,
-    visualProgress: progress,
-    previousProgress: null,
-    previousTime: null,
     estimatedProgressRate: 0,
     sampleIntervalMs: 0,
-    lastSampleTime: now,
-    sourceSampleTimeMs,
+    sourceRate: null,
+    cadenceMs: 0,
   };
 }
 
-function resetMotion(
+function resetProgress(
   state: DriverMotion,
   progress: number,
+  sourceTimeMs: number,
   now: number,
-  sourceSampleTimeMs: number | null,
 ): void {
+  state.samples = [{ sourceTimeMs, progress }];
+  state.visualProgress = progress;
   state.authoritativeProgress = progress;
   state.anchorTime = now;
-  state.visualProgress = progress;
-  state.previousProgress = null;
-  state.previousTime = null;
   state.estimatedProgressRate = 0;
   state.sampleIntervalMs = 0;
-  state.lastSampleTime = now;
-  state.sourceSampleTimeMs = sourceSampleTimeMs;
 }
 
 function advanceMotion(
   state: DriverMotion,
   progress: number,
   now: number,
-  sourceSampleTimeMs: number | null,
+  sourceTimeMs: number,
 ): void {
-  if (
-    sourceSampleTimeMs !== null &&
-    state.sourceSampleTimeMs !== null &&
-    sourceSampleTimeMs <= state.sourceSampleTimeMs
-  ) {
+  const last = state.samples[state.samples.length - 1];
+  if (last && sourceTimeMs <= last.sourceTimeMs) {
     return;
   }
-  const delta = unwrapDelta(progress, state.authoritativeProgress);
-  if (delta === 0) {
-    if (sourceSampleTimeMs !== null) {
-      state.anchorTime = now;
-      state.lastSampleTime = now;
-      state.estimatedProgressRate = 0;
-      state.sourceSampleTimeMs = sourceSampleTimeMs;
+  if (last) {
+    const srcDelta = sourceTimeMs - last.sourceTimeMs;
+    const localDelta = now - state.anchorTime;
+    if (srcDelta > 0 && localDelta > 0) {
+      const rate = srcDelta / localDelta;
+      state.sourceRate =
+        state.sourceRate === null
+          ? rate
+          : state.sourceRate * (1 - SOURCE_RATE_SMOOTHING) + rate * SOURCE_RATE_SMOOTHING;
+      state.cadenceMs =
+        state.cadenceMs === 0
+          ? srcDelta
+          : state.cadenceMs * (1 - CADENCE_SMOOTHING) + srcDelta * CADENCE_SMOOTHING;
     }
+  }
+  state.samples.push({ sourceTimeMs, progress });
+  if (state.samples.length > MAX_HISTORY) {
+    state.samples.shift();
+  }
+
+  const delta = unwrapDelta(progress, state.authoritativeProgress);
+  if (Math.abs(delta) < NO_MOVEMENT_EPSILON) {
+    state.anchorTime = now;
+    state.estimatedProgressRate = 0;
     return;
   }
   if (delta < 0 || delta > DISCONTINUITY_LAP_DELTA) {
-    resetMotion(state, state.authoritativeProgress + delta, now, sourceSampleTimeMs);
+    resetProgress(state, progress, sourceTimeMs, now);
     return;
   }
   const elapsed = now - state.anchorTime;
-  state.previousProgress = state.authoritativeProgress;
-  state.previousTime = state.anchorTime;
   const instantRate = elapsed > 0 ? delta / elapsed : 0;
   state.estimatedProgressRate =
     state.estimatedProgressRate > 0
@@ -113,26 +134,57 @@ function advanceMotion(
       : elapsed;
   state.authoritativeProgress += delta;
   state.anchorTime = now;
-  state.lastSampleTime = now;
-  state.sourceSampleTimeMs = sourceSampleTimeMs;
 }
 
-function projectMotion(state: DriverMotion, now: number, frameDeltaMs: number): void {
-  const alpha = 1 - Math.exp(
-    -Math.min(frameDeltaMs, PROJECTION_SMOOTHING_MAX_FRAME_MS) / PROJECTION_SMOOTHING_TAU_MS,
-  );
+function delayMs(cadenceMs: number): number {
+  return Math.min(MAX_DELAY_MS, Math.max(MIN_DELAY_MS, cadenceMs * DELAY_FACTOR));
+}
+
+function interpolate(samples: Sample[], renderTimeMs: number): number | null {
+  for (let i = 0; i < samples.length; i += 1) {
+    if (samples[i].sourceTimeMs > renderTimeMs) {
+      const b = samples[i];
+      const a = i > 0 ? samples[i - 1] : null;
+      if (!a) {
+        return null;
+      }
+      const span = b.sourceTimeMs - a.sourceTimeMs;
+      if (span <= 0) {
+        return null;
+      }
+      const factor = Math.min(1, Math.max(0, (renderTimeMs - a.sourceTimeMs) / span));
+      return a.progress + unwrapDelta(b.progress, a.progress) * factor;
+    }
+  }
+  return null;
+}
+
+function projectTarget(state: DriverMotion, now: number): number {
   const rate = state.estimatedProgressRate;
   const elapsed = now - state.anchorTime;
-  let target = state.authoritativeProgress;
-  if (rate > 0 && elapsed > 0) {
-    const timeDelta = rate * Math.min(elapsed, PROJECTION_MAX_MS);
-    const lead = Math.min(
-      rate * state.sampleIntervalMs * PROJECTION_LEAD_SAMPLES,
-      PROJECTION_MAX_DELTA,
-    );
-    target = state.authoritativeProgress + Math.min(timeDelta, lead);
+  if (rate <= 0 || elapsed <= 0) {
+    return state.authoritativeProgress;
   }
-  state.visualProgress += (target - state.visualProgress) * alpha;
+  const timeDelta = rate * Math.min(elapsed, PROJECTION_MAX_MS);
+  const lead = Math.min(
+    rate * state.sampleIntervalMs * PROJECTION_LEAD_SAMPLES,
+    PROJECTION_MAX_DELTA,
+  );
+  return state.authoritativeProgress + Math.min(timeDelta, lead);
+}
+
+function computeTarget(state: DriverMotion, now: number): number {
+  const latest = state.samples[state.samples.length - 1];
+  if (!latest || state.sourceRate === null) {
+    return state.visualProgress;
+  }
+  const renderTimeMs =
+    latest.sourceTimeMs + (now - state.anchorTime) * state.sourceRate - delayMs(state.cadenceMs);
+  const interp = interpolate(state.samples, renderTimeMs);
+  if (interp !== null) {
+    return state.visualProgress + unwrapDelta(interp, state.visualProgress);
+  }
+  return projectTarget(state, now);
 }
 
 export function useDriverMarkers(
@@ -171,11 +223,12 @@ export function useDriverMarkers(
       if (!Number.isFinite(entry.progress)) {
         continue;
       }
+      const sourceTimeMs = entry.sampleTimeMs ?? now;
       const state = states.get(number);
       if (!state) {
-        states.set(number, createMotion(entry.progress, now, entry.sampleTimeMs));
+        states.set(number, createMotion(entry.progress, sourceTimeMs, now));
       } else {
-        advanceMotion(state, entry.progress, now, entry.sampleTimeMs);
+        advanceMotion(state, entry.progress, now, sourceTimeMs);
       }
     }
     for (const number of states.keys()) {
@@ -201,12 +254,16 @@ export function useDriverMarkers(
       const now = performance.now();
       const frameDeltaMs = prevFrameTime > 0 ? now - prevFrameTime : 0;
       prevFrameTime = now;
+      const alpha = 1 - Math.exp(
+        -Math.min(frameDeltaMs, PROJECTION_SMOOTHING_MAX_FRAME_MS) / PROJECTION_SMOOTHING_TAU_MS,
+      );
       const states = statesRef.current;
       const lastTransforms = lastTransformRef.current;
       for (const [number, element] of elements) {
         const state = states.get(number);
         if (!state) continue;
-        projectMotion(state, now, frameDeltaMs);
+        const target = computeTarget(state, now);
+        state.visualProgress += (target - state.visualProgress) * alpha;
         const point = displayPathPoint(path, state.visualProgress);
         if (!point) continue;
         const transform = `translate(${point.x}px, ${point.y}px)`;
