@@ -10,9 +10,9 @@ Event types match docs/api/CONTRACT.md: ``location_update``,
 ``driver_update``, ``weather_update``, ``race_control_update``, and
 ``prediction_update``.
 
-A background async loop drains each state's dirty-topic flags every ~50 ms and
-broadcasts only the values that actually changed, so obsolete location samples
-are never queued and unrelated UI is not re-rendered. Live and replay keep
+A background async loop drains each state's dirty-topic flags every ~50 ms,
+projects queued location samples, and coalesces them to one event per driver.
+Live and replay keep
 separate connection managers and broadcasters so their events never cross.
 Each replay runtime gets its own broadcaster (and diff state) so one user's
 events never reach another user's socket.
@@ -30,7 +30,11 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from formula1_strategy_tool.acquisition.downloader import parse_openf1_datetime
 from formula1_strategy_tool.acquisition.live_drivers import drivers_from_live
 from formula1_strategy_tool.acquisition.live_session import latest_session_doc
-from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
+from formula1_strategy_tool.acquisition.live_state import (
+    LIVE_STATE,
+    LiveState,
+    location_xy,
+)
 from formula1_strategy_tool.track.models import load_layout
 from formula1_strategy_tool.track.projection import LocationProjector
 
@@ -204,32 +208,37 @@ class Broadcaster:
 
     async def _flush_locations(self) -> None:
         projector = self._projector_for_state()
-        for number, location in self.state.latest_locations().items():
-            key = (location["x"], location["y"])
+        events: dict[int, dict[str, Any]] = {}
+        for location in self.state.drain_location_updates():
+            raw_number = location.get("driver_number")
+            if raw_number is None:
+                continue
+            number = int(raw_number)
+            x, y = location_xy(location)
+            key = (x, y, location.get("date"))
             if self._last_locations.get(number) == key:
                 continue
             self._last_locations[number] = key
             progress = None
-            x = location.get("x")
-            y = location.get("y")
             if projector is not None and x is not None and y is not None:
                 parsed_date = parse_openf1_datetime(location.get("date"))
                 timestamp = parsed_date.timestamp() if parsed_date is not None else None
-                result = projector.project_location(
-                    number, float(x), float(y), timestamp
-                )
+                result = projector.project_location(number, x, y, timestamp)
                 if result is not None:
                     progress = result[0]
-            await self.manager.broadcast(
-                {
-                    "type": "location_update",
-                    "driver_number": number,
-                    "x": location["x"],
-                    "y": location["y"],
-                    "progress": progress,
-                    "timestamp": location["date"],
-                }
-            )
+            previous_event = events.get(number)
+            if progress is None and previous_event is not None:
+                progress = previous_event["progress"]
+            events[number] = {
+                "type": "location_update",
+                "driver_number": number,
+                "x": x,
+                "y": y,
+                "progress": progress,
+                "timestamp": location.get("date"),
+            }
+        for event in events.values():
+            await self.manager.broadcast(event)
 
     async def _flush_drivers(self) -> None:
         drivers = drivers_from_live(self.state) or []
@@ -262,9 +271,7 @@ class Broadcaster:
         if race_control is None or race_control == self._last_race_control:
             return
         self._last_race_control = race_control
-        await self.manager.broadcast(
-            {"type": "race_control_update", **race_control}
-        )
+        await self.manager.broadcast({"type": "race_control_update", **race_control})
 
     async def _flush_predictions(self) -> None:
         if self._prediction_source is None:

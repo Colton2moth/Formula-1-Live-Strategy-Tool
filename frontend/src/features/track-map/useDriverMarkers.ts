@@ -9,13 +9,12 @@ import { displayPathPoint } from "./geometry";
 // timestamps. Live location streams at ~1 Hz. The backend caps each accepted
 // update at 2% of a lap and suppresses backwards corrections under 0.5%.
 const DISCONTINUITY_LAP_DELTA = 0.1;
-const PROJECTION_MAX_MS = 1500;
-const PROJECTION_LEAD_SAMPLES = 1.5;
-const PROJECTION_MAX_DELTA = 0.02;
+const PROJECTION_MAX_MS = 3000;
+const PROJECTION_LEAD_SAMPLES = 2.5;
+const PROJECTION_MAX_DELTA = 0.04;
 const PROJECTION_SMOOTHING_TAU_MS = 75;
 const PROJECTION_SMOOTHING_MAX_FRAME_MS = 100;
 const RATE_SMOOTHING = 0.4;
-const REANCHOR_GAP_MS = 2000;
 const INTERVAL_SMOOTHING = 0.2;
 
 type DriverMotion = {
@@ -27,6 +26,7 @@ type DriverMotion = {
   estimatedProgressRate: number;
   sampleIntervalMs: number;
   lastSampleTime: number;
+  sourceSampleTimeMs: number | null;
 };
 
 function normalize(progress: number): number {
@@ -41,7 +41,7 @@ function unwrapDelta(progress: number, authoritativeProgress: number): number {
   return delta;
 }
 
-function createMotion(progress: number, now: number): DriverMotion {
+function createMotion(progress: number, now: number, sourceSampleTimeMs: number | null): DriverMotion {
   return {
     authoritativeProgress: progress,
     anchorTime: now,
@@ -51,10 +51,16 @@ function createMotion(progress: number, now: number): DriverMotion {
     estimatedProgressRate: 0,
     sampleIntervalMs: 0,
     lastSampleTime: now,
+    sourceSampleTimeMs,
   };
 }
 
-function resetMotion(state: DriverMotion, progress: number, now: number): void {
+function resetMotion(
+  state: DriverMotion,
+  progress: number,
+  now: number,
+  sourceSampleTimeMs: number | null,
+): void {
   state.authoritativeProgress = progress;
   state.anchorTime = now;
   state.visualProgress = progress;
@@ -63,23 +69,34 @@ function resetMotion(state: DriverMotion, progress: number, now: number): void {
   state.estimatedProgressRate = 0;
   state.sampleIntervalMs = 0;
   state.lastSampleTime = now;
+  state.sourceSampleTimeMs = sourceSampleTimeMs;
 }
 
-function advanceMotion(state: DriverMotion, progress: number, now: number): void {
+function advanceMotion(
+  state: DriverMotion,
+  progress: number,
+  now: number,
+  sourceSampleTimeMs: number | null,
+): void {
+  if (
+    sourceSampleTimeMs !== null &&
+    state.sourceSampleTimeMs !== null &&
+    sourceSampleTimeMs <= state.sourceSampleTimeMs
+  ) {
+    return;
+  }
   const delta = unwrapDelta(progress, state.authoritativeProgress);
   if (delta === 0) {
-    state.anchorTime = now;
-    state.lastSampleTime = now;
-    state.estimatedProgressRate = 0;
+    if (sourceSampleTimeMs !== null) {
+      state.anchorTime = now;
+      state.lastSampleTime = now;
+      state.estimatedProgressRate = 0;
+      state.sourceSampleTimeMs = sourceSampleTimeMs;
+    }
     return;
   }
   if (delta < 0 || delta > DISCONTINUITY_LAP_DELTA) {
-    resetMotion(state, state.authoritativeProgress + delta, now);
-    return;
-  }
-  const sinceLastSample = now - state.lastSampleTime;
-  if (sinceLastSample > REANCHOR_GAP_MS) {
-    resetMotion(state, state.authoritativeProgress + delta, now);
+    resetMotion(state, state.authoritativeProgress + delta, now, sourceSampleTimeMs);
     return;
   }
   const elapsed = now - state.anchorTime;
@@ -97,6 +114,7 @@ function advanceMotion(state: DriverMotion, progress: number, now: number): void
   state.authoritativeProgress += delta;
   state.anchorTime = now;
   state.lastSampleTime = now;
+  state.sourceSampleTimeMs = sourceSampleTimeMs;
 }
 
 function projectMotion(state: DriverMotion, now: number, frameDeltaMs: number): void {
@@ -155,9 +173,9 @@ export function useDriverMarkers(
       }
       const state = states.get(number);
       if (!state) {
-        states.set(number, createMotion(entry.progress, now));
+        states.set(number, createMotion(entry.progress, now, entry.sampleTimeMs));
       } else {
-        advanceMotion(state, entry.progress, now);
+        advanceMotion(state, entry.progress, now, entry.sampleTimeMs);
       }
     }
     for (const number of states.keys()) {

@@ -10,7 +10,7 @@ import {
 import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../features/activity/useActivity";
 import type { ApiDriver, ApiPrediction, ApiSession, RaceState, TrackState } from "../types/race";
 
-export type DriverTrackProgress = { progress: number };
+export type DriverTrackProgress = { progress: number; sampleTimeMs: number | null };
 
 export type DashboardSource = {
   socketPath: string;
@@ -90,17 +90,31 @@ export function useRaceStream(
       return;
     }
 
+    const pendingProgress = new Map<number, DriverTrackProgress>();
+    let progressFrame: number | null = null;
+    const flushProgress = () => {
+      progressFrame = null;
+      if (pendingProgress.size === 0) return;
+      const updates = new Map(pendingProgress);
+      pendingProgress.clear();
+      setProgress((prev) => {
+        const next = new Map(prev);
+        for (const [number, entry] of updates) next.set(number, entry);
+        return next;
+      });
+    };
+
     const applyEvent = (event: LiveEvent) => {
       switch (event.type) {
         case "location_update": {
-          setProgress((prev) => {
-            if (event.progress === null) {
-              return prev;
-            }
-            const next = new Map(prev);
-            next.set(event.driver_number, { progress: event.progress });
-            return next;
-          });
+          if (event.progress !== null) {
+            const parsedTime = event.timestamp === null ? Number.NaN : Date.parse(event.timestamp);
+            pendingProgress.set(event.driver_number, {
+              progress: event.progress,
+              sampleTimeMs: Number.isFinite(parsedTime) ? parsedTime : null,
+            });
+            progressFrame ??= window.requestAnimationFrame(flushProgress);
+          }
           break;
         }
         case "driver_update": {
@@ -224,6 +238,7 @@ export function useRaceStream(
 
     return () => {
       hasConnectedRef.current = false;
+      if (progressFrame !== null) window.cancelAnimationFrame(progressFrame);
       clearRecoveryTimer();
       socket.close();
       activity.clear(ACTIVITY_IDS.socket);

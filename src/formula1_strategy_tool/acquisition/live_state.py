@@ -23,9 +23,11 @@ background thread while FastAPI reads it to serve responses.
 from __future__ import annotations
 
 import threading
+from collections import deque
 from typing import Any
 
 _LOCATION_TOPIC = "v1/location"
+_MAX_PENDING_LOCATIONS = 4096
 
 
 def location_xy(payload: dict[str, Any]) -> tuple[float | None, float | None]:
@@ -59,6 +61,10 @@ class LiveState:
         self.counts: dict[str, int] = {}
         # Topics changed since the last drain (drives the WS broadcaster).
         self._dirty: set[str] = set()
+        # Short-lived samples awaiting projection by the WebSocket broadcaster.
+        self._pending_locations: deque[dict[str, Any]] = deque(
+            maxlen=_MAX_PENDING_LOCATIONS
+        )
         # Guards docs/counts/_dirty: MQTT writes in a thread, API reads in others.
         self._lock = threading.RLock()
 
@@ -112,6 +118,8 @@ class LiveState:
             bucket[key] = payload
             self.counts[topic] = self.counts.get(topic, 0) + 1
             self._dirty.add(topic)
+            if topic == _LOCATION_TOPIC:
+                self._pending_locations.append(payload)
 
     def drain_dirty(self) -> set[str]:
         """Return and clear the set of topics changed since the last drain."""
@@ -126,22 +134,21 @@ class LiveState:
             self.docs.clear()
             self.counts.clear()
             self._dirty.clear()
+            self._pending_locations.clear()
 
     def snapshot_docs(self) -> dict[str, dict[str, dict[str, Any]]]:
         """Copy the store (topic -> key -> payload) for checkpoint persistence."""
         with self._lock:
-            return {
-                topic: dict(bucket) for topic, bucket in self.docs.items()
-            }
+            return {topic: dict(bucket) for topic, bucket in self.docs.items()}
 
     def replace_docs(self, docs: dict[str, dict[str, dict[str, Any]]]) -> None:
         """Replace the whole store with a restored snapshot (thread-safe)."""
         with self._lock:
-            self.docs = {
-                topic: dict(bucket) for topic, bucket in docs.items()
-            }
+            self.docs = {topic: dict(bucket) for topic, bucket in docs.items()}
             self.counts = {topic: len(bucket) for topic, bucket in self.docs.items()}
             self._dirty = set(self.docs)
+            self._pending_locations.clear()
+            self._pending_locations.extend(self.docs.get(_LOCATION_TOPIC, {}).values())
 
     def docs_for(self, topic: str) -> list[dict[str, Any]]:
         """Return a snapshot list of stored payloads for one topic."""
@@ -170,6 +177,13 @@ class LiveState:
                     "date": payload.get("date"),
                 }
         return out
+
+    def drain_location_updates(self) -> list[dict[str, Any]]:
+        """Return queued location samples in arrival order, then clear them."""
+        with self._lock:
+            pending = list(self._pending_locations)
+            self._pending_locations.clear()
+        return pending
 
     def summary(self) -> dict[str, dict[str, int]]:
         """Return per-topic message count and how many unique keys we hold."""

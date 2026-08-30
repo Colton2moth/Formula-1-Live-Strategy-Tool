@@ -7,18 +7,20 @@ import os
 os.environ["LIVE_BOOTSTRAP"] = "0"
 os.environ["LIVE_MQTT"] = "0"
 
+import asyncio
 import time
 
 import pytest
 from fastapi.testclient import TestClient
 
-from formula1_strategy_tool.acquisition.live_state import LIVE_STATE
+from formula1_strategy_tool.acquisition.live_state import LIVE_STATE, LiveState
 from formula1_strategy_tool.api.schemas import (
     CompoundProbabilities,
     DriverState,
     PredictionState,
 )
 from formula1_strategy_tool.api.websocket import (
+    Broadcaster,
     _driver_event,
     _prediction_event,
     broadcaster,
@@ -153,6 +155,45 @@ def test_location_update_limits_impossible_timed_jump():
     assert first["progress"] is not None
     assert limited["progress"] is not None
     assert 0 < (limited["progress"] - first["progress"]) % 1.0 <= 0.02 + 1e-9
+
+
+def test_broadcaster_projects_queued_samples_before_coalescing():
+    from formula1_strategy_tool.track.models import load_layout
+
+    class CaptureManager:
+        def __init__(self):
+            self.messages = []
+
+        async def broadcast(self, message):
+            self.messages.append(message)
+
+    layout = load_layout(2)
+    assert layout is not None
+    state = LiveState()
+    state.update("v1/sessions", {"circuit_key": 2, "session_name": "Race"})
+    capture = CaptureManager()
+    local_broadcaster = Broadcaster(capture, state)
+
+    for offset, index in enumerate((100, 110, 120, 130)):
+        point = layout.reference_path[index]
+        state.update(
+            "v1/location",
+            {
+                "driver_number": 4,
+                "x": point.x,
+                "y": point.y,
+                "date": f"2025-07-06T14:00:0{offset}",
+            },
+        )
+        if offset == 0:
+            asyncio.run(local_broadcaster.flush())
+
+    asyncio.run(local_broadcaster.flush())
+    updates = [
+        message for message in capture.messages if message["type"] == "location_update"
+    ]
+    assert len(updates) == 2
+    assert (updates[1]["progress"] - updates[0]["progress"]) % 1.0 > 0.02
 
 
 def test_websocket_streams_only_changed_locations():

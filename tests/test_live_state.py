@@ -1,7 +1,7 @@
 """Tests for LiveState retention, thread-safe accessors, and location helpers."""
 
-from formula1_strategy_tool.acquisition.live_state import LiveState, location_xy
 from formula1_strategy_tool.acquisition.live_drivers import drivers_from_live
+from formula1_strategy_tool.acquisition.live_state import LiveState, location_xy
 
 
 def _location(driver_number, x, y, date="2026-01-01T00:00:00", key=None):
@@ -26,6 +26,19 @@ def test_location_retention_keeps_latest_per_driver():
     assert locations[1]["y"] == 220.0
     assert locations[44]["x"] == 5.0
     assert locations[44]["y"] == 6.0
+
+
+def test_location_updates_queue_intermediate_samples_until_drain():
+    state = LiveState()
+    for index, x in enumerate((100, 110, 120)):
+        state.update(
+            "v1/location",
+            _location(1, x, 200, date=f"2026-01-01T00:00:0{index}"),
+        )
+
+    assert state.latest_locations()[1]["x"] == 120.0
+    assert [row["x"] for row in state.drain_location_updates()] == [100, 110, 120]
+    assert state.drain_location_updates() == []
 
 
 def test_latest_locations_nulls_no_position_sentinel():

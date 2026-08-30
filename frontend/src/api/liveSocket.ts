@@ -7,6 +7,7 @@ export type LocationUpdate = {
   x: number | null;
   y: number | null;
   progress: number | null;
+  timestamp: string | null;
 };
 
 export type DriverUpdate = {
@@ -112,6 +113,7 @@ function parseLocationUpdate(value: Record<string, unknown>): LocationUpdate | n
     x: isNumber(value.x) ? value.x : null,
     y: isNumber(value.y) ? value.y : null,
     progress: toProgress(value.progress),
+    timestamp: typeof value.timestamp === "string" ? value.timestamp : null,
   };
 }
 
