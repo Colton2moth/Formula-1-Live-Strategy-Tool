@@ -38,6 +38,7 @@ export type RaceStreamResult = {
   drivers: ApiDriver[];
   predictions: ReadonlyMap<number, ApiPrediction>;
   progress: ReadonlyMap<number, DriverTrackProgress>;
+  resetGeneration: number;
   refreshing: boolean;
   stale: boolean;
 };
@@ -63,6 +64,7 @@ export function useRaceStream(
   const [status, setStatus] = useState<LiveSocketStatus>("connecting");
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState(false);
+  const [resetGeneration, setResetGeneration] = useState(0);
   const [seededSnapshot, setSeededSnapshot] = useState(snapshot);
   const activity = useActivity();
 
@@ -73,6 +75,7 @@ export function useRaceStream(
       setDrivers(snapshot.drivers);
       setPredictions(toPredictionMap(snapshot));
       setProgress(new Map());
+      setResetGeneration((generation) => generation + 1);
       setStale(false);
     }
   }
@@ -239,5 +242,5 @@ export function useRaceStream(
     return { ...session, current_lap: liveLap };
   }, [session, drivers]);
 
-  return { status, session: liveSession, drivers, predictions, progress, refreshing, stale };
+  return { status, session: liveSession, drivers, predictions, progress, resetGeneration, refreshing, stale };
 }

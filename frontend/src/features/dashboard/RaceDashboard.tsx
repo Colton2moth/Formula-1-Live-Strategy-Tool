@@ -57,6 +57,7 @@ export function RaceDashboard({ raceState, track, trackStatus, source }: RaceDas
             session={session}
             drivers={sortedDrivers}
             progress={stream.progress}
+            resetGeneration={stream.resetGeneration}
             selectedDriver={selectedDriver}
             onSelectDriver={toggleSelectedDriver}
           />

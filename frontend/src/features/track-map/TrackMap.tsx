@@ -12,13 +12,14 @@ type TrackMapProps = {
   session: ApiSession;
   drivers: ApiDriver[];
   progress: ReadonlyMap<number, DriverTrackProgress>;
+  resetGeneration: number;
   selectedDriver: ApiDriver | null;
   onSelectDriver: (driverNumber: number) => void;
 };
 
-export function TrackMap({ track, trackStatus, session, drivers, progress, selectedDriver, onSelectDriver }: TrackMapProps) {
+export function TrackMap({ track, trackStatus, session, drivers, progress, resetGeneration, selectedDriver, onSelectDriver }: TrackMapProps) {
   const displayPath = track?.display_path ?? [];
-  const { registerMarker } = useDriverMarkers(displayPath, progress);
+  const { registerMarker } = useDriverMarkers(displayPath, progress, resetGeneration);
   const label = `${session.meeting_name.toUpperCase()} | ${session.session_name.toUpperCase()}`;
   const mapPath = track ? trackPath(track.display_path) : "";
   const pitLanePath = track?.pit_lane?.path?.length ? trackPath(track.pit_lane.path) : null;

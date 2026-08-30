@@ -68,18 +68,21 @@ function resetMotion(state: DriverMotion, progress: number, now: number): void {
 function advanceMotion(state: DriverMotion, progress: number, now: number): void {
   const delta = unwrapDelta(progress, state.authoritativeProgress);
   if (delta === 0) {
+    state.anchorTime = now;
     state.lastSampleTime = now;
+    state.estimatedProgressRate = 0;
     return;
   }
   if (delta < 0 || delta > DISCONTINUITY_LAP_DELTA) {
     resetMotion(state, state.authoritativeProgress + delta, now);
     return;
   }
-  const elapsed = now - state.anchorTime;
-  if (elapsed > REANCHOR_GAP_MS) {
+  const sinceLastSample = now - state.lastSampleTime;
+  if (sinceLastSample > REANCHOR_GAP_MS) {
     resetMotion(state, state.authoritativeProgress + delta, now);
     return;
   }
+  const elapsed = now - state.anchorTime;
   state.previousProgress = state.authoritativeProgress;
   state.previousTime = state.anchorTime;
   const instantRate = elapsed > 0 ? delta / elapsed : 0;
@@ -97,29 +100,27 @@ function advanceMotion(state: DriverMotion, progress: number, now: number): void
 }
 
 function projectMotion(state: DriverMotion, now: number, frameDeltaMs: number): void {
-  if (state.estimatedProgressRate <= 0) {
-    return;
-  }
-  const elapsed = now - state.anchorTime;
-  if (elapsed <= 0) {
-    return;
-  }
-  const rate = state.estimatedProgressRate;
-  const timeDelta = rate * Math.min(elapsed, PROJECTION_MAX_MS);
-  const lead = Math.min(
-    rate * state.sampleIntervalMs * PROJECTION_LEAD_SAMPLES,
-    PROJECTION_MAX_DELTA,
-  );
-  const target = state.authoritativeProgress + Math.min(timeDelta, lead);
   const alpha = 1 - Math.exp(
     -Math.min(frameDeltaMs, PROJECTION_SMOOTHING_MAX_FRAME_MS) / PROJECTION_SMOOTHING_TAU_MS,
   );
+  const rate = state.estimatedProgressRate;
+  const elapsed = now - state.anchorTime;
+  let target = state.authoritativeProgress;
+  if (rate > 0 && elapsed > 0) {
+    const timeDelta = rate * Math.min(elapsed, PROJECTION_MAX_MS);
+    const lead = Math.min(
+      rate * state.sampleIntervalMs * PROJECTION_LEAD_SAMPLES,
+      PROJECTION_MAX_DELTA,
+    );
+    target = state.authoritativeProgress + Math.min(timeDelta, lead);
+  }
   state.visualProgress += (target - state.visualProgress) * alpha;
 }
 
 export function useDriverMarkers(
   displayPath: TrackPoint[],
   progress: ReadonlyMap<number, DriverTrackProgress>,
+  resetGeneration = 0,
 ) {
   const displayPathRef = useRef(displayPath);
   displayPathRef.current = displayPath;
@@ -131,6 +132,15 @@ export function useDriverMarkers(
   const elementsRef = useRef<Map<number, SVGGElement>>(new Map());
   const lastTransformRef = useRef<Map<number, string>>(new Map());
   const rafRef = useRef(0);
+
+  const resetGenerationRef = useRef(resetGeneration);
+  useEffect(() => {
+    if (resetGenerationRef.current === resetGeneration) {
+      return;
+    }
+    resetGenerationRef.current = resetGeneration;
+    statesRef.current.clear();
+  }, [resetGeneration]);
 
   useEffect(() => {
     if (progress.size === 0) {
