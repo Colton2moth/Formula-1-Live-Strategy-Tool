@@ -3,18 +3,30 @@ import type { DriverTrackProgress } from "../../hooks/useLiveState";
 import type { TrackPoint } from "../../types/race";
 import { displayPathPoint } from "./geometry";
 
+// Cadence basis: cached replay location samples (2025 season) arrive at a
+// median gap of 0.24 s (~4 Hz), p90 0.38 s, p95 0.42 s, p99 0.52 s, with the
+// longest normal gap ~1.9 s, no gaps over 2 s, and effectively no duplicate
+// timestamps. Live location streams at ~1 Hz. The backend caps each accepted
+// update at 2% of a lap and suppresses backwards corrections under 0.5%.
 const DISCONTINUITY_LAP_DELTA = 0.1;
-const MIN_INTERPOLATION_MS = 1;
-const MAX_INTERPOLATION_MS = 1000;
+const PROJECTION_MAX_MS = 1500;
+const PROJECTION_LEAD_SAMPLES = 1.5;
+const PROJECTION_MAX_DELTA = 0.02;
+const PROJECTION_SMOOTHING_TAU_MS = 75;
+const PROJECTION_SMOOTHING_MAX_FRAME_MS = 100;
+const RATE_SMOOTHING = 0.4;
+const REANCHOR_GAP_MS = 2000;
+const INTERVAL_SMOOTHING = 0.2;
 
-type MarkerAnim = {
-  visual: number;
-  target: number;
-  confirmed: number;
-  from: number;
-  startTime: number;
-  duration: number;
-  lastArrival: number;
+type DriverMotion = {
+  authoritativeProgress: number;
+  anchorTime: number;
+  visualProgress: number;
+  previousProgress: number | null;
+  previousTime: number | null;
+  estimatedProgressRate: number;
+  sampleIntervalMs: number;
+  lastSampleTime: number;
 };
 
 function normalize(progress: number): number {
@@ -22,21 +34,87 @@ function normalize(progress: number): number {
   return value < 0 ? value + 1 : value;
 }
 
-function unwrapDelta(progress: number, target: number): number {
-  let delta = progress - normalize(target);
+function unwrapDelta(progress: number, authoritativeProgress: number): number {
+  let delta = progress - normalize(authoritativeProgress);
   if (delta > 0.5) delta -= 1;
   if (delta < -0.5) delta += 1;
   return delta;
 }
 
-function snapState(state: MarkerAnim, target: number, confirmed: number, now: number): void {
-  state.visual = target;
-  state.target = target;
-  state.confirmed = confirmed;
-  state.from = target;
-  state.startTime = now;
-  state.duration = 0;
-  state.lastArrival = now;
+function createMotion(progress: number, now: number): DriverMotion {
+  return {
+    authoritativeProgress: progress,
+    anchorTime: now,
+    visualProgress: progress,
+    previousProgress: null,
+    previousTime: null,
+    estimatedProgressRate: 0,
+    sampleIntervalMs: 0,
+    lastSampleTime: now,
+  };
+}
+
+function resetMotion(state: DriverMotion, progress: number, now: number): void {
+  state.authoritativeProgress = progress;
+  state.anchorTime = now;
+  state.visualProgress = progress;
+  state.previousProgress = null;
+  state.previousTime = null;
+  state.estimatedProgressRate = 0;
+  state.sampleIntervalMs = 0;
+  state.lastSampleTime = now;
+}
+
+function advanceMotion(state: DriverMotion, progress: number, now: number): void {
+  const delta = unwrapDelta(progress, state.authoritativeProgress);
+  if (delta === 0) {
+    state.lastSampleTime = now;
+    return;
+  }
+  if (delta < 0 || delta > DISCONTINUITY_LAP_DELTA) {
+    resetMotion(state, state.authoritativeProgress + delta, now);
+    return;
+  }
+  const elapsed = now - state.anchorTime;
+  if (elapsed > REANCHOR_GAP_MS) {
+    resetMotion(state, state.authoritativeProgress + delta, now);
+    return;
+  }
+  state.previousProgress = state.authoritativeProgress;
+  state.previousTime = state.anchorTime;
+  const instantRate = elapsed > 0 ? delta / elapsed : 0;
+  state.estimatedProgressRate =
+    state.estimatedProgressRate > 0
+      ? state.estimatedProgressRate * (1 - RATE_SMOOTHING) + instantRate * RATE_SMOOTHING
+      : instantRate;
+  state.sampleIntervalMs =
+    state.sampleIntervalMs > 0
+      ? state.sampleIntervalMs * (1 - INTERVAL_SMOOTHING) + elapsed * INTERVAL_SMOOTHING
+      : elapsed;
+  state.authoritativeProgress += delta;
+  state.anchorTime = now;
+  state.lastSampleTime = now;
+}
+
+function projectMotion(state: DriverMotion, now: number, frameDeltaMs: number): void {
+  if (state.estimatedProgressRate <= 0) {
+    return;
+  }
+  const elapsed = now - state.anchorTime;
+  if (elapsed <= 0) {
+    return;
+  }
+  const rate = state.estimatedProgressRate;
+  const timeDelta = rate * Math.min(elapsed, PROJECTION_MAX_MS);
+  const lead = Math.min(
+    rate * state.sampleIntervalMs * PROJECTION_LEAD_SAMPLES,
+    PROJECTION_MAX_DELTA,
+  );
+  const target = state.authoritativeProgress + Math.min(timeDelta, lead);
+  const alpha = 1 - Math.exp(
+    -Math.min(frameDeltaMs, PROJECTION_SMOOTHING_MAX_FRAME_MS) / PROJECTION_SMOOTHING_TAU_MS,
+  );
+  state.visualProgress += (target - state.visualProgress) * alpha;
 }
 
 export function useDriverMarkers(
@@ -49,7 +127,7 @@ export function useDriverMarkers(
   const progressRef = useRef(progress);
   progressRef.current = progress;
 
-  const statesRef = useRef<Map<number, MarkerAnim>>(new Map());
+  const statesRef = useRef<Map<number, DriverMotion>>(new Map());
   const elementsRef = useRef<Map<number, SVGGElement>>(new Map());
   const lastTransformRef = useRef<Map<number, string>>(new Map());
   const rafRef = useRef(0);
@@ -62,43 +140,26 @@ export function useDriverMarkers(
     const now = performance.now();
     const states = statesRef.current;
     for (const [number, entry] of progress) {
-      const p = entry.progress;
+      if (!Number.isFinite(entry.progress)) {
+        continue;
+      }
       const state = states.get(number);
       if (!state) {
-        states.set(number, {
-          visual: p,
-          target: p,
-          confirmed: p,
-          from: p,
-          startTime: now,
-          duration: 0,
-          lastArrival: now,
-        });
-        continue;
+        states.set(number, createMotion(entry.progress, now));
+      } else {
+        advanceMotion(state, entry.progress, now);
       }
-      if (state.confirmed === p) {
-        continue;
+    }
+    for (const number of states.keys()) {
+      if (!progress.has(number)) {
+        states.delete(number);
       }
-      const delta = unwrapDelta(p, state.target);
-      if (delta < -DISCONTINUITY_LAP_DELTA || delta > DISCONTINUITY_LAP_DELTA) {
-        snapState(state, state.target + delta, p, now);
-        continue;
-      }
-      if (delta < 0) {
-        continue;
-      }
-      state.from = state.visual;
-      state.target = state.target + delta;
-      state.confirmed = p;
-      const interval = now - state.lastArrival;
-      state.duration = Math.min(Math.max(interval, MIN_INTERPOLATION_MS), MAX_INTERPOLATION_MS);
-      state.startTime = now;
-      state.lastArrival = now;
     }
   }, [progress]);
 
   useEffect(() => {
-    const frame = (now: number) => {
+    let prevFrameTime = 0;
+    const frame = () => {
       rafRef.current = window.requestAnimationFrame(frame);
 
       const path = displayPathRef.current;
@@ -109,16 +170,16 @@ export function useDriverMarkers(
       if (elements.size === 0) {
         return;
       }
+      const now = performance.now();
+      const frameDeltaMs = prevFrameTime > 0 ? now - prevFrameTime : 0;
+      prevFrameTime = now;
       const states = statesRef.current;
       const lastTransforms = lastTransformRef.current;
       for (const [number, element] of elements) {
         const state = states.get(number);
         if (!state) continue;
-        const elapsed = now - state.startTime;
-        const t = state.duration > 0 ? Math.min(1, elapsed / state.duration) : 1;
-        const visual = state.from + (state.target - state.from) * t;
-        state.visual = visual;
-        const point = displayPathPoint(path, visual);
+        projectMotion(state, now, frameDeltaMs);
+        const point = displayPathPoint(path, state.visualProgress);
         if (!point) continue;
         const transform = `translate(${point.x}px, ${point.y}px)`;
         if (lastTransforms.get(number) !== transform) {
@@ -150,6 +211,7 @@ export function useDriverMarkers(
         } else {
           elementsRef.current.delete(driverNumber);
           lastTransformRef.current.delete(driverNumber);
+          statesRef.current.delete(driverNumber);
         }
       };
       markerRefFactories.current.set(driverNumber, factory);
