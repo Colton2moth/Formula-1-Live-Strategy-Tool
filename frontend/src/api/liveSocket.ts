@@ -1,4 +1,4 @@
-import type { ApiCompoundProbabilities } from "../types/race";
+import type { ApiCompoundProbabilities, TrackRoute } from "../types/race";
 import { apiBaseUrl } from "./raceState";
 
 export type LocationUpdate = {
@@ -7,6 +7,8 @@ export type LocationUpdate = {
   x: number | null;
   y: number | null;
   progress: number | null;
+  route: TrackRoute;
+  pit_lane_progress: number | null;
   timestamp: string | null;
 };
 
@@ -90,6 +92,13 @@ function toProgress(value: unknown): number | null {
   return value;
 }
 
+function toPitLaneProgress(value: unknown): number | null {
+  if (!isNumber(value) || value < 0 || value > 1) {
+    return null;
+  }
+  return value;
+}
+
 function parseCompoundProbabilities(value: unknown): ApiCompoundProbabilities | null {
   if (value === null || !isRecord(value)) {
     return null;
@@ -104,7 +113,10 @@ function parseCompoundProbabilities(value: unknown): ApiCompoundProbabilities | 
 }
 
 function parseLocationUpdate(value: Record<string, unknown>): LocationUpdate | null {
-  if (!isNumber(value.driver_number)) {
+  if (
+    !isNumber(value.driver_number) ||
+    (value.route !== "track" && value.route !== "pit_lane")
+  ) {
     return null;
   }
   return {
@@ -113,6 +125,8 @@ function parseLocationUpdate(value: Record<string, unknown>): LocationUpdate | n
     x: isNumber(value.x) ? value.x : null,
     y: isNumber(value.y) ? value.y : null,
     progress: toProgress(value.progress),
+    route: value.route,
+    pit_lane_progress: toPitLaneProgress(value.pit_lane_progress),
     timestamp: typeof value.timestamp === "string" ? value.timestamp : null,
   };
 }

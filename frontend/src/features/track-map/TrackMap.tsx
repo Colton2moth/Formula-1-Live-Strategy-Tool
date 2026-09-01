@@ -21,10 +21,17 @@ type TrackMapProps = {
 
 export function TrackMap({ track, trackStatus, session, drivers, progress, resetGeneration, animationMode = { type: "live" }, selectedDriver, onSelectDriver }: TrackMapProps) {
   const displayPath = track?.display_path ?? [];
-  const { registerMarker } = useDriverMarkers(displayPath, progress, resetGeneration, animationMode);
+  const pitLanePoints = track?.pit_lane?.path ?? [];
+  const { registerMarker } = useDriverMarkers(
+    displayPath,
+    pitLanePoints,
+    progress,
+    resetGeneration,
+    animationMode,
+  );
   const label = `${session.meeting_name.toUpperCase()} | ${session.session_name.toUpperCase()}`;
   const mapPath = track ? trackPath(track.display_path) : "";
-  const pitLanePath = track?.pit_lane?.path?.length ? trackPath(track.pit_lane.path) : null;
+  const pitLanePath = pitLanePoints.length ? trackPath(pitLanePoints) : null;
   const squares = track ? startFinishSquares(track.start_finish) : [];
 
   return (

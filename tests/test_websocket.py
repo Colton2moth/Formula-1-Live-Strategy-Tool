@@ -71,6 +71,8 @@ def test_websocket_receives_location_and_driver_updates():
             assert location["x"] == 100.0
             assert location["y"] == 200.0
             assert location["progress"] is None
+            assert location["route"] == "track"
+            assert location["pit_lane_progress"] is None
             assert "map_x" not in location
             assert "map_y" not in location
             driver = by_type["driver_update"]
@@ -98,6 +100,8 @@ def test_location_update_exposes_progress():
             assert event["type"] == "location_update"
             assert isinstance(event["progress"], float)
             assert 0.0 <= event["progress"] < 1.0
+            assert event["route"] == "track"
+            assert event["pit_lane_progress"] is None
             assert "map_x" not in event
             assert "map_y" not in event
 
@@ -117,6 +121,8 @@ def test_location_update_null_progress_when_unprojectable():
             event = websocket.receive_json()
             assert event["type"] == "location_update"
             assert event["progress"] is None
+            assert event["route"] == "track"
+            assert event["pit_lane_progress"] is None
 
 
 def test_location_update_limits_impossible_timed_jump():
@@ -194,6 +200,73 @@ def test_broadcaster_projects_queued_samples_before_coalescing():
     ]
     assert len(updates) == 2
     assert (updates[1]["progress"] - updates[0]["progress"]) % 1.0 > 0.02
+
+
+def test_broadcaster_emits_typed_pit_lane_route_from_shared_projector():
+    from formula1_strategy_tool.track.models import load_layout
+
+    class CaptureManager:
+        def __init__(self):
+            self.messages = []
+
+        async def broadcast(self, message):
+            self.messages.append(message)
+
+    layout = load_layout(2)
+    assert layout is not None and layout.pit_lane is not None
+    state = LiveState()
+    state.update("v1/sessions", {"circuit_key": 2, "session_name": "Race"})
+    capture = CaptureManager()
+    local_broadcaster = Broadcaster(capture, state)
+    lane = layout.pit_lane
+    points = [
+        layout.reference_path[int(lane.entry_progress * 1000) - 5],
+        lane.reference[7],
+        lane.reference[8],
+    ]
+    for second, point in enumerate(points):
+        state.update(
+            "v1/location",
+            {
+                "driver_number": 4,
+                "x": point.x,
+                "y": point.y,
+                "date": f"2025-07-06T14:00:0{second}",
+            },
+        )
+    state.update(
+        "v1/location",
+        {
+            "driver_number": 4,
+            "x": 1e7,
+            "y": 1e7,
+            "date": "2025-07-06T14:00:03",
+        },
+    )
+
+    asyncio.run(local_broadcaster.flush())
+
+    event = capture.messages[-1]
+    assert event["type"] == "location_update"
+    assert event["route"] == "pit_lane"
+    assert 0.0 <= event["pit_lane_progress"] <= 1.0
+    assert isinstance(event["progress"], float)
+    assert event["x"] == 1e7
+
+    local_broadcaster.reset()
+    track_point = layout.reference_path[300]
+    state.update(
+        "v1/location",
+        {
+            "driver_number": 4,
+            "x": track_point.x,
+            "y": track_point.y,
+            "date": "2025-07-06T14:00:04",
+        },
+    )
+    asyncio.run(local_broadcaster.flush())
+    assert capture.messages[-1]["route"] == "track"
+    assert capture.messages[-1]["pit_lane_progress"] is None
 
 
 def test_websocket_streams_only_changed_locations():

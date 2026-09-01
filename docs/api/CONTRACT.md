@@ -270,17 +270,29 @@ reconnect and refetch `/api/race-state` to resync to the new session.
   "driver_number": 4,
   "x": 1245,
   "y": -438,
-  "progress": 0.6274,
+  "progress": 0.918,
+  "route": "pit_lane",
+  "pit_lane_progress": 0.37,
   "timestamp": "2026-06-14T18:34:10Z"
 }
 ```
 
 `x` / `y` are the raw OpenF1 coordinates, retained for debugging. `progress`
 is the projected normalized position around the main circuit, from `0.0`
-inclusive to `1.0` exclusive. The frontend maps `progress` onto `display_path`
-to place the marker, so the backend no longer supplies display-specific
-`map_x` / `map_y` coordinates. `progress` is `null` when the sample cannot be
-projected reliably; the frontend should retain the last valid position.
+inclusive to `1.0` exclusive. `route` is exactly `"track"` or `"pit_lane"`.
+For `"track"`, the frontend maps `progress` onto `display_path`. For
+`"pit_lane"`, `pit_lane_progress` is a finite, clamped value from `0.0` at pit
+entry through `1.0` at pit exit and is mapped onto the optional open
+`pit_lane.path`; it is otherwise `null`. Main-track `progress` is retained while
+the driver is on the lane for continuity and backward compatibility. The
+backend does not supply display-specific `map_x` / `map_y` coordinates.
+
+When the active route cannot be projected reliably, its route-specific progress
+is `null` and the frontend retains the last valid route and position. Route
+changes require persistent geometry evidence so nearby track and pit-lane paths
+do not cause flicker. Circuits without reviewed pit geometry always emit the
+existing `"track"` behavior. Live and replay broadcasters use the same projector
+and event shape, and replay reset/seek clears the retained route state.
 `timestamp` is the source-sample time; clients use it to reject stale or
 out-of-order marker targets rather than deriving order from network arrival.
 When a timestamped sample implies physically impossible movement, the backend

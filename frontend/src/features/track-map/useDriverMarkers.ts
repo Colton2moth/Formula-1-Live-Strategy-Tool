@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { DriverTrackProgress } from "../../hooks/useLiveState";
-import type { TrackPoint } from "../../types/race";
-import { displayPathPoint } from "./geometry";
+import type { TrackPoint, TrackRoute } from "../../types/race";
+import { displayPathPoint, openPathPoint } from "./geometry";
+import type { SvgPoint } from "./geometry";
 
 export type MarkerAnimationMode =
   | { type: "live" }
@@ -46,6 +47,8 @@ const CADENCE_SMOOTHING = 0.3;
 // retained.
 const REPLAY_BUFFER_MS = 5000;
 const REPLAY_HISTORY_WINDOW_MS = 10000;
+const ROUTE_TRANSITION_MS = 750;
+const PIT_VISUAL_MAX_PROGRESS_PER_MS = 0.0001;
 
 type Sample = {
   sourceTimeMs: number;
@@ -53,6 +56,7 @@ type Sample = {
 };
 
 type DriverMotion = {
+  route: TrackRoute;
   samples: Sample[];
   visualProgress: number;
   authoritativeProgress: number;
@@ -61,6 +65,9 @@ type DriverMotion = {
   sampleIntervalMs: number;
   sourceRate: number | null;
   cadenceMs: number;
+  lastPoint: SvgPoint | null;
+  transition: { from: SvgPoint; startedAt: number } | null;
+  pendingRoute: DriverMotion | null;
 };
 
 type ReplayClock = {
@@ -91,8 +98,30 @@ function replayLog(kind: string, payload: Record<string, unknown>): void {
   console.warn(`[track-replay] ${kind}`, payload);
 }
 
-function createMotion(progress: number, sourceTimeMs: number, now: number): DriverMotion {
+function activeProgress(entry: DriverTrackProgress): number | null {
+  return entry.route === "pit_lane" ? entry.pitLaneProgress : entry.progress;
+}
+
+function routePoint(
+  trackPath: TrackPoint[],
+  pitLanePath: TrackPoint[],
+  route: TrackRoute,
+  progress: number,
+): SvgPoint | null {
+  return route === "pit_lane"
+    ? openPathPoint(pitLanePath, progress)
+    : displayPathPoint(trackPath, progress);
+}
+
+function createMotion(
+  route: TrackRoute,
+  progress: number,
+  sourceTimeMs: number,
+  now: number,
+  transitionFrom: SvgPoint | null = null,
+): DriverMotion {
   return {
+    route,
     samples: [{ sourceTimeMs, progress }],
     visualProgress: progress,
     authoritativeProgress: progress,
@@ -101,6 +130,9 @@ function createMotion(progress: number, sourceTimeMs: number, now: number): Driv
     sampleIntervalMs: 0,
     sourceRate: null,
     cadenceMs: 0,
+    lastPoint: transitionFrom,
+    transition: transitionFrom ? { from: transitionFrom, startedAt: now } : null,
+    pendingRoute: null,
   };
 }
 
@@ -126,13 +158,22 @@ function advanceMotion(
     return;
   }
 
-  const previousNormalized = normalize(state.authoritativeProgress);
-  const rawDiff = progress - previousNormalized;
-  const forwardDelta = Math.abs(rawDiff) < NO_MOVEMENT_EPSILON ? 0 : (rawDiff + 1) % 1;
+  const previousProgress =
+    state.route === "track" ? normalize(state.authoritativeProgress) : state.authoritativeProgress;
+  const rawDiff = progress - previousProgress;
+  const forwardDelta =
+    Math.abs(rawDiff) < NO_MOVEMENT_EPSILON
+      ? 0
+      : state.route === "track"
+        ? (rawDiff + 1) % 1
+        : rawDiff;
 
   const sourceGapMs = last ? sourceTimeMs - last.sourceTimeMs : 0;
-  const maxPlausible = Math.min(1, sourceGapMs / MIN_PLAUSIBLE_LAP_MS + PROGRESS_GAP_SLACK);
-  if (forwardDelta > maxPlausible) {
+  const maxPlausible =
+    state.route === "track"
+      ? Math.min(1, sourceGapMs / MIN_PLAUSIBLE_LAP_MS + PROGRESS_GAP_SLACK)
+      : 1;
+  if (forwardDelta < 0 || forwardDelta > maxPlausible) {
     motionLog("implausible", {
       driverNumber,
       previousProgress: state.authoritativeProgress,
@@ -298,12 +339,16 @@ function advanceReplayClock(
 
 export function useDriverMarkers(
   displayPath: TrackPoint[],
+  pitLanePath: TrackPoint[],
   progress: ReadonlyMap<number, DriverTrackProgress>,
   resetGeneration = 0,
   animationMode: MarkerAnimationMode = { type: "live" },
 ) {
   const displayPathRef = useRef(displayPath);
   displayPathRef.current = displayPath;
+
+  const pitLanePathRef = useRef(pitLanePath);
+  pitLanePathRef.current = pitLanePath;
 
   const progressRef = useRef(progress);
   progressRef.current = progress;
@@ -341,7 +386,8 @@ export function useDriverMarkers(
     const historyWindowMs = modeRef.current.type === "replay" ? REPLAY_HISTORY_WINDOW_MS : null;
     let maxSourceTime = 0;
     for (const [number, entry] of progress) {
-      if (!Number.isFinite(entry.progress)) {
+      const incomingProgress = activeProgress(entry);
+      if (incomingProgress === null || !Number.isFinite(incomingProgress)) {
         continue;
       }
       const sourceTimeMs = entry.sampleTimeMs ?? now;
@@ -350,9 +396,42 @@ export function useDriverMarkers(
       }
       const state = states.get(number);
       if (!state) {
-        states.set(number, createMotion(entry.progress, sourceTimeMs, now));
+        states.set(number, createMotion(entry.route, incomingProgress, sourceTimeMs, now));
+      } else if (state.route !== entry.route) {
+        const routeState = state.pendingRoute?.route === entry.route ? state.pendingRoute : null;
+        const lastSample = (routeState ?? state).samples[(routeState ?? state).samples.length - 1];
+        if (lastSample && sourceTimeMs <= lastSample.sourceTimeMs) {
+          continue;
+        }
+        if (modeRef.current.type === "replay") {
+          if (routeState) {
+            advanceMotion(
+              number,
+              routeState,
+              incomingProgress,
+              now,
+              sourceTimeMs,
+              historyWindowMs,
+            );
+          } else {
+            state.pendingRoute = createMotion(entry.route, incomingProgress, sourceTimeMs, now);
+          }
+        } else {
+          const transitionFrom =
+            state.lastPoint ??
+            routePoint(
+              displayPathRef.current,
+              pitLanePathRef.current,
+              state.route,
+              state.visualProgress,
+            );
+          states.set(
+            number,
+            createMotion(entry.route, incomingProgress, sourceTimeMs, now, transitionFrom),
+          );
+        }
       } else {
-        advanceMotion(number, state, entry.progress, now, sourceTimeMs, historyWindowMs);
+        advanceMotion(number, state, incomingProgress, now, sourceTimeMs, historyWindowMs);
       }
     }
     if (maxSourceTime > 0) {
@@ -377,6 +456,7 @@ export function useDriverMarkers(
       if (!path.length) {
         return;
       }
+      const pitPath = pitLanePathRef.current;
       const elements = elementsRef.current;
       if (elements.size === 0) {
         return;
@@ -402,15 +482,53 @@ export function useDriverMarkers(
       const states = statesRef.current;
       const lastTransforms = lastTransformRef.current;
       for (const [number, element] of elements) {
-        const state = states.get(number);
+        let state = states.get(number);
         if (!state) continue;
+        const pending = state.pendingRoute;
+        const pendingStart = pending?.samples[0]?.sourceTimeMs;
+        if (
+          mode.type === "replay" &&
+          renderSourceTimeMs !== null &&
+          pending &&
+          pendingStart !== undefined &&
+          renderSourceTimeMs >= pendingStart
+        ) {
+          const transitionFrom =
+            state.lastPoint ?? routePoint(path, pitPath, state.route, state.visualProgress);
+          pending.lastPoint = transitionFrom;
+          pending.transition = transitionFrom ? { from: transitionFrom, startedAt: now } : null;
+          states.set(number, pending);
+          state = pending;
+        }
         const target =
           mode.type === "replay"
             ? computeReplayTarget(state, renderSourceTimeMs)
             : computeLiveTarget(state, now);
-        state.visualProgress += (target - state.visualProgress) * alpha;
-        const point = displayPathPoint(path, state.visualProgress);
+        const visualDelta = (target - state.visualProgress) * alpha;
+        if (state.route === "pit_lane") {
+          const speed = mode.type === "replay" ? mode.speed : 1;
+          const maxDelta =
+            PIT_VISUAL_MAX_PROGRESS_PER_MS *
+            Math.min(frameDeltaMs, PROJECTION_SMOOTHING_MAX_FRAME_MS) *
+            speed;
+          state.visualProgress += Math.min(maxDelta, Math.max(0, visualDelta));
+        } else {
+          state.visualProgress += visualDelta;
+        }
+        let point = routePoint(path, pitPath, state.route, state.visualProgress);
         if (!point) continue;
+        if (state.transition) {
+          const factor = Math.min(1, (now - state.transition.startedAt) / ROUTE_TRANSITION_MS);
+          const eased = factor * factor * (3 - 2 * factor);
+          point = {
+            x: state.transition.from.x + (point.x - state.transition.from.x) * eased,
+            y: state.transition.from.y + (point.y - state.transition.from.y) * eased,
+          };
+          if (factor >= 1) {
+            state.transition = null;
+          }
+        }
+        state.lastPoint = point;
         const transform = `translate(${point.x}px, ${point.y}px)`;
         if (lastTransforms.get(number) !== transform) {
           lastTransforms.set(number, transform);
@@ -433,9 +551,20 @@ export function useDriverMarkers(
           elementsRef.current.set(driverNumber, element);
           const entry = progressRef.current.get(driverNumber);
           if (entry) {
-            const point = displayPathPoint(displayPathRef.current, entry.progress);
+            const entryProgress = activeProgress(entry);
+            const point =
+              entryProgress === null
+                ? null
+                : routePoint(
+                    displayPathRef.current,
+                    pitLanePathRef.current,
+                    entry.route,
+                    entryProgress,
+                  );
             if (point) {
               element.style.transform = `translate(${point.x}px, ${point.y}px)`;
+              const state = statesRef.current.get(driverNumber);
+              if (state) state.lastPoint = point;
             }
           }
         } else {

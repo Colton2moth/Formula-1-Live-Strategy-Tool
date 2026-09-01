@@ -54,6 +54,7 @@ export type RaceState = {
 };
 
 export type TrackPoint = { x: number; y: number };
+export type TrackRoute = "track" | "pit_lane";
 export type StartFinish = { x: number; y: number; angle_deg: number };
 export type DisplayPitLane = {
   path: TrackPoint[];

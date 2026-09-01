@@ -3,7 +3,11 @@
 import pytest
 
 from formula1_strategy_tool.track.models import load_layout
-from formula1_strategy_tool.track.projection import LocationProjector, Projector
+from formula1_strategy_tool.track.projection import (
+    LocationProjector,
+    OpenPathProjector,
+    Projector,
+)
 
 
 @pytest.fixture(scope="module")
@@ -115,3 +119,126 @@ def test_location_projector_accepts_timed_lap_wrap(silverstone):
     assert first is not None
     assert wrapped is not None
     assert wrapped[0] < first[0]
+
+
+def test_open_pit_lane_progress_clamps_at_entry_middle_and_exit(silverstone):
+    lane = silverstone.pit_lane
+    assert lane is not None
+    projector = OpenPathProjector(
+        [(point.x, point.y) for point in lane.reference],
+        [(point.x, point.y) for point in lane.display],
+    )
+
+    entry = projector.project(lane.reference[0].x, lane.reference[0].y)
+    middle_point = lane.reference[len(lane.reference) // 2]
+    middle = projector.project(middle_point.x, middle_point.y)
+    exit_ = projector.project(lane.reference[-1].x, lane.reference[-1].y)
+
+    assert entry is not None and entry[0] == pytest.approx(0.0)
+    assert middle is not None and 0.25 < middle[0] < 0.75
+    assert exit_ is not None and exit_[0] == pytest.approx(1.0)
+
+
+def _enter_silverstone_pit(projector, silverstone):
+    lane = silverstone.pit_lane
+    assert lane is not None
+    before_entry = silverstone.reference_path[int(lane.entry_progress * 1000) - 5]
+    assert (
+        projector.project_routed_location(
+            4, before_entry.x, before_entry.y, timestamp=0.0
+        ).route
+        == "track"
+    )
+    first_candidate = lane.reference[7]
+    assert (
+        projector.project_routed_location(
+            4, first_candidate.x, first_candidate.y, timestamp=1.0
+        )
+        is None
+    )
+    second_candidate = lane.reference[8]
+    return projector.project_routed_location(
+        4, second_candidate.x, second_candidate.y, timestamp=2.0
+    )
+
+
+def test_location_projector_confirms_wrap_aware_pit_entry(silverstone):
+    lane = silverstone.pit_lane
+    assert lane is not None and lane.entry_progress > lane.exit_progress
+
+    routed = _enter_silverstone_pit(LocationProjector(silverstone), silverstone)
+
+    assert routed is not None
+    assert routed.route == "pit_lane"
+    assert routed.pit_lane_progress is not None
+
+
+def test_location_projector_handles_pit_entry_beside_backward_track_progress():
+    monaco = load_layout(22)
+    assert monaco is not None and monaco.pit_lane is not None
+    projector = LocationProjector(monaco)
+    lane = monaco.pit_lane
+    before_entry = monaco.reference_path[int(lane.entry_progress * 1000) - 5]
+    projector.project_routed_location(4, before_entry.x, before_entry.y, 0.0)
+
+    first = lane.reference[2]
+    second = lane.reference[3]
+    held = projector.project_routed_location(4, first.x, first.y, 1.0)
+    routed = projector.project_routed_location(4, second.x, second.y, 2.0)
+
+    assert held is None
+    assert routed is not None and routed.route == "pit_lane"
+
+
+def test_location_projector_confirms_pit_exit_and_reseeds_track(silverstone):
+    projector = LocationProjector(silverstone)
+    assert _enter_silverstone_pit(projector, silverstone) is not None
+    lane = silverstone.pit_lane
+    assert lane is not None
+    for index in (20, 25, 29):
+        point = lane.reference[index]
+        result = projector.project_routed_location(4, point.x, point.y, index)
+        assert result is not None and result.route == "pit_lane"
+
+    first_track = silverstone.reference_path[112]
+    held = projector.project_routed_location(4, first_track.x, first_track.y, 30.0)
+    second_track = silverstone.reference_path[115]
+    exited = projector.project_routed_location(4, second_track.x, second_track.y, 31.0)
+
+    assert held is not None and held.route == "pit_lane"
+    assert exited is not None and exited.route == "track"
+    assert exited.progress == pytest.approx(0.115, abs=0.01)
+
+
+def test_location_projector_does_not_switch_on_ambiguous_track_points(silverstone):
+    projector = LocationProjector(silverstone)
+    lane = silverstone.pit_lane
+    assert lane is not None
+    for offset in range(-3, 4):
+        point = silverstone.reference_path[int(lane.entry_progress * 1000) + offset]
+        result = projector.project_routed_location(4, point.x, point.y)
+        assert result is not None and result.route == "track"
+
+
+def test_location_projector_falls_back_without_pit_geometry(silverstone):
+    layout = silverstone.model_copy(update={"pit_lane": None})
+    projector = LocationProjector(layout)
+    point = layout.reference_path[100]
+
+    result = projector.project_routed_location(4, point.x, point.y)
+
+    assert result is not None
+    assert result.route == "track"
+    assert result.pit_lane_progress is None
+
+
+def test_location_projector_reset_clears_pit_route(silverstone):
+    projector = LocationProjector(silverstone)
+    routed = _enter_silverstone_pit(projector, silverstone)
+    assert routed is not None and routed.route == "pit_lane"
+
+    projector.reset(4)
+    point = silverstone.reference_path[300]
+    after_reset = projector.project_routed_location(4, point.x, point.y)
+
+    assert after_reset is not None and after_reset.route == "track"

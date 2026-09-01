@@ -8,9 +8,21 @@ import {
   fetchTrack,
 } from "../api/raceState";
 import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../features/activity/useActivity";
-import type { ApiDriver, ApiPrediction, ApiSession, RaceState, TrackState } from "../types/race";
+import type {
+  ApiDriver,
+  ApiPrediction,
+  ApiSession,
+  RaceState,
+  TrackRoute,
+  TrackState,
+} from "../types/race";
 
-export type DriverTrackProgress = { progress: number; sampleTimeMs: number | null };
+export type DriverTrackProgress = {
+  progress: number | null;
+  route: TrackRoute;
+  pitLaneProgress: number | null;
+  sampleTimeMs: number | null;
+};
 
 export type DashboardSource = {
   socketPath: string;
@@ -60,6 +72,10 @@ function rawWrappedDelta(incoming: number, previous: number): number {
   return delta;
 }
 
+function activeProgress(entry: DriverTrackProgress): number | null {
+  return entry.route === "pit_lane" ? entry.pitLaneProgress : entry.progress;
+}
+
 function rawLog(kind: string, payload: Record<string, unknown>, level: "warn" | "debug" = "warn"): void {
   if (!import.meta.env.DEV) {
     return;
@@ -73,8 +89,7 @@ function rawLog(kind: string, payload: Record<string, unknown>, level: "warn" | 
 
 function diagnoseRawEvent(
   driverNumber: number,
-  incomingProgress: number,
-  incomingTimeMs: number | null,
+  incoming: DriverTrackProgress,
   rawPrevious: Map<number, DriverTrackProgress>,
   pending: DriverTrackProgress | undefined,
 ): void {
@@ -86,10 +101,12 @@ function diagnoseRawEvent(
       "coalesced",
       {
         driverNumber,
-        replacedProgress: pending.progress,
-        replacementProgress: incomingProgress,
+        replacedRoute: pending.route,
+        replacementRoute: incoming.route,
+        replacedProgress: activeProgress(pending),
+        replacementProgress: activeProgress(incoming),
         replacedTimestamp: pending.sampleTimeMs,
-        replacementTimestamp: incomingTimeMs,
+        replacementTimestamp: incoming.sampleTimeMs,
       },
       "debug",
     );
@@ -98,37 +115,49 @@ function diagnoseRawEvent(
   if (!prev) {
     return;
   }
-  const delta = rawWrappedDelta(incomingProgress, prev.progress);
+  const incomingProgress = activeProgress(incoming);
+  const previousProgress = activeProgress(prev);
+  if (incomingProgress === null || previousProgress === null) {
+    return;
+  }
+  const delta =
+    incoming.route === "track" && prev.route === "track"
+      ? rawWrappedDelta(incomingProgress, previousProgress)
+      : incomingProgress - previousProgress;
   const base = {
     driverNumber,
-    previousProgress: prev.progress,
+    previousRoute: prev.route,
+    incomingRoute: incoming.route,
+    previousProgress,
     incomingProgress,
     delta,
     previousTimestamp: prev.sampleTimeMs,
-    incomingTimestamp: incomingTimeMs,
+    incomingTimestamp: incoming.sampleTimeMs,
     replacesPendingSample: pending !== undefined,
-    pendingProgress: pending?.progress,
+    pendingProgress: pending ? activeProgress(pending) : undefined,
     pendingTimestamp: pending?.sampleTimeMs,
   };
-  if (delta < 0) {
+  if (incoming.route !== prev.route) {
+    rawLog("route-change", base, "debug");
+  } else if (delta < 0) {
     rawLog("backward", base);
   } else if (delta > 0.1) {
     rawLog("large-forward", base);
   }
-  if (incomingTimeMs !== null && prev.sampleTimeMs !== null) {
-    if (incomingTimeMs === prev.sampleTimeMs) {
+  if (incoming.sampleTimeMs !== null && prev.sampleTimeMs !== null) {
+    if (incoming.sampleTimeMs === prev.sampleTimeMs) {
       rawLog("timestamp", {
         driverNumber,
         kind: "duplicate-timestamp",
         previousTimestamp: prev.sampleTimeMs,
-        incomingTimestamp: incomingTimeMs,
+        incomingTimestamp: incoming.sampleTimeMs,
       });
-    } else if (incomingTimeMs < prev.sampleTimeMs) {
+    } else if (incoming.sampleTimeMs < prev.sampleTimeMs) {
       rawLog("timestamp", {
         driverNumber,
         kind: "older-timestamp",
         previousTimestamp: prev.sampleTimeMs,
-        incomingTimestamp: incomingTimeMs,
+        incomingTimestamp: incoming.sampleTimeMs,
       });
     }
   }
@@ -189,21 +218,25 @@ export function useRaceStream(
     const applyEvent = (event: LiveEvent) => {
       switch (event.type) {
         case "location_update": {
-          if (event.progress !== null) {
+          const eventProgress =
+            event.route === "pit_lane" ? event.pit_lane_progress : event.progress;
+          if (eventProgress !== null) {
             const parsedTime = event.timestamp === null ? Number.NaN : Date.parse(event.timestamp);
             const sampleTimeMs = Number.isFinite(parsedTime) ? parsedTime : null;
+            const entry: DriverTrackProgress = {
+              progress: event.progress,
+              route: event.route,
+              pitLaneProgress: event.pit_lane_progress,
+              sampleTimeMs,
+            };
             diagnoseRawEvent(
               event.driver_number,
-              event.progress,
-              sampleTimeMs,
+              entry,
               rawPrevious,
               pendingProgress.get(event.driver_number),
             );
-            pendingProgress.set(event.driver_number, {
-              progress: event.progress,
-              sampleTimeMs,
-            });
-            rawPrevious.set(event.driver_number, { progress: event.progress, sampleTimeMs });
+            pendingProgress.set(event.driver_number, entry);
+            rawPrevious.set(event.driver_number, entry);
             progressFrame ??= window.requestAnimationFrame(flushProgress);
           }
           break;

@@ -220,21 +220,29 @@ class Broadcaster:
                 continue
             self._last_locations[number] = key
             progress = None
+            route = projector.route_for(number) if projector is not None else "track"
+            pit_lane_progress = None
             if projector is not None and x is not None and y is not None:
                 parsed_date = parse_openf1_datetime(location.get("date"))
                 timestamp = parsed_date.timestamp() if parsed_date is not None else None
-                result = projector.project_location(number, x, y, timestamp)
+                result = projector.project_routed_location(number, x, y, timestamp)
                 if result is not None:
-                    progress = result[0]
+                    progress = result.progress
+                    route = result.route
+                    pit_lane_progress = result.pit_lane_progress
             previous_event = events.get(number)
             if progress is None and previous_event is not None:
                 progress = previous_event["progress"]
+                route = previous_event["route"]
+                pit_lane_progress = previous_event["pit_lane_progress"]
             events[number] = {
                 "type": "location_update",
                 "driver_number": number,
                 "x": x,
                 "y": y,
                 "progress": progress,
+                "route": route,
+                "pit_lane_progress": pit_lane_progress,
                 "timestamp": location.get("date"),
             }
         for event in events.values():
