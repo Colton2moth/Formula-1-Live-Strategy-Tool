@@ -7,18 +7,18 @@ REST endpoints for the replay controller. See
 
 | Method | Path                  | Purpose                                   |
 | ------ | --------------------- | ----------------------------------------- |
-| GET    | `/api/replay/status`  | controller state + replay progress        |
+| GET    | `/api/replays/{replay_id}/status`  | controller state + replay progress        |
 | GET    | `/api/replay/sessions`| completed Race sessions (year + country + readiness) |
-| GET    | `/api/replay/race-state` | replay-owned bootstrap snapshot (session + drivers + predictions) |
-| GET    | `/api/replay/track`   | static circuit map for the replay session |
-| POST   | `/api/replay/start`   | start a replay (`{session_key, speed}`)   |
-| POST   | `/api/replay/pause`   | suspend the running replay clock          |
-| POST   | `/api/replay/resume`  | continue a paused replay                  |
-| POST   | `/api/replay/seek`    | jump by replay-clock `time` or completed `lap` |
-| POST   | `/api/replay/speed`   | change the active replay speed in place   |
-| POST   | `/api/replay/stop`    | stop the replay (live mode unaffected)    |
+| GET    | `/api/replays/{replay_id}/race-state` | replay-owned bootstrap snapshot |
+| GET    | `/api/replays/{replay_id}/track`   | static circuit map for the replay session |
+| POST   | `/api/replays`   | create a replay (`{session_key, speed}`)   |
+| POST   | `/api/replays/{replay_id}/pause`   | suspend the running replay clock          |
+| POST   | `/api/replays/{replay_id}/resume`  | continue a paused replay                  |
+| POST   | `/api/replays/{replay_id}/seek`    | jump by replay-clock `time` or completed `lap` |
+| POST   | `/api/replays/{replay_id}/speed`   | change the active replay speed in place   |
+| POST   | `/api/replays/{replay_id}/stop`    | stop the replay (live mode unaffected)    |
 
-The replay WebSocket is `GET /ws/replay`; it emits the same event types as
+The replay WebSocket is `GET /ws/replays/{replay_id}`; it emits the same event types as
 `/ws/live` (`location_update`, `driver_update`, `weather_update`,
 `race_control_update`, `prediction_update`) but sourced from the replay
 controller's private state.
@@ -43,7 +43,7 @@ The frontend never estimates progress on its own; it reads the authoritative
 `current_time` / `total_duration` / `current_lap` / `total_laps` owned by the
 producer.
 
-## GET `/api/replay/status`
+## GET `/api/replays/{replay_id}/status`
 
 Current replay controller state and progress. Returns the status object above.
 
@@ -65,48 +65,47 @@ Returns a list where each entry has:
 Readiness is documented in [CACHE.md](./CACHE.md#readiness-states). Returns
 `503` when the OpenF1 session list cannot be fetched.
 
-## GET `/api/replay/race-state`
+## GET `/api/replays/{replay_id}/race-state`
 
 Full replay bootstrap snapshot for the Replay page, sourced from the replay
 controller's private state (never `LIVE_STATE`). Same shape as the live
 `/api/race-state`: `{ session, drivers, predictions }`. Returns `409` when no
 replay has been started yet.
 
-## GET `/api/replay/track`
+## GET `/api/replays/{replay_id}/track`
 
 Static circuit map for the replay session's `circuit_key`, sourced from the
 replay controller's state. Returns `409` when no replay has been started, and
 `404` when the circuit is unknown.
 
-## POST `/api/replay/start`
+## POST `/api/replays`
 
 Start replaying a completed session into the controller's own state.
 
 Request body:
 
 ```json
-{ "session_key": 9693, "speed": 20 }
+{ "session_key": 9693, "speed": 10 }
 ```
 
-- `session_key` — optional. Falls back to `REPLAY_SESSION_KEY`, then
-  `INFERENCE_SESSION_KEY`. Returns `400` if none are set.
-- `speed` — replay multiplier, `0.25`–`100`, default `10`.
+- `session_key` — required session to replay.
+- `speed` — one of `1`, `2`, `5`, or `10`; default `1`.
 
 Live ingestion (bootstrap + MQTT) is unaffected.
 
-## POST `/api/replay/pause`
+## POST `/api/replays/{replay_id}/pause`
 
 Suspend the running replay clock. Resume continues from the same position.
 
-## POST `/api/replay/resume`
+## POST `/api/replays/{replay_id}/resume`
 
 Continue a paused replay from where it left off.
 
-## POST `/api/replay/stop`
+## POST `/api/replays/{replay_id}/stop`
 
 Stop the running replay. Live ingestion is unaffected.
 
-## POST `/api/replay/seek`
+## POST `/api/replays/{replay_id}/seek`
 
 Jump the active replay to a replay-clock time or completed-lap checkpoint. The
 producer restores the nearest checkpoint at or before the target, then resumes
@@ -127,17 +126,17 @@ Request body — exactly one of:
 
 Providing neither target, both targets, or an out-of-range value returns `422`.
 
-## POST `/api/replay/speed`
+## POST `/api/replays/{replay_id}/speed`
 
 Change the active replay speed in place, without restarting it.
 
 Request body:
 
 ```json
-{ "speed": 40 }
+{ "speed": 5 }
 ```
 
-- `speed` — replay multiplier, `0.25`–`100`.
+- `speed` — one of `1`, `2`, `5`, or `10`.
 
 Only valid while the replay is `running` or `paused`; otherwise returns `409`.
 

@@ -140,16 +140,36 @@ def test_replay_speed_requires_running_runtime(monkeypatch):
     runtime = replay_registry.registry.create(100, speed=10)
     try:
         response = client.post(
-            f"/api/replays/{runtime.replay_id}/speed", json={"speed": 50.0}
+            f"/api/replays/{runtime.replay_id}/speed", json={"speed": 5.0}
         )
         assert response.status_code == 409
     finally:
         replay_registry.registry.stop(runtime.replay_id)
 
 
-def test_replay_speed_validates_range():
-    response = client.post("/api/replays/unknown/speed", json={"speed": 0.1})
-    assert response.status_code == 422
+@pytest.mark.parametrize("speed", [0.25, 3, 20, 50, 100])
+def test_replay_speed_rejects_unsupported_presets(speed):
+    assert (
+        client.post("/api/replays/unknown/speed", json={"speed": speed}).status_code
+        == 422
+    )
+    assert (
+        client.post("/api/replays", json={"session_key": 1, "speed": speed}).status_code
+        == 422
+    )
+
+
+@pytest.mark.parametrize("speed", [1, 2, 5, 10])
+def test_replay_create_accepts_supported_presets(monkeypatch, speed):
+    from formula1_strategy_tool.acquisition import replay as replay_mod
+    from formula1_strategy_tool.acquisition import replay_registry
+
+    monkeypatch.setattr(
+        replay_mod.ReplayController, "start", lambda self, *a, **k: None
+    )
+    response = client.post("/api/replays", json={"session_key": 1, "speed": speed})
+    assert response.status_code == 200
+    replay_registry.registry.stop(response.json()["replay_id"])
 
 
 def test_replay_seek_accepts_exactly_one_lap_or_time(monkeypatch):

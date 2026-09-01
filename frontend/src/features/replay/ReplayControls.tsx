@@ -1,9 +1,6 @@
-import { useEffect, useState } from "react";
 import { Panel } from "../../components/Panel";
 import { StatusChip } from "../../components/StatusChip";
 import {
-  MAX_SPEED,
-  MIN_SPEED,
   SPEED_PRESETS,
   grandPrixName,
   sessionLabel,
@@ -48,64 +45,6 @@ const READINESS_TONES: Record<string, "neutral" | "green" | "amber" | "red"> = {
   failed: "red",
   unknown: "neutral",
 };
-
-type CustomSpeedInputProps = {
-  speed: number;
-  disabled: boolean;
-  onCommit: (speed: number) => void;
-};
-
-function CustomSpeedInput({ speed, disabled, onCommit }: CustomSpeedInputProps) {
-  const [text, setText] = useState(String(speed));
-  const [invalid, setInvalid] = useState(false);
-
-  useEffect(() => {
-    setText(String(speed));
-    setInvalid(false);
-  }, [speed]);
-
-  const commit = () => {
-    const value = Number(text);
-    if (!Number.isFinite(value) || value < MIN_SPEED || value > MAX_SPEED) {
-      setInvalid(true);
-      return;
-    }
-    setInvalid(false);
-    onCommit(value);
-  };
-
-  return (
-    <div className="replay-speed-custom">
-      <label className="replay-speed-label" htmlFor="replay-speed-custom">
-        Custom speed
-      </label>
-      <input
-        id="replay-speed-custom"
-        className={`replay-speed-input ${invalid ? "replay-speed-input--invalid" : ""}`}
-        type="number"
-        min={MIN_SPEED}
-        max={MAX_SPEED}
-        step={0.25}
-        value={text}
-        disabled={disabled}
-        onChange={(event) => {
-          setText(event.target.value);
-          setInvalid(false);
-        }}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") commit();
-        }}
-        aria-label="Custom replay speed"
-      />
-      {invalid ? (
-        <div className="replay-speed-error">
-          Enter a speed from {MIN_SPEED}× to {MAX_SPEED}×
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 export function ReplayControls(replay: ReplayControlsProps) {
   const {
@@ -296,7 +235,6 @@ export function ReplayControls(replay: ReplayControlsProps) {
               );
             })}
           </div>
-          <CustomSpeedInput speed={speed} disabled={!speedEditable} onCommit={setSpeed} />
           <div className="replay-speed-readout" aria-live="polite">
             Replay Speed: {speed}×
           </div>

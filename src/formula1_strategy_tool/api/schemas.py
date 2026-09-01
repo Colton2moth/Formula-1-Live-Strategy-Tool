@@ -9,6 +9,7 @@ These shapes match docs/api/CONTRACT.md exactly. FastAPI uses them to:
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -188,7 +189,7 @@ class ReplayCreateRequest(BaseModel):
     """Body for POST /api/replays."""
 
     session_key: int
-    speed: float = Field(default=10.0, ge=0.25, le=100.0)
+    speed: Literal[1, 2, 5, 10] = 1
 
 
 class ReplaySeekRequest(BaseModel):
@@ -205,9 +206,9 @@ class ReplaySeekRequest(BaseModel):
 
 
 class ReplaySpeedRequest(BaseModel):
-    """Body for POST /api/replays/{replay_id}/speed. Same valid range as create."""
+    """Body for POST /api/replays/{replay_id}/speed. Same presets as create."""
 
-    speed: float = Field(ge=0.25, le=100.0)
+    speed: Literal[1, 2, 5, 10]
 
 
 class ReplayStatus(BaseModel):

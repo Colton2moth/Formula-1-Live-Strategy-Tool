@@ -13,14 +13,7 @@ import {
 import type { ReplaySessionOption, ReplayStatusValue } from "../../api/replay";
 import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../activity/useActivity";
 
-export const SPEED_PRESETS = [1, 2, 5, 10, 20, 50, 100] as const;
-export const MIN_SPEED = 0.25;
-export const MAX_SPEED = 100;
-
-function clampSpeed(value: number): number {
-  if (!Number.isFinite(value)) return 10;
-  return Math.min(MAX_SPEED, Math.max(MIN_SPEED, value));
-}
+export const SPEED_PRESETS = [1, 2, 5, 10] as const;
 
 function defaultSpeed(): number {
   const env = Number(import.meta.env.VITE_REPLAY_SPEED);
@@ -197,10 +190,10 @@ export function useReplay(onSeeded: () => void) {
 
   const setSpeed = useCallback(
     (nextSpeed: number) => {
-      const clamped = clampSpeed(nextSpeed);
-      setSpeedState(clamped);
+      if (!(SPEED_PRESETS as readonly number[]).includes(nextSpeed)) return;
+      setSpeedState(nextSpeed);
       if (replayId && (status === "running" || status === "paused")) {
-        void setReplaySpeed(replayId, clamped)
+        void setReplaySpeed(replayId, nextSpeed)
           .then((result) => setStatus(result.status))
           .catch(() => setError("Failed to change replay speed"));
       }
@@ -240,7 +233,7 @@ export function useReplay(onSeeded: () => void) {
     seededRef.current = false;
     setProgress(EMPTY_PROGRESS);
     try {
-      const next = await createReplay(key, Number(speed) || 10);
+      const next = await createReplay(key, speed);
       setReplayId(next.replay_id);
       setStatus(next.status);
     } catch (requestError) {

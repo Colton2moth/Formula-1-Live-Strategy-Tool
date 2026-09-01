@@ -26,7 +26,9 @@ data/
         ├── intervals.json
         ├── weather.json
         ├── race_control.json
-        ├── timeline.json
+        ├── timeline/
+        │   ├── index.json
+        │   └── chunk-0000.json, …   (5-minute race-clock chunks)
         ├── checkpoints/
         │   ├── index.json
         │   └── checkpoint-0001.json, …   (one state file per completed lap)
@@ -80,6 +82,11 @@ The bulk cache command is safe to stop and run again: `download_replay_data`
 uses `get_or_download`, which loads endpoint files and location windows already
 on disk instead of hitting OpenF1 again. One race failing does not stop the
 rest; failures are appended to the failure log and the run continues.
+
+Prepared format version 4 replaces the old whole-race `timeline.json`. A local
+cache pass rebuilds the timeline directory and checkpoints from files already
+on disk, then removes the obsolete monolithic file. Normal playback reads the
+lightweight index and retains only the current and next timeline chunks.
 
 ## Readiness states
 

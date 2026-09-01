@@ -53,9 +53,9 @@ def replay_readiness(session_key: int) -> str:
     if session_key in CANCELLED_SESSION_KEYS:
         return "cancelled"
     cache = replay_dir(session_key)
-    if (cache / "timeline.json").exists() and load_checkpoint_index(
-        cache, session_key
-    ) is not None:
+    if load_timeline(cache, session_key, validate_chunks=True) is not None and (
+        load_checkpoint_index(cache, session_key, validate_states=True) is not None
+    ):
         gap = _location_gap_status(cache)
         return "partial" if gap in ("internal", "absent") else "ready"
     if _session_in_failures(session_key):
@@ -220,8 +220,8 @@ def cache_session(
     # Build the timeline + checkpoints whenever the core endpoints downloaded
     # and they are not already current.
     if (
-        load_timeline(cache, session_key) is None
-        or load_checkpoint_index(cache, session_key) is None
+        load_timeline(cache, session_key, validate_chunks=True) is None
+        or load_checkpoint_index(cache, session_key, validate_states=True) is None
     ):
         events, _ = prepare_timeline(cache, data)
         print(f"  timeline + checkpoints: {len(events)} events prepared", flush=True)

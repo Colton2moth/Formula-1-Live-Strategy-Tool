@@ -8,7 +8,7 @@ Environment variables and known limits for Replay Mode.
 | ----------------------- | -------- | ------- | ------------------------------------ |
 | `REPLAY_SESSION_KEY`    | backend  | unset   | session to replay at startup         |
 | `REPLAY_SPEED`          | backend  | `10`    | replay speed multiplier (1x = real)  |
-| `VITE_REPLAY_SPEED`     | frontend | `10`    | prefill the Replay Speed control     |
+| `VITE_REPLAY_SPEED`     | frontend | `1`     | prefill the Replay Speed control     |
 
 ### `REPLAY_SESSION_KEY`
 
@@ -23,7 +23,8 @@ Replay speed multiplier used when starting replay via `REPLAY_SESSION_KEY`.
 
 ### `VITE_REPLAY_SPEED`
 
-Prefills the Replay Speed control on the Replay page. Set it in `frontend/.env`.
+Prefills the Replay Speed control with `1`, `2`, `5`, or `10`; any other value
+falls back to `1`. Set it in `frontend/.env`.
 Year and race are chosen in the UI; there is no `VITE_REPLAY_SESSION_KEY`.
 
 ## Current limitations

@@ -284,36 +284,6 @@
   @apply mx-1 text-app-muted;
 }
 
-.replay-speed-custom {
-  @apply grid gap-1.5;
-  grid-row: span 2;
-}
-
-.replay-speed-input {
-  @apply w-32 border border-app-line bg-app-panelAlt px-2 py-1.5 text-sm font-semibold tabular-nums text-app-text;
-  border-radius: var(--radius-compact);
-  transition:
-    border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard);
-}
-
-.replay-speed-input:focus-visible {
-  outline: 0.125rem solid var(--color-f1-red);
-  outline-offset: 0.125rem;
-}
-
-.replay-speed-input--invalid {
-  @apply border-app-red;
-}
-
-.replay-speed-input:disabled {
-  @apply cursor-not-allowed opacity-50;
-}
-
-.replay-speed-error {
-  @apply text-xs font-semibold text-app-red;
-}
-
 .replay-session-id-row {
   @apply flex items-stretch gap-1.5;
 }
@@ -374,7 +344,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .replay-speed-custom,
   .replay-speed-readout,
   .replay-speed-helper {
     grid-column: 1;

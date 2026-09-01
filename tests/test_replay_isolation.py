@@ -326,7 +326,7 @@ def test_replay_controls_do_not_control_live_mqtt(monkeypatch):
     controller.seek_lap(12)
     assert started.wait(timeout=1.0)
 
-    assert controller.set_speed(20.0) is True
+    assert controller.set_speed(2.0) is True
     controller.stop()
 
     assert calls == []

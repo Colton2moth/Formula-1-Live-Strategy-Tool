@@ -79,13 +79,13 @@ endpoint coverage.
   2.1s/request); later runs start instantly.
 - The dashboard advances on its own: lap counter ticks up, cars move on the
   map, leaderboard/compound/tyre-age update, flags and weather change.
-- `GET /api/replay/race-state` returns the replay snapshot and
-  `GET /api/replay/track` its circuit, while `GET /api/race-state` keeps
+- `GET /api/replays/{replay_id}/race-state` returns the replay snapshot and
+  `GET /api/replays/{replay_id}/track` its circuit, while `GET /api/race-state` keeps
   serving live data (replay never mixes into the live endpoints).
 
 ## Common status meanings
 
-`GET /api/replay/status` reports the replay controller's runtime state:
+`GET /api/replays/{replay_id}/status` reports the replay controller's runtime state:
 
 | Status        | Meaning                                                       |
 | ------------- | ------------------------------------------------------------ |

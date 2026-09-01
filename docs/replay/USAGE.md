@@ -53,7 +53,7 @@ Add to `.env`:
 
 ```
 REPLAY_SESSION_KEY=<key>
-REPLAY_SPEED=20
+REPLAY_SPEED=10
 ```
 
 Then start the backend normally. When `REPLAY_SESSION_KEY` is set, the backend
@@ -69,7 +69,7 @@ bootstrap and MQTT (used for automated end-to-end checks):
 Replay without the API server (useful for checking the producer):
 
 ```powershell
-.\.venv\Scripts\python.exe -m formula1_strategy_tool.acquisition.replay --session-key <key> --speed 20
+.\.venv\Scripts\python.exe -m formula1_strategy_tool.acquisition.replay --session-key <key> --speed 10
 ```
 
 ## Finding session keys
