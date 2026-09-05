@@ -9,7 +9,6 @@ import { useRaceData } from "../dashboard/useRaceData";
 import { replaySourceFor } from "../../hooks/useLiveState";
 import type { MarkerAnimationMode } from "../track-map/useDriverMarkers";
 import { ReplayControls } from "./ReplayControls";
-import { ReplayProgress } from "./ReplayProgress";
 import { grandPrixName, useReplay } from "./useReplay";
 
 export function ReplayPage() {
@@ -60,13 +59,7 @@ export function ReplayPage() {
         <div className="replay-banner" role="status">
           {banner}
         </div>
-        <ReplayControls {...replay} />
-        <ReplayProgress
-          progress={replay.progress}
-          onSeek={replay.seek}
-          onSeekLap={replay.seekLap}
-          canSeek={canSeek}
-        />
+        <ReplayControls {...replay} canSeek={canSeek} />
         {raceStateStatus === "error" && !raceState ? (
           <Panel label="Race data" icon="database">
             <div className="p-4">

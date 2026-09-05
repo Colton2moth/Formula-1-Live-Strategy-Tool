@@ -76,6 +76,7 @@ export function useReplay(onSeeded: () => void) {
   const [replayId, setReplayId] = useState<string | null>(null);
   const [progress, setProgress] = useState<ReplayProgress>(EMPTY_PROGRESS);
   const [busy, setBusy] = useState<boolean>(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingSessions, setLoadingSessions] = useState<boolean>(true);
   const [sessionIdInput, setSessionIdInput] = useState<string>("");
@@ -199,13 +200,19 @@ export function useReplay(onSeeded: () => void) {
   }, []);
 
   const setSpeed = useCallback(
-    (nextSpeed: number) => {
+    async (nextSpeed: number) => {
       if (!(SPEED_PRESETS as readonly number[]).includes(nextSpeed)) return;
       setSpeedState(nextSpeed);
       if (replayId && (status === "running" || status === "paused")) {
-        void setReplaySpeed(replayId, nextSpeed)
-          .then((result) => setStatus(result.status))
-          .catch(() => setError("Failed to change replay speed"));
+        setPendingAction("speed");
+        try {
+          const result = await setReplaySpeed(replayId, nextSpeed);
+          setStatus(result.status);
+        } catch {
+          setError("Failed to change replay speed");
+        } finally {
+          setPendingAction(null);
+        }
       }
     },
     [replayId, status],
@@ -239,6 +246,7 @@ export function useReplay(onSeeded: () => void) {
       return;
     }
     setBusy(true);
+    setPendingAction("start");
     setError(null);
     seededRef.current = false;
     setProgress(EMPTY_PROGRESS);
@@ -252,12 +260,14 @@ export function useReplay(onSeeded: () => void) {
       );
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   }, [sessionKey, speed]);
 
   const pause = useCallback(async () => {
     if (!replayId) return;
     setBusy(true);
+    setPendingAction("pause");
     setError(null);
     try {
       const next = await pauseReplay(replayId);
@@ -268,12 +278,14 @@ export function useReplay(onSeeded: () => void) {
       );
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   }, [replayId]);
 
   const resume = useCallback(async () => {
     if (!replayId) return;
     setBusy(true);
+    setPendingAction("resume");
     setError(null);
     try {
       const next = await resumeReplay(replayId);
@@ -284,12 +296,14 @@ export function useReplay(onSeeded: () => void) {
       );
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   }, [replayId]);
 
   const stop = useCallback(async () => {
     if (!replayId) return;
     setBusy(true);
+    setPendingAction("stop");
     setError(null);
     seededRef.current = false;
     try {
@@ -303,6 +317,7 @@ export function useReplay(onSeeded: () => void) {
       );
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   }, [replayId]);
 
@@ -314,6 +329,7 @@ export function useReplay(onSeeded: () => void) {
       }
       if (!replayId) return;
       setBusy(true);
+      setPendingAction("seek");
       setError(null);
       seededRef.current = false;
       try {
@@ -325,6 +341,7 @@ export function useReplay(onSeeded: () => void) {
         );
       } finally {
         setBusy(false);
+        setPendingAction(null);
       }
     },
     [replayId],
@@ -338,6 +355,7 @@ export function useReplay(onSeeded: () => void) {
       }
       if (!replayId) return;
       setBusy(true);
+      setPendingAction("seek");
       setError(null);
       seededRef.current = false;
       try {
@@ -349,6 +367,7 @@ export function useReplay(onSeeded: () => void) {
         );
       } finally {
         setBusy(false);
+        setPendingAction(null);
       }
     },
     [replayId],
@@ -367,6 +386,7 @@ export function useReplay(onSeeded: () => void) {
     replayId,
     progress,
     busy,
+    pendingAction,
     error,
     loadingSessions,
     sessionIdInput,

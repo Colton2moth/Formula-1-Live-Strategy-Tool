@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Panel } from "../../components/Panel";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { ReplayProgress as ReplayProgressState } from "./useReplay";
 
 type ReplayProgressProps = {
@@ -7,6 +6,9 @@ type ReplayProgressProps = {
   onSeek: (time: number) => void;
   onSeekLap: (lap: number) => void;
   canSeek: boolean;
+  seeking: boolean;
+  leading?: ReactNode;
+  trailing?: ReactNode;
 };
 
 function formatDuration(seconds: number | null): string {
@@ -23,7 +25,17 @@ function formatDuration(seconds: number | null): string {
   return `${minutes}:${String(secs).padStart(2, "0")}`;
 }
 
-export function ReplayProgress({ progress, onSeek, onSeekLap, canSeek }: ReplayProgressProps) {
+const SEEK_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"]);
+
+export function ReplayProgress({
+  progress,
+  onSeek,
+  onSeekLap,
+  canSeek,
+  seeking,
+  leading,
+  trailing,
+}: ReplayProgressProps) {
   const { currentTime, totalDuration, currentLap, totalLaps } = progress;
   const [previewTime, setPreviewTime] = useState<number | null>(null);
   const [lapText, setLapText] = useState("1");
@@ -55,72 +67,84 @@ export function ReplayProgress({ progress, onSeek, onSeekLap, canSeek }: ReplayP
   };
 
   return (
-    <Panel label="Replay Progress" className="replay-progress-panel" icon="timeline">
-      <div className="replay-progress-body">
-        <input
-          type="range"
-          className="replay-timeline"
-          aria-label="Replay timeline"
-          min={0}
-          max={max}
-          step={0.1}
-          value={displayed}
-          style={timelineStyle}
-          disabled={disabled}
-          onChange={(event) => setPreviewTime(Number(event.target.value))}
-          onPointerUp={(event) => commit(Number((event.target as HTMLInputElement).value))}
-          onKeyUp={(event) => commit(Number((event.target as HTMLInputElement).value))}
-        />
-        <div className="replay-progress-readouts">
-          <div className="replay-progress-time">
-            <span className="replay-progress-label">Elapsed</span>
-            <span className="replay-progress-value">{formatDuration(displayed)}</span>
-            <span className="replay-progress-divider">/</span>
-            <span className="replay-progress-value">{formatDuration(max)}</span>
-          </div>
-          {totalLaps !== null && totalLaps > 0 ? (
-            <div className="replay-progress-laps">
-              <label className="replay-progress-label" htmlFor="replay-lap-target">
-                Lap
-              </label>
-              <input
-                id="replay-lap-target"
-                className="replay-lap-input"
-                type="number"
-                min={1}
-                max={totalLaps}
-                step={1}
-                value={lapText}
-                disabled={lapDisabled}
-                aria-invalid={lapText !== "" && !lapValid}
-                onFocus={() => {
-                  lapInputFocusedRef.current = true;
-                }}
-                onBlur={() => {
-                  lapInputFocusedRef.current = false;
-                }}
-                onChange={(event) => setLapText(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && lapValid) onSeekLap(lapTarget);
-                }}
-              />
-              <span className="replay-progress-divider">/</span>
-              <span className="replay-progress-value">{totalLaps}</span>
-              <button
-                type="button"
-                className="replay-lap-button"
-                aria-label={`Jump to lap ${lapText || "number"}`}
-                onClick={() => onSeekLap(lapTarget)}
-                disabled={!lapValid}
-              >
-                <span className="material-symbols-rounded replay-lap-button-icon" aria-hidden="true">
-                  arrow_forward
-                </span>
-              </button>
-            </div>
+    <div className="replay-toolbar">
+      <div className="replay-toolbar-primary">
+        {leading}
+        <div className="replay-timeline-wrap">
+          <input
+            type="range"
+            className="replay-timeline"
+            aria-label="Replay timeline"
+            min={0}
+            max={max}
+            step={0.1}
+            value={displayed}
+            style={timelineStyle}
+            disabled={disabled}
+            onChange={(event) => setPreviewTime(Number(event.target.value))}
+            onPointerUp={(event) => commit(Number((event.target as HTMLInputElement).value))}
+            onKeyUp={(event) => {
+              if (SEEK_KEYS.has(event.key)) {
+                commit(Number((event.target as HTMLInputElement).value));
+              }
+            }}
+          />
+          {previewTime !== null && !disabled ? (
+            <span className="replay-preview-time">{formatDuration(previewTime)}</span>
           ) : null}
         </div>
+        <div className="replay-time-readout">
+          <span className="replay-time-value">{formatDuration(displayed)}</span>
+          <span className="replay-time-divider">/</span>
+          <span className="replay-time-value">{formatDuration(max)}</span>
+          {seeking ? <span className="replay-seeking">Seeking…</span> : null}
+        </div>
       </div>
-    </Panel>
+
+      <div className="replay-toolbar-secondary">
+        
+
+        {totalLaps !== null && totalLaps > 0 ? (
+          <div className="replay-lap-seek">
+            <label className="replay-lap-label" htmlFor="replay-lap-target">
+              Lap:
+            </label>
+            <input
+              id="replay-lap-target"
+              className="replay-lap-input"
+              type="number"
+              min={1}
+              max={totalLaps}
+              step={1}
+              value={lapText}
+              disabled={lapDisabled}
+              aria-invalid={lapText !== "" && !lapValid}
+              onFocus={() => {
+                lapInputFocusedRef.current = true;
+              }}
+              onBlur={() => {
+                lapInputFocusedRef.current = false;
+              }}
+              onChange={(event) => setLapText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && lapValid) onSeekLap(lapTarget);
+              }}
+            />
+            <span className="replay-lap-divider">/</span>
+            <span className="replay-lap-total">{totalLaps}</span>
+            <button
+              type="button"
+              className="replay-lap-button"
+              onClick={() => onSeekLap(lapTarget)}
+              disabled={!lapValid || seeking}
+            >
+              {seeking ? "Seeking…" : "Go to lap"}
+            </button>
+          </div>
+        ) : null}
+
+        {trailing}
+      </div>
+    </div>
   );
 }
