@@ -1,5 +1,28 @@
+.leaderboard-panel {
+  @apply flex min-h-0 flex-col overflow-hidden;
+}
+
 .leaderboard-scroll {
-  @apply overflow-x-auto;
+  @apply min-h-0 flex-1 overflow-auto;
+  scrollbar-color: var(--color-muted) var(--color-panel-alt);
+  scrollbar-width: .5rem;
+}
+
+.leaderboard-scroll::-webkit-scrollbar-track,
+.leaderboard-scroll::-webkit-scrollbar-corner {
+  background: var(--color-panel-alt);
+}
+
+.leaderboard-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--color-muted);
+  border: 0.125rem solid var(--color-panel-alt);
+  border-radius: var(--radius-control);
+  transition: background-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.leaderboard-scroll::-webkit-scrollbar-thumb:hover,
+.leaderboard-scroll::-webkit-scrollbar-thumb:active {
+  background-color: var(--color-f1-red);
 }
 
 .leaderboard-table {
@@ -28,6 +51,10 @@
 .leaderboard-header-cell,
 .leaderboard-cell {
   @apply px-2 py-2;
+}
+
+.leaderboard-header-cell {
+  @apply sticky top-0 z-10 bg-app-panel;
 }
 
 .leaderboard-header-text {

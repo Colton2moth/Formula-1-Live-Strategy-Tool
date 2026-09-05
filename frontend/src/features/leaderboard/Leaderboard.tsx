@@ -41,7 +41,7 @@ function splitDriverName(name: string) {
 
 export function Leaderboard({ drivers, selectedDriver, onSelectDriver }: LeaderboardProps) {
   return (
-    <Panel label="Leaderboard" icon="trophy">
+    <Panel label="Leaderboard" className="leaderboard-panel" icon="trophy">
       <div className="leaderboard-scroll">
         <table className="leaderboard-table">
           <thead>
