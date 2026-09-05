@@ -38,10 +38,8 @@ export function RaceDashboard({ raceState, track, trackStatus, source, animation
   };
 
   const session = stream.session ?? raceState.session;
-  const isActiveRace =
-    session.session_name.trim().toLowerCase() === "race" &&
-    session.session_status.trim().toLowerCase() === "active";
-  const showNoLiveRaceModal = source.socketPath === liveSource.socketPath && !isActiveRace;
+  const isActiveSession = session.session_status.trim().toLowerCase() === "active";
+  const showNoLiveRaceModal = source.socketPath === liveSource.socketPath && !isActiveSession;
 
   return (
     <>

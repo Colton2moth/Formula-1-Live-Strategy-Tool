@@ -145,6 +145,13 @@ def _predictions_from_state(state: LiveState) -> list[PredictionState] | None:
     Shared scoring path for live and replay: both build features from a
     supplied LiveState so replay never reads live data.
     """
+    session = latest_session_doc(state)
+    session_type = str(
+        (session or {}).get("session_type") or (session or {}).get("session_name") or ""
+    ).casefold()
+    if session_type != "race":
+        return None
+
     model_dir = Path(os.getenv("INFERENCE_MODEL_DIR", "data/models"))
     try:
         feat = features_from_live(state)
