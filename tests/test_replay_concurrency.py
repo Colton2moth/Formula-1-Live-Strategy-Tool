@@ -1,5 +1,6 @@
 """Multi-runtime concurrency tests: two replays run independently (Phase 10)."""
 
+import itertools
 import os
 
 os.environ["LIVE_BOOTSTRAP"] = "0"
@@ -75,7 +76,7 @@ def _make_fake_replay(monkeypatch):
 def test_two_runtimes_run_different_races_independently(monkeypatch):
     create = _make_fake_replay(monkeypatch)
     a = create(100, circuit_key=4, speed=10)
-    b = create(200, circuit_key=23, speed=20)
+    b = create(200, circuit_key=23, speed=5)
 
     assert a.replay_id != b.replay_id
     assert a.controller.state.docs_for("v1/sessions")[0]["circuit_key"] == 4
@@ -85,8 +86,8 @@ def test_two_runtimes_run_different_races_independently(monkeypatch):
     assert a.controller.snapshot()["status"] == "paused"
     assert b.controller.snapshot()["status"] == "running"
 
-    assert a.controller.set_speed(50.0) is True
-    assert b.controller.snapshot()["speed"] == 20
+    assert a.controller.set_speed(2.0) is True
+    assert b.controller.snapshot()["speed"] == 5
 
     replay_registry.registry.stop(a.replay_id)
     assert replay_registry.registry.get(a.replay_id) is None
@@ -99,20 +100,20 @@ def test_two_runtimes_run_different_races_independently(monkeypatch):
 def test_two_runtimes_same_race_different_speeds(monkeypatch):
     create = _make_fake_replay(monkeypatch)
     a = create(9979, circuit_key=23, speed=10)
-    b = create(9979, circuit_key=23, speed=50)
+    b = create(9979, circuit_key=23, speed=5)
 
     assert a.replay_id != b.replay_id
     assert a.controller.snapshot()["session_key"] == 9979
     assert b.controller.snapshot()["session_key"] == 9979
     assert a.controller.snapshot()["speed"] == 10
-    assert b.controller.snapshot()["speed"] == 50
+    assert b.controller.snapshot()["speed"] == 5
     assert a.controller.state is not b.controller.state
 
 
 def test_seek_a_does_not_affect_b(monkeypatch):
     create = _make_fake_replay(monkeypatch)
     a = create(100, circuit_key=4, speed=10)
-    b = create(200, circuit_key=23, speed=20)
+    b = create(200, circuit_key=23, speed=5)
 
     b_state_before = b.controller.state.snapshot_docs()
     a.controller.seek(50.0)
@@ -157,7 +158,7 @@ def test_a_finishing_does_not_change_b_status(monkeypatch):
     monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
 
     a = replay_registry.registry.create(100, speed=10)
-    b = replay_registry.registry.create(200, speed=20)
+    b = replay_registry.registry.create(200, speed=5)
     assert finished_a.wait(timeout=1.0)
     assert seeded_b.wait(timeout=1.0)
 
@@ -311,11 +312,14 @@ def test_two_runtimes_load_shared_prepared_data(monkeypatch, tmp_path):
             AssertionError("prepared data must be reused, not re-downloaded")
         ),
     )
+    ticks = itertools.count(step=100)
+    monkeypatch.setattr(replay_mod.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(replay_mod.time, "sleep", lambda _: None)
 
     buffer_a = LiveState()
     buffer_b = LiveState()
-    replay_mod.replay_session(7, speed=100000, state=buffer_a)
-    replay_mod.replay_session(7, speed=100000, state=buffer_b)
+    replay_mod.replay_session(7, speed=10, state=buffer_a)
+    replay_mod.replay_session(7, speed=10, state=buffer_b)
 
     assert buffer_a.snapshot_docs() == buffer_b.snapshot_docs()
     assert buffer_a.docs_for("v1/sessions")[0]["session_key"] == 7

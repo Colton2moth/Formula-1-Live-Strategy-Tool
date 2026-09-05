@@ -7,8 +7,8 @@ import { Panel } from "../../components/Panel";
 import { RaceDashboard } from "../dashboard/RaceDashboard";
 import { useRaceData } from "../dashboard/useRaceData";
 import { replaySourceFor } from "../../hooks/useLiveState";
+import type { MarkerAnimationMode } from "../track-map/useDriverMarkers";
 import { ReplayControls } from "./ReplayControls";
-import { ReplayProgress } from "./ReplayProgress";
 import { grandPrixName, useReplay } from "./useReplay";
 
 export function ReplayPage() {
@@ -45,6 +45,12 @@ export function ReplayPage() {
       replay.status === "finished") &&
     !replay.busy;
 
+  const animationMode: MarkerAnimationMode = {
+    type: "replay",
+    speed: replay.speed,
+    playing: replay.status === "running",
+  };
+
   return (
     <main className="dashboard-shell">
       <div className="dashboard-container">
@@ -53,13 +59,7 @@ export function ReplayPage() {
         <div className="replay-banner" role="status">
           {banner}
         </div>
-        <ReplayControls {...replay} />
-        <ReplayProgress
-          progress={replay.progress}
-          onSeek={replay.seek}
-          onSeekLap={replay.seekLap}
-          canSeek={canSeek}
-        />
+        <ReplayControls {...replay} canSeek={canSeek} />
         {raceStateStatus === "error" && !raceState ? (
           <Panel label="Race data" icon="database">
             <div className="p-4">
@@ -83,7 +83,7 @@ export function ReplayPage() {
             </div>
           </Panel>
         ) : (
-          <RaceDashboard raceState={raceState} track={track} trackStatus={trackStatus} source={source} />
+          <RaceDashboard raceState={raceState} track={track} trackStatus={trackStatus} source={source} animationMode={animationMode} />
         )}
       </div>
       <Footer />

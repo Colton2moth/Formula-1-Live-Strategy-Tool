@@ -1,13 +1,17 @@
 """Tests for the replay harness timeline builder and location thinning."""
 
+import itertools
 import threading
 import time
+
+import pytest
 
 from formula1_strategy_tool.acquisition import cache_replays
 from formula1_strategy_tool.acquisition import replay as replay_mod
 from formula1_strategy_tool.acquisition.client import atomic_write_json, load_json
 from formula1_strategy_tool.acquisition.live_state import LiveState
 from formula1_strategy_tool.acquisition.replay import (
+    TimelineReader,
     _thin_location,
     build_checkpoints,
     build_timeline,
@@ -92,6 +96,26 @@ def test_timeline_schedules_lap_at_date_end():
     # Lap 1 finishes at 13:01:30 → 90s after the 13:00:00 clock start.
     assert lap_events[0][0] == 90.0
     assert lap_events[0][1]["lap_number"] == 1
+
+
+def test_timeline_schedules_lap_at_start_plus_duration_without_date_end():
+    data = _data()
+    data["laps"] = [
+        {
+            "driver_number": 4,
+            "lap_number": 1,
+            "date_start": "2026-07-26T13:00:00+00:00",
+            "lap_duration": 90.0,
+        }
+    ]
+    events = build_timeline(data)
+    lap_events = [
+        (offset, payload)
+        for offset, topic, payload in events
+        if topic == "v1/laps"
+    ]
+    assert len(lap_events) == 1
+    assert lap_events[0][0] == 90.0
 
 
 def test_stint_opens_with_null_lap_end():
@@ -207,13 +231,13 @@ def test_replay_controller_start_stop(monkeypatch):
     controller = replay_mod.ReplayController()
     monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
 
-    controller.start(9979, speed=20)
+    controller.start(9979, speed=10)
     assert started.wait(timeout=1.0)
     snapshot = controller.snapshot()
     assert snapshot["status"] == "running"
     assert snapshot["running"] is True
     assert snapshot["session_key"] == 9979
-    assert snapshot["speed"] == 20
+    assert snapshot["speed"] == 10
 
     controller.stop()
     deadline = time.time() + 2.0
@@ -373,7 +397,7 @@ def test_two_controllers_run_independently(monkeypatch):
     controller_b = replay_mod.ReplayController()
 
     controller_a.start(100, speed=10)
-    controller_b.start(200, speed=20)
+    controller_b.start(200, speed=5)
     assert seeded_a.wait(timeout=1.0)
     assert seeded_b.wait(timeout=1.0)
 
@@ -385,8 +409,8 @@ def test_two_controllers_run_independently(monkeypatch):
     assert controller_a.snapshot()["status"] == "paused"
     assert controller_b.snapshot()["status"] == "running"
 
-    assert controller_a.set_speed(50.0) is True
-    assert controller_b.snapshot()["speed"] == 20
+    assert controller_a.set_speed(2.0) is True
+    assert controller_b.snapshot()["speed"] == 5
 
     controller_a.stop()
     assert controller_a.snapshot()["status"] == "idle"
@@ -427,19 +451,19 @@ def test_replay_controller_seek_restarts_with_time(monkeypatch):
     controller.seek(50.0)
     assert seen == []
 
-    controller.start(9979, speed=20)
+    controller.start(9979, speed=5)
     assert started.wait(timeout=1.0)
     assert seen[0][2] is None
 
     started.clear()
     controller.seek(50.0)
     assert started.wait(timeout=1.0)
-    assert seen[-1] == (9979, 20, 50.0, None)
+    assert seen[-1] == (9979, 5, 50.0, None)
 
     started.clear()
     controller.seek_lap(12)
     assert started.wait(timeout=1.0)
-    assert seen[-1] == (9979, 20, None, 12)
+    assert seen[-1] == (9979, 5, None, 12)
 
     controller.stop()
 
@@ -476,13 +500,52 @@ def test_replay_controller_set_speed(monkeypatch):
     assert seeded.wait(timeout=1.0)
     assert controller.snapshot()["speed"] == 10
 
-    assert controller.set_speed(50.0) is True
-    assert controller.snapshot()["speed"] == 50
-    assert captured_holder is not None and captured_holder["value"] == 50
+    assert controller.set_speed(3.0) is False
+    assert controller.snapshot()["speed"] == 10
+    assert controller.set_speed(5.0) is True
+    assert controller.snapshot()["speed"] == 5
+    assert captured_holder is not None and captured_holder["value"] == 5
 
     controller.stop()
     # Speed can only change while running or paused.
-    assert controller.set_speed(20.0) is False
+    assert controller.set_speed(2.0) is False
+
+
+@pytest.mark.parametrize("speed", [0.25, 3, 20, 50, 100])
+def test_replay_controller_rejects_unsupported_speed(speed):
+    controller = replay_mod.ReplayController()
+    with pytest.raises(ValueError, match="1, 2, 5, or 10"):
+        controller.start(9979, speed=speed)
+
+
+def test_replay_controller_joins_old_worker_before_seek(monkeypatch):
+    active = 0
+    maximum_active = 0
+    counter_lock = threading.Lock()
+    seeded = threading.Event()
+
+    def fake_replay(*args, stop_event=None, on_seeded=None, **kwargs):
+        nonlocal active, maximum_active
+        with counter_lock:
+            active += 1
+            maximum_active = max(maximum_active, active)
+        if on_seeded is not None:
+            on_seeded()
+        seeded.set()
+        assert stop_event is not None
+        stop_event.wait(timeout=2.0)
+        with counter_lock:
+            active -= 1
+
+    controller = replay_mod.ReplayController()
+    monkeypatch.setattr(replay_mod, "replay_session", fake_replay)
+    controller.start(9979, speed=10)
+    assert seeded.wait(timeout=1.0)
+    seeded.clear()
+    controller.seek(300.0)
+    assert seeded.wait(timeout=1.0)
+    controller.stop()
+    assert maximum_active == 1
 
 
 def test_replay_controller_seek_preserves_pause(monkeypatch):
@@ -639,13 +702,64 @@ def test_save_and_load_timeline_roundtrip(tmp_path):
 
     loaded = load_timeline(tmp_path, data["session"]["session_key"])
     assert loaded is not None
-    loaded_events, meta = loaded
+    assert loaded["format_version"] == replay_mod._TIMELINE_FORMAT_VERSION
+    assert loaded["session_key"] == 1
+    assert loaded["event_count"] == len(events)
+    assert loaded["total_duration"] == events[-1][0]
+    assert loaded["total_laps"] == 2
+    reader = TimelineReader(tmp_path, loaded)
+    reader.seek_cursor(0)
+    loaded_events = []
+    while (event := reader.pop()) is not None:
+        loaded_events.append(event)
     assert loaded_events == events
-    assert meta["format_version"] == replay_mod._TIMELINE_FORMAT_VERSION
-    assert meta["session_key"] == 1
-    assert meta["event_count"] == len(events)
-    assert meta["total_duration"] == events[-1][0]
-    assert meta["total_laps"] == 2
+
+
+def test_timeline_chunks_use_race_clock_boundaries_without_loss(tmp_path):
+    data = _data()
+    events = [
+        (299.9, "v1/weather", {"id": 1}),
+        (300.0, "v1/weather", {"id": 2}),
+        (599.9, "v1/weather", {"id": 3}),
+        (600.0, "v1/weather", {"id": 4}),
+    ]
+    save_timeline(tmp_path, events, data)
+    index = load_timeline(tmp_path, 1, validate_chunks=True)
+    assert index is not None
+    assert [chunk["event_count"] for chunk in index["chunks"]] == [1, 2, 1]
+    assert [chunk["file"] for chunk in index["chunks"]] == [
+        "chunk-0000.json",
+        "chunk-0001.json",
+        "chunk-0002.json",
+    ]
+    assert sum(chunk["event_count"] for chunk in index["chunks"]) == len(events)
+
+
+def test_timeline_reader_releases_old_chunks(tmp_path):
+    data = _data()
+    events = [
+        (0.0, "v1/weather", {"id": 1}),
+        (300.0, "v1/weather", {"id": 2}),
+        (600.0, "v1/weather", {"id": 3}),
+    ]
+    save_timeline(tmp_path, events, data)
+    index = load_timeline(tmp_path, 1)
+    assert index is not None
+    reader = TimelineReader(tmp_path, index)
+    reader.seek_cursor(0)
+    assert reader.loaded_chunk_indices == (0, 1)
+    assert reader.pop() == events[0]
+    assert reader.pop() == events[1]
+    assert reader.loaded_chunk_indices == (1, 2)
+    assert len(reader.loaded_chunk_indices) <= 2
+
+
+def test_old_monolithic_timeline_is_not_current_format(tmp_path):
+    atomic_write_json(
+        tmp_path / "timeline.json",
+        {"format_version": replay_mod._TIMELINE_FORMAT_VERSION - 1, "events": []},
+    )
+    assert load_timeline(tmp_path, 1) is None
 
 
 def test_load_timeline_missing_returns_none(tmp_path):
@@ -847,12 +961,15 @@ def test_restore_seek_returns_checkpoint_cursor(tmp_path):
         events, data["session"], data["meetings"], data["drivers"]
     )
     save_checkpoints(tmp_path, checkpoints, data["session"]["session_key"])
+    save_timeline(tmp_path, events, data)
+    timeline = load_timeline(tmp_path, data["session"]["session_key"])
+    assert timeline is not None
 
     buffer = LiveState()
     cursor, lap = replay_mod._restore_seek(
         tmp_path,
         data["session"]["session_key"],
-        events,
+        TimelineReader(tmp_path, timeline),
         data["session"],
         data["meetings"],
         data["drivers"],
@@ -871,13 +988,16 @@ def test_restore_seek_fast_forwards_between_checkpoints(tmp_path):
         events, data["session"], data["meetings"], data["drivers"]
     )
     save_checkpoints(tmp_path, checkpoints, data["session"]["session_key"])
+    save_timeline(tmp_path, events, data)
+    timeline = load_timeline(tmp_path, data["session"]["session_key"])
+    assert timeline is not None
 
     buffer = LiveState()
     # 91.0 is after the lap-1 checkpoint (90.0) but before lap 2 (180.0).
     cursor, lap = replay_mod._restore_seek(
         tmp_path,
         data["session"]["session_key"],
-        events,
+        TimelineReader(tmp_path, timeline),
         data["session"],
         data["meetings"],
         data["drivers"],
@@ -890,37 +1010,43 @@ def test_restore_seek_fast_forwards_between_checkpoints(tmp_path):
     assert laps == [1, 1]  # both drivers' lap 1, nothing from lap 2
 
 
-def test_restore_seek_builds_checkpoints_when_missing(tmp_path):
+def test_restore_seek_rejects_missing_checkpoints(tmp_path):
     data = _multi_driver_data()
     events = build_timeline(data)
+    save_timeline(tmp_path, events, data)
+    timeline = load_timeline(tmp_path, data["session"]["session_key"])
+    assert timeline is not None
 
     buffer = LiveState()
-    cursor, lap = replay_mod._restore_seek(
-        tmp_path,
-        data["session"]["session_key"],
-        events,
-        data["session"],
-        data["meetings"],
-        data["drivers"],
-        seek_time=90.0,
-        buffer=buffer,
-    )
-    assert lap == 1
-    assert cursor > 0
-    # Checkpoints were built and persisted on first seek.
-    index = load_checkpoint_index(tmp_path, data["session"]["session_key"])
-    assert index is not None and len(index) == 2
+    with pytest.raises(ValueError, match="checkpoint index"):
+        replay_mod._restore_seek(
+            tmp_path,
+            data["session"]["session_key"],
+            TimelineReader(tmp_path, timeline),
+            data["session"],
+            data["meetings"],
+            data["drivers"],
+            seek_time=90.0,
+            buffer=buffer,
+        )
 
 
 def test_restore_seek_before_first_lap_seeds_identity(tmp_path):
     data = _multi_driver_data()
     events = build_timeline(data)
+    checkpoints = build_checkpoints(
+        events, data["session"], data["meetings"], data["drivers"]
+    )
+    save_checkpoints(tmp_path, checkpoints, data["session"]["session_key"])
+    save_timeline(tmp_path, events, data)
+    timeline = load_timeline(tmp_path, data["session"]["session_key"])
+    assert timeline is not None
 
     buffer = LiveState()
     cursor, lap = replay_mod._restore_seek(
         tmp_path,
         data["session"]["session_key"],
-        events,
+        TimelineReader(tmp_path, timeline),
         data["session"],
         data["meetings"],
         data["drivers"],
@@ -939,11 +1065,14 @@ def test_replay_session_seek_reaches_same_final_state(monkeypatch, tmp_path):
     monkeypatch.setattr(
         replay_mod, "download_replay_data", lambda client, key, cache=None: data
     )
+    ticks = itertools.count(step=100)
+    monkeypatch.setattr(replay_mod.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(replay_mod.time, "sleep", lambda _: None)
 
     buffer = LiveState()
     progress: dict = {}
     replay_mod.replay_session(
-        7, speed=100000, state=buffer, progress=progress, seek_time=91.0
+        7, speed=10, state=buffer, progress=progress, seek_time=91.0
     )
 
     expected = LiveState()
@@ -1030,6 +1159,21 @@ def test_replay_readiness_not_ready(monkeypatch, tmp_path):
     assert cache_replays.replay_readiness(99) == "not_ready"
 
 
+def test_replay_readiness_skips_chunk_validation(monkeypatch, tmp_path):
+    cache = tmp_path / "1"
+    cache_replays.prepare_timeline(cache, _data())
+    missing = next((cache / "timeline").glob("chunk-*.json"))
+    missing.unlink()
+    monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
+    monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "failures.txt")
+
+    # Full validation (cache-preparation path) still detects the missing chunk.
+    assert load_timeline(cache, 1, validate_chunks=True) is None
+    # The runtime library path uses the lightweight index only, so the race is
+    # still listed as ready without deserializing every chunk.
+    assert cache_replays.replay_readiness(1) == "ready"
+
+
 def test_replay_readiness_failed(monkeypatch, tmp_path):
     failures = tmp_path / "cache_failures.txt"
     failures.write_text(
@@ -1043,6 +1187,60 @@ def test_replay_readiness_failed(monkeypatch, tmp_path):
 
 def test_classify_location_gaps_complete():
     assert replay_mod.classify_location_gaps(4, [0, 1, 2, 3]) == "complete"
+
+
+def test_list_local_sessions_missing_directory(tmp_path):
+    assert cache_replays.list_local_sessions(tmp_path / "nope") == []
+
+
+def test_list_local_sessions_returns_normalized_rows(tmp_path):
+    root = tmp_path / "replay"
+    cache = root / "10006"
+    cache.mkdir(parents=True)
+    atomic_write_json(
+        cache / "sessions.json",
+        [
+            {
+                "session_key": 10006,
+                "year": 2025,
+                "country_name": "Japan",
+                "location": "Suzuka",
+                "circuit_short_name": "Suzuka",
+                "date_start": "2025-04-06T05:00:00+00:00",
+                "extra": "ignored",
+            }
+        ],
+    )
+    assert cache_replays.list_local_sessions(root) == [
+        {
+            "session_key": 10006,
+            "year": 2025,
+            "country_name": "Japan",
+            "location": "Suzuka",
+            "circuit_short_name": "Suzuka",
+            "date_start": "2025-04-06T05:00:00+00:00",
+        }
+    ]
+
+
+def test_list_local_sessions_dedupes_and_skips_malformed(tmp_path):
+    root = tmp_path / "replay"
+    first = root / "1"
+    second = root / "2"
+    malformed = root / "bad"
+    for directory in (first, second, malformed):
+        directory.mkdir(parents=True)
+    atomic_write_json(
+        first / "sessions.json",
+        [{"session_key": 1, "year": 2025, "country_name": "A"}],
+    )
+    atomic_write_json(
+        second / "sessions.json",
+        [{"session_key": 1, "year": 2025, "country_name": "A"}],
+    )
+    (malformed / "sessions.json").write_text("{not json", encoding="utf-8")
+    rows = cache_replays.list_local_sessions(root)
+    assert [row["session_key"] for row in rows] == [1]
 
 
 def test_classify_location_gaps_one_trailing_missing():
@@ -1077,32 +1275,19 @@ def _write_readiness_cache(
 ):
     cache = tmp_path / str(session_key)
     cache.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(
-        cache / "sessions.json",
-        [
-            {
-                "session_key": session_key,
-                "date_start": "2026-07-26T13:00:00+00:00",
-                "date_end": date_end,
-            }
-        ],
-    )
+    session = {
+        "session_key": session_key,
+        "date_start": "2026-07-26T13:00:00+00:00",
+        "date_end": date_end,
+    }
+    atomic_write_json(cache / "sessions.json", [session])
     atomic_write_json(cache / "laps.json", [])
     location_dir = cache / "location"
     location_dir.mkdir(parents=True, exist_ok=True)
     for index in windows:
         atomic_write_json(location_dir / f"{index:04d}.json", [])
-    atomic_write_json(cache / "timeline.json", {})
-    checkpoints_dir = cache / "checkpoints"
-    checkpoints_dir.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(
-        checkpoints_dir / "index.json",
-        {
-            "format_version": replay_mod._TIMELINE_FORMAT_VERSION,
-            "session_key": session_key,
-            "checkpoints": [],
-        },
-    )
+    save_timeline(cache, [], {"session": session, "laps": []})
+    save_checkpoints(cache, [], session_key)
     return cache
 
 

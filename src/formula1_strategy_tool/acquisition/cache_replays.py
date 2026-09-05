@@ -53,9 +53,9 @@ def replay_readiness(session_key: int) -> str:
     if session_key in CANCELLED_SESSION_KEYS:
         return "cancelled"
     cache = replay_dir(session_key)
-    if (cache / "timeline.json").exists() and load_checkpoint_index(
-        cache, session_key
-    ) is not None:
+    if load_timeline(cache, session_key) is not None and (
+        load_checkpoint_index(cache, session_key) is not None
+    ):
         gap = _location_gap_status(cache)
         return "partial" if gap in ("internal", "absent") else "ready"
     if _session_in_failures(session_key):
@@ -90,17 +90,49 @@ def _session_in_failures(session_key: int) -> bool:
     )
 
 
-def _local_sessions() -> list[dict[str, Any]]:
-    """Discover already-cached sessions from ``data/replay`` without OpenF1."""
+def list_local_sessions(root: Path | None = None) -> list[dict[str, Any]]:
+    """Discover already-cached Race sessions from ``data/replay`` without OpenF1.
+
+    Returns one normalized row per session with the fields the replay picker
+    needs (the same shape as ``fetch_replay_sessions``). A missing/empty replay
+    directory, malformed cache entries, and duplicate session keys are all
+    handled here so the API library endpoint never hangs or crashes on them.
+    """
+    root = root or Path("data/replay")
+    if not root.exists():
+        return []
     sessions: list[dict[str, Any]] = []
-    for child in sorted(Path("data/replay").iterdir()):
+    seen: set[int] = set()
+    for child in sorted(root.iterdir()):
         if not child.is_dir():
             continue
         path = child / "sessions.json"
         if not path.exists():
             continue
-        for row in load_json(path):
-            sessions.append(row)
+        try:
+            rows = load_json(path)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            key = row.get("session_key")
+            year = row.get("year")
+            if not isinstance(key, int) or not isinstance(year, int) or key in seen:
+                continue
+            seen.add(key)
+            sessions.append(
+                {
+                    "session_key": key,
+                    "year": year,
+                    "country_name": row.get("country_name"),
+                    "location": row.get("location"),
+                    "circuit_short_name": row.get("circuit_short_name"),
+                    "date_start": row.get("date_start"),
+                }
+            )
     return sessions
 
 
@@ -220,8 +252,8 @@ def cache_session(
     # Build the timeline + checkpoints whenever the core endpoints downloaded
     # and they are not already current.
     if (
-        load_timeline(cache, session_key) is None
-        or load_checkpoint_index(cache, session_key) is None
+        load_timeline(cache, session_key, validate_chunks=True) is None
+        or load_checkpoint_index(cache, session_key, validate_states=True) is None
     ):
         events, _ = prepare_timeline(cache, data)
         print(f"  timeline + checkpoints: {len(events)} events prepared", flush=True)
@@ -247,7 +279,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     client = OpenF1Client(max_retries=args.max_retries, min_interval=args.interval)
 
     if args.local:
-        sessions = _local_sessions()
+        sessions = list_local_sessions()
         print(f"Using {len(sessions)} locally cached sessions.\n", flush=True)
     else:
         if not args.years:

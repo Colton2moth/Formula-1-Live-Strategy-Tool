@@ -12,11 +12,23 @@ export function formatLapTime(seconds: number) {
   return `${minutes}:${remaining}`;
 }
 
-export function formatGap(value: number | null) {
-  if (value === null || value === 0) {
+export function formatGap(value: number | string | null) {
+  if (value === null) {
     return "Leader";
   }
-  return `+${value.toFixed(3)}`;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? `+${value.toFixed(3)}` : "Unknown";
+  }
+  if (typeof value === "string") {
+    if (value === "UNKNOWN") {
+      return "Unknown";
+    }
+    if (/^\+\d+\s+LAPS?$/i.test(value.trim())) {
+      return value.trim().toUpperCase();
+    }
+    return "Unknown";
+  }
+  return "Unknown";
 }
 
 export function formatUpdatedAt(value: string) {

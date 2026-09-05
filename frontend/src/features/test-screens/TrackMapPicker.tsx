@@ -96,7 +96,8 @@ export function TrackMapPicker() {
           trackStatus="ready"
           session={sessionForTrack(selectedTrack)}
           drivers={[]}
-          locations={new Map()}
+          progress={new Map()}
+          resetGeneration={0}
           selectedDriver={null}
           onSelectDriver={() => {}}
         />

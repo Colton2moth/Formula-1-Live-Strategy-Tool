@@ -8,7 +8,12 @@ These shapes match docs/api/CONTRACT.md exactly. FastAPI uses them to:
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
+import re
+from typing import Literal
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+_LAP_GAP_PATTERN = re.compile(r"^\+\d+ LAPS?$")
 
 
 class SessionState(BaseModel):
@@ -44,10 +49,27 @@ class DriverState(BaseModel):
     compound: str
     tyre_age: int
     last_lap_time: float
-    gap_to_leader: float
+    # gap_to_leader states: float (numeric gap), null (leader), a normalized
+    # lap-count string such as "+1 LAP" (lapped), or "UNKNOWN" (missing/stale).
+    gap_to_leader: float | str | None
     interval_ahead: float | None  # null when leading or no car ahead
     interval_behind: float | None
     pit_stops: int
+
+    @field_validator("gap_to_leader")
+    @classmethod
+    def _validate_gap_to_leader(cls, value: float | str | None) -> float | str | None:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip()
+        if text == "UNKNOWN" or _LAP_GAP_PATTERN.match(text):
+            return text
+        raise ValueError(
+            "gap_to_leader must be a number, a lap string like '+1 LAP', "
+            "'UNKNOWN', or null"
+        )
 
 
 class LocationState(BaseModel):
@@ -167,7 +189,7 @@ class ReplayCreateRequest(BaseModel):
     """Body for POST /api/replays."""
 
     session_key: int
-    speed: float = Field(default=10.0, ge=0.25, le=100.0)
+    speed: Literal[1, 2, 5, 10] = 1
 
 
 class ReplaySeekRequest(BaseModel):
@@ -184,9 +206,9 @@ class ReplaySeekRequest(BaseModel):
 
 
 class ReplaySpeedRequest(BaseModel):
-    """Body for POST /api/replays/{replay_id}/speed. Same valid range as create."""
+    """Body for POST /api/replays/{replay_id}/speed. Same presets as create."""
 
-    speed: float = Field(ge=0.25, le=100.0)
+    speed: Literal[1, 2, 5, 10]
 
 
 class ReplayStatus(BaseModel):

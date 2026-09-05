@@ -31,10 +31,19 @@ export function BrandBar({ replayMode = false }: BrandBarProps) {
 
   return (
     <div ref={headerRef} className="dashboard-brand">
-      <div role="heading" aria-level={1} className="dashboard-brand-title">
-        PitPit
+      <div className="dashboard-brand-lockup">
+        <img
+          src="/brand/pitpit-logo-full.png"
+          alt="PitPit logo"
+          className="dashboard-brand-logo"
+        />
+        <div className="dashboard-brand-text">
+          <div role="heading" aria-level={1} className="dashboard-brand-title">
+            PitPit
+          </div>
+          <div className="dashboard-brand-subtitle">F1 Live Strategy Tool</div>
+        </div>
       </div>
-      <div className="dashboard-brand-subtitle">F1 Live Strategy Tool</div>
       <nav className="dashboard-brand-nav" aria-label="Primary navigation">
         {replayMode ? (
           <Link className="dashboard-brand-nav-link" to="/">

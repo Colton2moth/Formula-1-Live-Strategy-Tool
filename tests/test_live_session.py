@@ -65,6 +65,35 @@ def test_early_live_race_state_lap_one_unknown_total():
     assert session.total_laps is None
 
 
+def test_latest_session_doc_prefers_highest_session_key():
+    from formula1_strategy_tool.acquisition.live_session import latest_session_doc
+
+    state = LiveState()
+    _seed_session(state, session_key=100)
+    state.update(
+        "v1/sessions",
+        {
+            "session_key": 200,
+            "circuit_key": 5,
+            "circuit_short_name": "Monza",
+            "session_name": "Race",
+            "session_type": "Race",
+            "location": "Monza",
+            "date_start": "2026-09-06T13:00:00+00:00",
+            "date_end": "2026-09-06T15:00:00+00:00",
+            "is_cancelled": False,
+        },
+    )
+
+    session = latest_session_doc(state)
+    assert session is not None
+    assert session["session_key"] == 200
+
+    mapped = session_from_live(state)
+    assert mapped is not None
+    assert mapped.session_name == "Race"
+
+
 def test_replay_race_state_threads_total_laps(monkeypatch):
     from fastapi.testclient import TestClient
 

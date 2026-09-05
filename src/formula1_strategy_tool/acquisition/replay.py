@@ -25,6 +25,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -56,7 +57,9 @@ _LOCATION_THIN_SECONDS = 0.25
 # Bump when the prepared timeline's shape changes (new topics, ordering rules,
 # thinning intervals, or payload edits) or the checkpoint layout changes.
 # Older prepared files are rebuilt from the raw cache instead of being trusted.
-_TIMELINE_FORMAT_VERSION = 3
+_TIMELINE_FORMAT_VERSION = 4
+_TIMELINE_CHUNK_SECONDS = 300.0
+_SUPPORTED_SPEEDS = frozenset({1.0, 2.0, 5.0, 10.0})
 # Download window for the paginated location endpoint (whole-session returns 422).
 _LOCATION_WINDOW_SECONDS = 300
 
@@ -111,13 +114,23 @@ def fetch_replay_sessions(
 
 
 _sessions_cache: list[dict[str, Any]] | None = None
+_sessions_cache_at: float | None = None
+# Refresh periodically so newly completed races appear without a server restart.
+_SESSIONS_CACHE_TTL_SECONDS = 3600.0
 
 
 def list_replay_sessions() -> list[dict[str, Any]]:
     """Return completed Race sessions, fetching (and caching) on first call."""
-    global _sessions_cache
-    if _sessions_cache is None:
+    global _sessions_cache, _sessions_cache_at
+    now = time.monotonic()
+    stale = (
+        _sessions_cache is None
+        or _sessions_cache_at is None
+        or now - _sessions_cache_at > _SESSIONS_CACHE_TTL_SECONDS
+    )
+    if stale:
         _sessions_cache = fetch_replay_sessions(OpenF1Client())
+        _sessions_cache_at = now
     return _sessions_cache
 
 
@@ -293,7 +306,10 @@ def _download_location(
 
 def _event_offset(value: Any, t0: datetime) -> float | None:
     """Race-clock offset in seconds for one timestamp, or None if unparseable."""
-    dt = parse_openf1_datetime(value)
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        dt = parse_openf1_datetime(value)
     if dt is None:
         return None
     return max(0.0, (dt - t0).total_seconds())
@@ -338,6 +354,28 @@ def _lap_start_index(laps: list[dict[str, Any]]) -> dict[tuple[int, int], Any]:
     return index
 
 
+def _lap_finish_time(row: dict[str, Any]) -> datetime | None:
+    """
+    When a lap completed, for replay scheduling.
+
+    OpenF1 lap rows usually lack ``date_end``; derive finish from
+    ``date_start + lap_duration`` so laps are not exposed at lap *start*
+    (future-data leak). Falls back to ``date_start`` only when duration is
+    missing.
+    """
+    end = parse_openf1_datetime(row.get("date_end"))
+    if end is not None:
+        return end
+    start = parse_openf1_datetime(row.get("date_start"))
+    duration = row.get("lap_duration")
+    if start is not None and duration is not None:
+        try:
+            return start + timedelta(seconds=float(duration))
+        except (TypeError, ValueError):
+            pass
+    return start
+
+
 def build_timeline(data: dict[str, Any]) -> list[tuple[float, str, dict[str, Any]]]:
     """
     Normalize one session's rows into a chronological (offset, topic, payload)
@@ -347,9 +385,10 @@ def build_timeline(data: dict[str, Any]) -> list[tuple[float, str, dict[str, Any
     t0 = _reference_time(data["session"], data["laps"])
     events: list[tuple[float, str, dict[str, Any]]] = []
 
-    # Laps become known only when they finish (date_end) — never early.
+    # Laps become known only when they finish — never at date_start alone.
     for row in data["laps"]:
-        offset = _event_offset(row.get("date_end") or row.get("date_start"), t0)
+        finish = _lap_finish_time(row)
+        offset = _event_offset(finish, t0)
         if offset is not None:
             events.append((offset, "v1/laps", row))
 
@@ -403,9 +442,17 @@ def build_timeline(data: dict[str, Any]) -> list[tuple[float, str, dict[str, Any
     return events
 
 
+def _timeline_dir(cache: Path) -> Path:
+    return cache / "timeline"
+
+
 def _timeline_path(cache: Path) -> Path:
-    """Prepared chronological-event file for one session's replay cache."""
-    return cache / "timeline.json"
+    """Lightweight prepared timeline index for one replay cache."""
+    return _timeline_dir(cache) / "index.json"
+
+
+def _timeline_chunk_path(cache: Path, file_name: str) -> Path:
+    return _timeline_dir(cache) / file_name
 
 
 def _timeline_meta(
@@ -422,6 +469,7 @@ def _timeline_meta(
         "total_duration": total_duration,
         "total_laps": total_laps,
         "event_count": len(events),
+        "chunk_duration": _TIMELINE_CHUNK_SECONDS,
     }
 
 
@@ -430,23 +478,51 @@ def save_timeline(
     events: list[tuple[float, str, dict[str, Any]]],
     data: dict[str, Any],
 ) -> None:
-    """Persist the prepared event list + metadata under the session cache."""
+    """Persist chronological events as race-clock chunks plus a small index."""
     meta = _timeline_meta(events, data)
-    payload = {
-        **meta,
-        "events": [[offset, topic, payload] for offset, topic, payload in events],
-    }
-    atomic_write_json(_timeline_path(cache), payload)
+    timeline_dir = _timeline_dir(cache)
+    timeline_dir.mkdir(parents=True, exist_ok=True)
+    chunks: list[dict[str, Any]] = []
+    cursor = 0
+    while cursor < len(events):
+        chunk_number = int(events[cursor][0] // _TIMELINE_CHUNK_SECONDS)
+        end_cursor = cursor
+        while (
+            end_cursor < len(events)
+            and int(events[end_cursor][0] // _TIMELINE_CHUNK_SECONDS)
+            == chunk_number
+        ):
+            end_cursor += 1
+        chunk_events = events[cursor:end_cursor]
+        file_name = f"chunk-{chunk_number:04d}.json"
+        atomic_write_json(
+            _timeline_chunk_path(cache, file_name),
+            [[offset, topic, payload] for offset, topic, payload in chunk_events],
+        )
+        chunks.append(
+            {
+                "file": file_name,
+                "start_time": chunk_events[0][0],
+                "end_time": chunk_events[-1][0],
+                "start_cursor": cursor,
+                "event_count": len(chunk_events),
+            }
+        )
+        cursor = end_cursor
+    atomic_write_json(_timeline_path(cache), {**meta, "chunks": chunks})
+    referenced = {chunk["file"] for chunk in chunks}
+    for path in timeline_dir.glob("chunk-*.json"):
+        if path.name not in referenced:
+            path.unlink()
+    legacy = cache / "timeline.json"
+    if legacy.exists():
+        legacy.unlink()
 
 
 def load_timeline(
-    cache: Path, session_key: int
-) -> tuple[list[tuple[float, str, dict[str, Any]]], dict[str, Any]] | None:
-    """Return (events, meta) from the prepared file, or None if unusable.
-
-    Unusable means missing, wrong format version, wrong session, or malformed.
-    The caller then rebuilds from the raw cache via ``build_timeline``.
-    """
+    cache: Path, session_key: int, *, validate_chunks: bool = False
+) -> dict[str, Any] | None:
+    """Return the lightweight chunk index, or None when it is unusable."""
     path = _timeline_path(cache)
     if not path.exists():
         return None
@@ -460,23 +536,149 @@ def load_timeline(
         return None
     if blob.get("session_key") != session_key:
         return None
-    raw_events = blob.get("events")
-    if not isinstance(raw_events, list):
+    if not (
+        isinstance(blob.get("event_count"), int)
+        and isinstance(blob.get("total_duration"), (int, float))
+        and isinstance(blob.get("total_laps"), int)
+        and blob.get("chunk_duration") == _TIMELINE_CHUNK_SECONDS
+    ):
+        return None
+    chunks = blob.get("chunks")
+    if not isinstance(chunks, list):
+        return None
+    expected_cursor = 0
+    previous_end = -1.0
+    for entry in chunks:
+        if not (
+            isinstance(entry, dict)
+            and isinstance(entry.get("file"), str)
+            and isinstance(entry.get("start_time"), (int, float))
+            and isinstance(entry.get("end_time"), (int, float))
+            and isinstance(entry.get("start_cursor"), int)
+            and isinstance(entry.get("event_count"), int)
+        ):
+            return None
+        if entry["start_cursor"] != expected_cursor or entry["event_count"] <= 0:
+            return None
+        if float(entry["start_time"]) < previous_end:
+            return None
+        expected_cursor += entry["event_count"]
+        previous_end = float(entry["end_time"])
+        if validate_chunks:
+            events = _load_timeline_chunk(cache, entry)
+            if events is None:
+                return None
+            if (
+                events[0][0] != entry["start_time"]
+                or events[-1][0] != entry["end_time"]
+            ):
+                return None
+    if expected_cursor != blob["event_count"]:
+        return None
+    return blob
+
+
+def _load_timeline_chunk(
+    cache: Path, entry: dict[str, Any]
+) -> list[tuple[float, str, dict[str, Any]]] | None:
+    """Load and validate one indexed chunk without retaining other chunks."""
+    path = _timeline_chunk_path(cache, entry["file"])
+    if not path.exists():
+        return None
+    try:
+        raw_events = load_json(path)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(raw_events, list) or len(raw_events) != entry["event_count"]:
         return None
     events: list[tuple[float, str, dict[str, Any]]] = []
+    previous = -1.0
     for item in raw_events:
         if not (isinstance(item, list) and len(item) == 3):
             return None
         offset, topic, payload = item
-        if (
-            not isinstance(offset, (int, float))
-            or not isinstance(topic, str)
-            or not isinstance(payload, dict)
+        if not (
+            isinstance(offset, (int, float))
+            and isinstance(topic, str)
+            and isinstance(payload, dict)
+            and float(offset) >= previous
         ):
             return None
+        previous = float(offset)
         events.append((float(offset), topic, payload))
-    meta = {key: value for key, value in blob.items() if key != "events"}
-    return events, meta
+    return events
+
+
+@dataclass
+class TimelineReader:
+    """Cursor-based reader retaining only the current and next event chunks."""
+
+    cache: Path
+    index: dict[str, Any]
+
+    def __post_init__(self) -> None:
+        self._chunk_index = 0
+        self._event_index = 0
+        self._cursor = 0
+        self._loaded: dict[int, list[tuple[float, str, dict[str, Any]]]] = {}
+
+    @property
+    def loaded_chunk_indices(self) -> tuple[int, ...]:
+        return tuple(sorted(self._loaded))
+
+    @property
+    def cursor(self) -> int:
+        return self._cursor
+
+    def seek_cursor(self, cursor: int) -> None:
+        chunks = self.index["chunks"]
+        self._cursor = cursor
+        if cursor >= self.index["event_count"]:
+            self._chunk_index = len(chunks)
+            self._event_index = 0
+            self._loaded.clear()
+            return
+        for chunk_index, entry in enumerate(chunks):
+            end = entry["start_cursor"] + entry["event_count"]
+            if entry["start_cursor"] <= cursor < end:
+                self._chunk_index = chunk_index
+                self._event_index = cursor - entry["start_cursor"]
+                self._loaded.clear()
+                self._ensure_window()
+                return
+        raise ValueError(f"timeline cursor {cursor} is outside the index")
+
+    def peek(self) -> tuple[float, str, dict[str, Any]] | None:
+        while self._chunk_index < len(self.index["chunks"]):
+            self._ensure_window()
+            events = self._loaded[self._chunk_index]
+            if self._event_index < len(events):
+                return events[self._event_index]
+            self._chunk_index += 1
+            self._event_index = 0
+            self._ensure_window()
+        return None
+
+    def pop(self) -> tuple[float, str, dict[str, Any]] | None:
+        event = self.peek()
+        if event is not None:
+            self._event_index += 1
+            self._cursor += 1
+        return event
+
+    def _ensure_window(self) -> None:
+        chunks = self.index["chunks"]
+        keep = set(range(self._chunk_index, min(self._chunk_index + 2, len(chunks))))
+        self._loaded = {
+            key: value for key, value in self._loaded.items() if key in keep
+        }
+        for chunk_index in keep:
+            if chunk_index not in self._loaded:
+                events = _load_timeline_chunk(self.cache, chunks[chunk_index])
+                if events is None:
+                    file_name = chunks[chunk_index]["file"]
+                    raise ValueError(f"invalid replay chunk {file_name}")
+                self._loaded[chunk_index] = events
 
 
 def _load_identity(
@@ -511,7 +713,10 @@ def prepare_timeline(
         events, data["session"], data["meetings"], data["drivers"]
     )
     save_checkpoints(cache, checkpoints, data["session"].get("session_key"))
-    return events, _timeline_meta(events, data)
+    index = load_timeline(cache, data["session"].get("session_key"))
+    if index is None:
+        raise ValueError("prepared replay timeline index is invalid")
+    return events, index
 
 
 def _checkpoint_dir(cache: Path) -> Path:
@@ -599,7 +804,9 @@ def save_checkpoints(
     )
 
 
-def load_checkpoint_index(cache: Path, session_key: int) -> list[dict[str, Any]] | None:
+def load_checkpoint_index(
+    cache: Path, session_key: int, *, validate_states: bool = False
+) -> list[dict[str, Any]] | None:
     """Return the lightweight checkpoint index, or None if unusable.
 
     Unusable means missing, wrong format version, wrong session, or malformed.
@@ -620,14 +827,23 @@ def load_checkpoint_index(cache: Path, session_key: int) -> list[dict[str, Any]]
     entries = blob.get("checkpoints")
     if not isinstance(entries, list):
         return None
+    previous_time = -1.0
+    previous_lap = 0
     for entry in entries:
         if (
             not isinstance(entry, dict)
             or not isinstance(entry.get("lap"), int)
+            or not isinstance(entry.get("time"), (int, float))
             or not isinstance(entry.get("cursor"), int)
             or not isinstance(entry.get("file"), str)
         ):
             return None
+        if entry["lap"] <= previous_lap or float(entry["time"]) < previous_time:
+            return None
+        if validate_states and load_checkpoint_state(cache, entry) is None:
+            return None
+        previous_lap = entry["lap"]
+        previous_time = float(entry["time"])
     return entries
 
 
@@ -646,6 +862,8 @@ def load_checkpoint_state(cache: Path, entry: dict[str, Any]) -> dict[str, Any] 
     if not isinstance(checkpoint, dict) or not isinstance(
         checkpoint.get("state"), dict
     ):
+        return None
+    if any(checkpoint.get(key) != entry.get(key) for key in ("lap", "time", "cursor")):
         return None
     return checkpoint
 
@@ -685,7 +903,7 @@ def restore_checkpoint(state: LiveState, checkpoint: dict[str, Any]) -> int:
 def _restore_seek(
     cache: Path,
     session_key: int,
-    events: list[tuple[float, str, dict[str, Any]]],
+    reader: TimelineReader,
     session: dict[str, Any],
     meetings: list[dict[str, Any]],
     drivers: list[dict[str, Any]],
@@ -701,9 +919,7 @@ def _restore_seek(
     """
     index = load_checkpoint_index(cache, session_key)
     if index is None:
-        checkpoints = build_checkpoints(events, session, meetings, drivers)
-        save_checkpoints(cache, checkpoints, session_key)
-        index = load_checkpoint_index(cache, session_key)
+        raise ValueError("missing or invalid replay checkpoint index")
 
     entry = nearest_checkpoint_by_time(index or [], seek_time)
     checkpoint = load_checkpoint_state(cache, entry) if entry is not None else None
@@ -719,14 +935,15 @@ def _restore_seek(
         cursor = restore_checkpoint(buffer, checkpoint)
         current_lap = int(checkpoint["lap"])
 
-    total = len(events)
-    while cursor < total and events[cursor][0] <= seek_time:
-        _, topic, payload = events[cursor]
+    reader.seek_cursor(cursor)
+    event = reader.peek()
+    while event is not None and event[0] <= seek_time:
+        _, topic, payload = reader.pop()
         buffer.update(topic, payload)
         if topic == "v1/laps":
             current_lap = max(current_lap, int(payload.get("lap_number") or 0))
-        cursor += 1
-    return cursor, current_lap
+        event = reader.peek()
+    return reader.cursor, current_lap
 
 
 def replay_session(
@@ -760,26 +977,26 @@ def replay_session(
     ``{"value": float}`` the clock reads each tick so the speed can change
     without restarting the worker.
     """
-    if speed <= 0:
-        raise ValueError("speed must be positive")
+    if float(speed) not in _SUPPORTED_SPEEDS:
+        raise ValueError("speed must be one of 1, 2, 5, or 10")
     buffer = state if state is not None else LIVE_STATE
 
     cache = replay_dir(session_key)
-    prepared = load_timeline(cache, session_key)
-    if prepared is None:
+    timeline_index = load_timeline(cache, session_key)
+    if timeline_index is None or load_checkpoint_index(cache, session_key) is None:
         data = download_replay_data(OpenF1Client(), session_key, cache=cache)
         if stop_event is not None and stop_event.is_set():
             return
-        events, meta = prepare_timeline(cache, data)
+        _, timeline_index = prepare_timeline(cache, data)
         session = data["session"]
         meetings = data["meetings"]
         drivers = data["drivers"]
     else:
-        events, meta = prepared
         session, meetings, drivers = _load_identity(cache)
+    reader = TimelineReader(cache, timeline_index)
 
-    total_duration = meta["total_duration"]
-    total_laps = meta["total_laps"]
+    total_duration = timeline_index["total_duration"]
+    total_laps = timeline_index["total_laps"]
     if progress is not None:
         progress["total_duration"] = total_duration
         progress["total_laps"] = total_laps
@@ -790,17 +1007,13 @@ def replay_session(
         raise ValueError("seek_time and seek_lap are mutually exclusive")
     if seek_lap is not None:
         index = load_checkpoint_index(cache, session_key)
-        if index is None:
-            checkpoints = build_checkpoints(events, session, meetings, drivers)
-            save_checkpoints(cache, checkpoints, session_key)
-            index = load_checkpoint_index(cache, session_key)
         checkpoint = nearest_checkpoint_by_lap(index or [], seek_lap)
         target = float(checkpoint["time"]) if checkpoint is not None else 0.0
     else:
         target = min(max(seek_time or 0.0, 0.0), total_duration)
     if seek_time is not None or seek_lap is not None:
-        cursor, current_lap = _restore_seek(
-            cache, session_key, events, session, meetings, drivers, target, buffer
+        _, current_lap = _restore_seek(
+            cache, session_key, reader, session, meetings, drivers, target, buffer
         )
         base_offset = target
     else:
@@ -809,7 +1022,8 @@ def replay_session(
             buffer.update("v1/meetings", meeting)
         for driver in drivers:
             buffer.update("v1/drivers", driver)
-        cursor, current_lap, base_offset = 0, 0, 0.0
+        current_lap, base_offset = 0, 0.0
+        reader.seek_cursor(0)
 
     if progress is not None:
         progress["current_time"] = min(base_offset, total_duration)
@@ -821,12 +1035,15 @@ def replay_session(
     def current_speed() -> float:
         return speed_holder["value"] if speed_holder is not None else speed
 
-    print(f"replay: session_key={session_key} events={len(events)} speed={speed}x")
+    print(
+        f"replay: session_key={session_key} "
+        f"events={timeline_index['event_count']} speed={speed}x"
+    )
 
-    total = len(events)
     replay_time = base_offset
     last_wall = time.monotonic()
-    while cursor < total:
+    event = reader.peek()
+    while event is not None:
         if stop_event is not None and stop_event.is_set():
             print("replay: stopped early")
             return
@@ -842,15 +1059,15 @@ def replay_session(
         if progress is not None:
             progress["current_time"] = replay_time
             progress["current_lap"] = current_lap
-        while cursor < total and events[cursor][0] <= replay_time:
-            _, topic, payload = events[cursor]
+        while event is not None and event[0] <= replay_time:
+            _, topic, payload = reader.pop()
             buffer.update(topic, payload)
             if topic == "v1/laps":
                 current_lap = max(current_lap, int(payload.get("lap_number") or 0))
-            cursor += 1
-        if cursor >= total:
+            event = reader.peek()
+        if event is None:
             break
-        wait = (events[cursor][0] - replay_time) / current_speed()
+        wait = (event[0] - replay_time) / current_speed()
         time.sleep(max(0.0, min(wait, 0.1)))
 
     if progress is not None:
@@ -877,6 +1094,7 @@ class ReplayController:
         self._stop = threading.Event()
         self._pause = threading.Event()
         self._lock = threading.Lock()
+        self._transition_lock = threading.Lock()
         self.status = "idle"
         self.session_key: int | None = None
         self.speed: float | None = None
@@ -898,10 +1116,13 @@ class ReplayController:
 
     def start(self, session_key: int, speed: float = 10.0) -> None:
         """Stop any running replay, then start a new one in a daemon thread."""
-        with self._lock:
+        self._validate_speed(speed)
+        with self._transition_lock:
             if self.on_before_start is not None:
                 self.on_before_start()
-            self._launch(session_key, speed, seek_time=None, seek_lap=None)
+            self._stop_and_join_worker()
+            with self._lock:
+                self._launch(session_key, speed, seek_time=None, seek_lap=None)
 
     def seek(self, time_: float) -> None:
         """Restart the active replay at the nearest checkpoint <= ``time_``.
@@ -909,45 +1130,55 @@ class ReplayController:
         Only valid while a replay is running/paused/finished. Paused state is
         preserved across the seek.
         """
-        with self._lock:
-            if self.status not in {"running", "paused", "finished"}:
-                return
-            if self.session_key is None or self.speed is None:
-                return
-            was_paused = self.status == "paused"
-            self._launch(
-                self.session_key,
-                self.speed,
-                seek_time=time_,
-                seek_lap=None,
-                paused=was_paused,
-            )
+        with self._transition_lock:
+            with self._lock:
+                if self.status not in {"running", "paused", "finished"}:
+                    return
+                if self.session_key is None or self.speed is None:
+                    return
+                session_key, speed = self.session_key, self.speed
+                was_paused = self.status == "paused"
+            self._stop_and_join_worker()
+            with self._lock:
+                self._launch(
+                    session_key,
+                    speed,
+                    seek_time=time_,
+                    seek_lap=None,
+                    paused=was_paused,
+                )
 
     def seek_lap(self, lap: int) -> None:
         """Restart the active replay at the checkpoint for ``lap``."""
-        with self._lock:
-            if self.status not in {"running", "paused", "finished"}:
-                return
-            if self.session_key is None or self.speed is None:
-                return
-            self._launch(
-                self.session_key,
-                self.speed,
-                seek_time=None,
-                seek_lap=lap,
-                paused=self.status == "paused",
-            )
+        with self._transition_lock:
+            with self._lock:
+                if self.status not in {"running", "paused", "finished"}:
+                    return
+                if self.session_key is None or self.speed is None:
+                    return
+                session_key, speed = self.session_key, self.speed
+                was_paused = self.status == "paused"
+            self._stop_and_join_worker()
+            with self._lock:
+                self._launch(
+                    session_key,
+                    speed,
+                    seek_time=None,
+                    seek_lap=lap,
+                    paused=was_paused,
+                )
 
     def set_speed(self, speed: float) -> bool:
         """Change the active replay speed in place; False when not runnable."""
-        with self._lock:
-            if self.status not in {"running", "paused"}:
-                return False
-            if speed <= 0:
-                return False
-            self.speed = speed
-            self._speed_holder["value"] = speed
-            return True
+        with self._transition_lock:
+            with self._lock:
+                if self.status not in {"running", "paused"}:
+                    return False
+                if float(speed) not in _SUPPORTED_SPEEDS:
+                    return False
+                self.speed = speed
+                self._speed_holder["value"] = speed
+                return True
 
     def _launch(
         self,
@@ -958,8 +1189,7 @@ class ReplayController:
         seek_lap: int | None,
         paused: bool = False,
     ) -> None:
-        """Swap in a fresh stop/pause pair and start a new producer thread."""
-        self._stop.set()
+        """Start a fresh producer after the prior worker has been joined."""
         stop_event = threading.Event()
         self._stop = stop_event
         pause_event = threading.Event()
@@ -999,31 +1229,47 @@ class ReplayController:
 
     def pause(self) -> None:
         """Suspend the replay clock; playback resumes from the same position."""
-        with self._lock:
-            if self.status == "running":
-                self._pause.set()
-                self.status = "paused"
+        with self._transition_lock:
+            with self._lock:
+                if self.status == "running":
+                    self._pause.set()
+                    self.status = "paused"
 
     def resume(self) -> None:
         """Continue a paused replay from where it left off."""
-        with self._lock:
-            if self.status == "paused":
-                self._pause.clear()
-                self.status = "running"
+        with self._transition_lock:
+            with self._lock:
+                if self.status == "paused":
+                    self._pause.clear()
+                    self.status = "running"
 
     def stop(self) -> None:
         """Stop the replay; fire the optional on_after_stop hook."""
-        with self._lock:
-            was_active = self.status in {
-                "downloading",
-                "running",
-                "paused",
-                "finished",
-            }
-            self._stop.set()
-            self.status = "idle"
+        with self._transition_lock:
+            with self._lock:
+                was_active = self.status in {
+                    "downloading",
+                    "running",
+                    "paused",
+                    "finished",
+                }
+                self.status = "idle"
+            self._stop_and_join_worker()
         if was_active and self.on_after_stop is not None:
             self.on_after_stop()
+
+    def _stop_and_join_worker(self) -> None:
+        """Signal the current worker and join without holding the state lock."""
+        with self._lock:
+            thread = self._thread
+            self._stop.set()
+        if thread is not None and thread is not threading.current_thread():
+            thread.join()
+
+    @staticmethod
+    def _validate_speed(speed: float) -> None:
+        if float(speed) not in _SUPPORTED_SPEEDS:
+            raise ValueError("speed must be one of 1, 2, 5, or 10")
 
     def _run(
         self,
@@ -1044,23 +1290,34 @@ class ReplayController:
                 stop_event=stop_event,
                 pause_event=pause_event,
                 progress=progress,
-                on_seeded=self._on_seeded,
+                on_seeded=lambda: self._on_seeded(stop_event, pause_event),
                 seek_time=seek_time,
                 seek_lap=seek_lap,
                 speed_holder=speed_holder,
             )
         except Exception as exc:  # noqa: BLE001 — keep API up if replay dies
-            self.error = str(exc)
-            self.status = "error"
+            # A superseded worker must not clobber a newer replay's status.
+            if stop_event.is_set():
+                return
+            with self._lock:
+                if self._stop is not stop_event:
+                    return
+                self.error = str(exc)
+                self.status = "error"
             print(f"Replay worker exited: {exc}")
             return
         if not stop_event.is_set():
-            self.status = "finished"
+            with self._lock:
+                if self._stop is stop_event:
+                    self.status = "finished"
 
-    def _on_seeded(self) -> None:
+    def _on_seeded(
+        self, stop_event: threading.Event, pause_event: threading.Event
+    ) -> None:
         """Mark the replay as running (or paused) once its own state is seeded."""
         with self._lock:
-            self.status = "paused" if self._pause.is_set() else "running"
+            if self._stop is stop_event and not stop_event.is_set():
+                self.status = "paused" if pause_event.is_set() else "running"
 
     def snapshot(self) -> dict[str, Any]:
         """Current controller state for /api/replays/{replay_id}/status."""

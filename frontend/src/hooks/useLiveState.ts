@@ -8,9 +8,21 @@ import {
   fetchTrack,
 } from "../api/raceState";
 import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../features/activity/useActivity";
-import type { ApiDriver, ApiPrediction, ApiSession, RaceState, TrackState } from "../types/race";
+import type {
+  ApiDriver,
+  ApiPrediction,
+  ApiSession,
+  RaceState,
+  TrackRoute,
+  TrackState,
+} from "../types/race";
 
-export type DriverLocation = { map_x: number; map_y: number };
+export type DriverTrackProgress = {
+  progress: number | null;
+  route: TrackRoute;
+  pitLaneProgress: number | null;
+  sampleTimeMs: number | null;
+};
 
 export type DashboardSource = {
   socketPath: string;
@@ -37,7 +49,8 @@ export type RaceStreamResult = {
   session: ApiSession | null;
   drivers: ApiDriver[];
   predictions: ReadonlyMap<number, ApiPrediction>;
-  locations: ReadonlyMap<number, DriverLocation>;
+  progress: ReadonlyMap<number, DriverTrackProgress>;
+  resetGeneration: number;
   refreshing: boolean;
   stale: boolean;
 };
@@ -52,6 +65,104 @@ function recoveryDelay(attempt: number): number {
   return Math.min(1000 * 2 ** attempt, MAX_RECOVERY_DELAY_MS);
 }
 
+function rawWrappedDelta(incoming: number, previous: number): number {
+  let delta = incoming - previous;
+  if (delta > 0.5) delta -= 1;
+  if (delta < -0.5) delta += 1;
+  return delta;
+}
+
+function activeProgress(entry: DriverTrackProgress): number | null {
+  return entry.route === "pit_lane" ? entry.pitLaneProgress : entry.progress;
+}
+
+function rawLog(kind: string, payload: Record<string, unknown>, level: "warn" | "debug" = "warn"): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+  if (level === "debug") {
+    console.debug(`[track-raw] ${kind}`, payload);
+  } else {
+    console.warn(`[track-raw] ${kind}`, payload);
+  }
+}
+
+function diagnoseRawEvent(
+  driverNumber: number,
+  incoming: DriverTrackProgress,
+  rawPrevious: Map<number, DriverTrackProgress>,
+  pending: DriverTrackProgress | undefined,
+): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+  if (pending) {
+    rawLog(
+      "coalesced",
+      {
+        driverNumber,
+        replacedRoute: pending.route,
+        replacementRoute: incoming.route,
+        replacedProgress: activeProgress(pending),
+        replacementProgress: activeProgress(incoming),
+        replacedTimestamp: pending.sampleTimeMs,
+        replacementTimestamp: incoming.sampleTimeMs,
+      },
+      "debug",
+    );
+  }
+  const prev = rawPrevious.get(driverNumber);
+  if (!prev) {
+    return;
+  }
+  const incomingProgress = activeProgress(incoming);
+  const previousProgress = activeProgress(prev);
+  if (incomingProgress === null || previousProgress === null) {
+    return;
+  }
+  const delta =
+    incoming.route === "track" && prev.route === "track"
+      ? rawWrappedDelta(incomingProgress, previousProgress)
+      : incomingProgress - previousProgress;
+  const base = {
+    driverNumber,
+    previousRoute: prev.route,
+    incomingRoute: incoming.route,
+    previousProgress,
+    incomingProgress,
+    delta,
+    previousTimestamp: prev.sampleTimeMs,
+    incomingTimestamp: incoming.sampleTimeMs,
+    replacesPendingSample: pending !== undefined,
+    pendingProgress: pending ? activeProgress(pending) : undefined,
+    pendingTimestamp: pending?.sampleTimeMs,
+  };
+  if (incoming.route !== prev.route) {
+    rawLog("route-change", base, "debug");
+  } else if (delta < 0) {
+    rawLog("backward", base);
+  } else if (delta > 0.1) {
+    rawLog("large-forward", base);
+  }
+  if (incoming.sampleTimeMs !== null && prev.sampleTimeMs !== null) {
+    if (incoming.sampleTimeMs === prev.sampleTimeMs) {
+      rawLog("timestamp", {
+        driverNumber,
+        kind: "duplicate-timestamp",
+        previousTimestamp: prev.sampleTimeMs,
+        incomingTimestamp: incoming.sampleTimeMs,
+      });
+    } else if (incoming.sampleTimeMs < prev.sampleTimeMs) {
+      rawLog("timestamp", {
+        driverNumber,
+        kind: "older-timestamp",
+        previousTimestamp: prev.sampleTimeMs,
+        incomingTimestamp: incoming.sampleTimeMs,
+      });
+    }
+  }
+}
+
 export function useRaceStream(
   snapshot: RaceState | null,
   source: DashboardSource,
@@ -59,10 +170,11 @@ export function useRaceStream(
   const [session, setSession] = useState<ApiSession | null>(snapshot?.session ?? null);
   const [drivers, setDrivers] = useState<ApiDriver[]>(snapshot?.drivers ?? []);
   const [predictions, setPredictions] = useState<ReadonlyMap<number, ApiPrediction>>(() => toPredictionMap(snapshot));
-  const [locations, setLocations] = useState<ReadonlyMap<number, DriverLocation>>(() => new Map());
+  const [progress, setProgress] = useState<ReadonlyMap<number, DriverTrackProgress>>(() => new Map());
   const [status, setStatus] = useState<LiveSocketStatus>("connecting");
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState(false);
+  const [resetGeneration, setResetGeneration] = useState(0);
   const [seededSnapshot, setSeededSnapshot] = useState(snapshot);
   const activity = useActivity();
 
@@ -72,7 +184,8 @@ export function useRaceStream(
       setSession(snapshot.session);
       setDrivers(snapshot.drivers);
       setPredictions(toPredictionMap(snapshot));
-      setLocations(new Map());
+      setProgress(new Map());
+      setResetGeneration((generation) => generation + 1);
       setStale(false);
     }
   }
@@ -80,28 +193,52 @@ export function useRaceStream(
   const hasConnectedRef = useRef(false);
   const recoveryTimerRef = useRef<number | null>(null);
   const recoveryAttemptRef = useRef(0);
+  const recoveryGenerationRef = useRef(0);
 
   useEffect(() => {
     if (!snapshot) {
       return;
     }
 
+    const pendingProgress = new Map<number, DriverTrackProgress>();
+    const rawPrevious = new Map<number, DriverTrackProgress>();
+    let progressFrame: number | null = null;
+    const flushProgress = () => {
+      progressFrame = null;
+      if (pendingProgress.size === 0) return;
+      const updates = new Map(pendingProgress);
+      pendingProgress.clear();
+      setProgress((prev) => {
+        const next = new Map(prev);
+        for (const [number, entry] of updates) next.set(number, entry);
+        return next;
+      });
+    };
+
     const applyEvent = (event: LiveEvent) => {
       switch (event.type) {
         case "location_update": {
-          setLocations((prev) => {
-            if (event.map_x === null || event.map_y === null) {
-              if (!prev.has(event.driver_number)) {
-                return prev;
-              }
-              const next = new Map(prev);
-              next.delete(event.driver_number);
-              return next;
-            }
-            const next = new Map(prev);
-            next.set(event.driver_number, { map_x: event.map_x, map_y: event.map_y });
-            return next;
-          });
+          const eventProgress =
+            event.route === "pit_lane" ? event.pit_lane_progress : event.progress;
+          if (eventProgress !== null) {
+            const parsedTime = event.timestamp === null ? Number.NaN : Date.parse(event.timestamp);
+            const sampleTimeMs = Number.isFinite(parsedTime) ? parsedTime : null;
+            const entry: DriverTrackProgress = {
+              progress: event.progress,
+              route: event.route,
+              pitLaneProgress: event.pit_lane_progress,
+              sampleTimeMs,
+            };
+            diagnoseRawEvent(
+              event.driver_number,
+              entry,
+              rawPrevious,
+              pendingProgress.get(event.driver_number),
+            );
+            pendingProgress.set(event.driver_number, entry);
+            rawPrevious.set(event.driver_number, entry);
+            progressFrame ??= window.requestAnimationFrame(flushProgress);
+          }
           break;
         }
         case "driver_update": {
@@ -169,14 +306,19 @@ export function useRaceStream(
     };
 
     const recoverSnapshot = async () => {
+      const generation = ++recoveryGenerationRef.current;
       setRefreshing(true);
       activity.set(ACTIVITY_IDS.snapshotRefresh, ACTIVITY_MESSAGES.snapshotRefresh);
       try {
         const fresh = await source.fetchRaceState();
+        // Ignore stale fetches — WS events may have arrived while we waited.
+        if (generation !== recoveryGenerationRef.current) {
+          return;
+        }
         setSession(fresh.session);
         setDrivers(fresh.drivers);
         setPredictions(toPredictionMap(fresh));
-        setLocations(new Map());
+        // Keep live map positions; clearing here caused cars to vanish on reconnect.
         setStale(false);
         recoveryAttemptRef.current = 0;
         activity.clear(ACTIVITY_IDS.snapshotRefresh);
@@ -220,6 +362,7 @@ export function useRaceStream(
 
     return () => {
       hasConnectedRef.current = false;
+      if (progressFrame !== null) window.cancelAnimationFrame(progressFrame);
       clearRecoveryTimer();
       socket.close();
       activity.clear(ACTIVITY_IDS.socket);
@@ -238,5 +381,5 @@ export function useRaceStream(
     return { ...session, current_lap: liveLap };
   }, [session, drivers]);
 
-  return { status, session: liveSession, drivers, predictions, locations, refreshing, stale };
+  return { status, session: liveSession, drivers, predictions, progress, resetGeneration, refreshing, stale };
 }

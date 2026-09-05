@@ -23,7 +23,7 @@ export type ApiDriver = {
   compound: string;
   tyre_age: number;
   last_lap_time: number;
-  gap_to_leader: number;
+  gap_to_leader: number | string | null;
   interval_ahead: number | null;
   interval_behind: number | null;
   pit_stops: number;
@@ -54,6 +54,7 @@ export type RaceState = {
 };
 
 export type TrackPoint = { x: number; y: number };
+export type TrackRoute = "track" | "pit_lane";
 export type StartFinish = { x: number; y: number; angle_deg: number };
 export type DisplayPitLane = {
   path: TrackPoint[];

@@ -77,6 +77,13 @@ Returns the current state of every driver.
 `x` / `y` are raw OpenF1 track coordinates and `null` when the car has
 no live telemetry.
 
+`gap_to_leader` is one of:
+
+- a number — the gap in seconds, e.g. `3.8`
+- `null` — the leader
+- a lap-count string — a lapped car, e.g. `"+1 LAP"` or `"+2 LAPS"`
+- `"UNKNOWN"` — no interval sample, a malformed value, or stale data
+
 ### GET `/api/drivers/{driver_number}`
 
 Returns the current state of one driver (same shape as `/api/drivers`).
@@ -263,16 +270,34 @@ reconnect and refetch `/api/race-state` to resync to the new session.
   "driver_number": 4,
   "x": 1245,
   "y": -438,
-  "map_x": 45.2,
-  "map_y": 30.1,
+  "progress": 0.918,
+  "route": "pit_lane",
+  "pit_lane_progress": 0.37,
   "timestamp": "2026-06-14T18:34:10Z"
 }
 ```
 
-`x` / `y` are the raw OpenF1 coordinates (kept for debugging). `map_x` /
-`map_y` are the projected display positions the frontend should use to place
-the marker; they are `null` when the sample cannot be projected onto the
-circuit, so the frontend should hold or hide the marker.
+`x` / `y` are the raw OpenF1 coordinates, retained for debugging. `progress`
+is the projected normalized position around the main circuit, from `0.0`
+inclusive to `1.0` exclusive. `route` is exactly `"track"` or `"pit_lane"`.
+For `"track"`, the frontend maps `progress` onto `display_path`. For
+`"pit_lane"`, `pit_lane_progress` is a finite, clamped value from `0.0` at pit
+entry through `1.0` at pit exit and is mapped onto the optional open
+`pit_lane.path`; it is otherwise `null`. Main-track `progress` is retained while
+the driver is on the lane for continuity and backward compatibility. The
+backend does not supply display-specific `map_x` / `map_y` coordinates.
+
+When the active route cannot be projected reliably, its route-specific progress
+is `null` and the frontend retains the last valid route and position. Route
+changes require persistent geometry evidence so nearby track and pit-lane paths
+do not cause flicker. Circuits without reviewed pit geometry always emit the
+existing `"track"` behavior. Live and replay broadcasters use the same projector
+and event shape, and replay reset/seek clears the retained route state.
+`timestamp` is the source-sample time; clients use it to reject stale or
+out-of-order marker targets rather than deriving order from network arrival.
+When a timestamped sample implies physically impossible movement, the backend
+advances progress by at most 2% of a lap so markers recover continuously
+instead of teleporting to the raw target.
 
 ### Driver state update
 
@@ -291,6 +316,9 @@ circuit, so the frontend should hold or hide the marker.
   "pit_stops": 1
 }
 ```
+
+`gap_to_leader` uses the same states as `/api/drivers`: a number, `null`
+(leader), a lap-count string such as `"+1 LAP"`, or `"UNKNOWN"`.
 
 ### Prediction update
 

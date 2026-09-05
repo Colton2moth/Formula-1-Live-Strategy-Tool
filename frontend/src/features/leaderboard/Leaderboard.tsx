@@ -41,7 +41,7 @@ function splitDriverName(name: string) {
 
 export function Leaderboard({ drivers, selectedDriver, onSelectDriver }: LeaderboardProps) {
   return (
-    <Panel label="Leaderboard" icon="trophy">
+    <Panel label="Leaderboard" className="leaderboard-panel" icon="trophy">
       <div className="leaderboard-scroll">
         <table className="leaderboard-table">
           <thead>
@@ -57,7 +57,7 @@ export function Leaderboard({ drivers, selectedDriver, onSelectDriver }: Leaderb
               const isSelected = driver.driver_number === selectedDriver?.driver_number;
               const isLeader = driver.position === 1;
               const gapToLeader = isLeader ? "—" : formatGap(driver.gap_to_leader);
-              const interval = isLeader ? "LEADER" : formatGap(driver.interval_ahead);
+              const interval = isLeader ? "LEADER" : driver.interval_ahead === null ? "—" : formatGap(driver.interval_ahead);
               const { firstName, lastName } = splitDriverName(driver.name);
               const compound = driver.compound.trim().toUpperCase();
               const tyreLetter = (tyreCompoundLetters[compound] ?? compound.charAt(0)) || "?";

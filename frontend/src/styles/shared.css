@@ -16,6 +16,19 @@
   box-shadow: var(--shadow-surface);
 }
 
+.dashboard-brand-lockup {
+  @apply inline-flex items-center gap-3;
+}
+
+.dashboard-brand-logo {
+  @apply h-10 w-auto shrink-0;
+  object-fit: contain;
+}
+
+.dashboard-brand-text {
+  @apply flex flex-col items-center;
+}
+
 .dashboard-brand-title {
   @apply text-[2rem] font-black italic uppercase tracking-[0.12em] text-white;
   font-family: var(--font-brand);
@@ -27,12 +40,13 @@
 }
 
 .footer {
-  @apply flex flex-col items-center gap-3 border-t border-app-line px-1 py-4 text-center;
-  margin-top: auto;
+  @apply flex flex-col items-center gap-3 border-t border-app-line  py-2 text-center;
+  margin-top: 1rem;
 }
 
 .footer-brand {
-  @apply text-lg font-black uppercase tracking-[0.12em] text-white;
+  @apply text-[1.5rem] font-black italic uppercase tracking-[0.12em] text-white;
+  font-family: var(--font-brand);
 }
 
 .footer-links {
@@ -40,7 +54,7 @@
 }
 
 .footer-link {
-  @apply inline-flex items-center gap-2 text-sm font-semibold text-app-muted;
+  @apply inline-flex items-center gap-2 text-[1.2rem] font-semibold text-app-muted;
   transition:
     color var(--motion-duration-fast) var(--motion-easing-standard),
     transform var(--motion-duration-fast) var(--motion-easing-standard);
@@ -86,6 +100,88 @@
 .dashboard-stack {
   @apply grid content-start gap-4;
   min-width: 0;
+}
+
+.dashboard-stack--leaderboard {
+  contain: size;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.no-live-race-backdrop {
+  @apply fixed inset-0 z-[60] grid place-items-center p-4;
+  background: color-mix(in srgb, var(--color-bg) 78%, transparent);
+  animation: no-live-race-fade-in var(--motion-duration-standard) var(--motion-easing-standard);
+}
+
+.no-live-race-modal {
+  @apply grid w-full max-w-[30rem] justify-items-center gap-3 border border-app-line bg-app-panel p-6 text-center;
+  border-radius: 1rem;
+  box-shadow: var(--shadow-surface);
+  animation: no-live-race-enter var(--motion-duration-standard) var(--motion-easing-standard);
+}
+
+.no-live-race-icon {
+  @apply text-3xl leading-none text-app-red;
+}
+
+.no-live-race-title {
+  @apply text-2xl font-black uppercase tracking-wide text-white;
+}
+
+.no-live-race-description {
+  @apply text-sm font-semibold text-app-text;
+}
+
+.no-live-race-supporting-copy {
+  @apply max-w-[24rem] text-sm font-medium leading-6 text-app-muted;
+}
+
+.no-live-race-replay-link {
+  @apply mt-2 inline-flex min-h-11 items-center justify-center gap-2 border border-app-red bg-app-red px-4 py-2 text-sm font-bold uppercase tracking-wide text-white;
+  border-radius: var(--radius-compact);
+  transition: background-color var(--motion-duration-fast) var(--motion-easing-standard), transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.no-live-race-replay-link:hover {
+  background-color: color-mix(in srgb, var(--color-f1-red) 82%, white);
+  transform: translateY(-0.0625rem);
+}
+
+.no-live-race-replay-link:focus-visible {
+  outline: 0.125rem solid white;
+  outline-offset: 0.1875rem;
+}
+
+.no-live-race-check-button {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 border border-app-line bg-app-panelAlt px-4 py-2 text-sm font-bold uppercase tracking-wide text-app-text;
+  border-radius: var(--radius-compact);
+  transition: border-color var(--motion-duration-fast) var(--motion-easing-standard), color var(--motion-duration-fast) var(--motion-easing-standard), transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.no-live-race-check-button:hover:not(:disabled) {
+  @apply border-app-red text-white;
+  transform: translateY(-0.0625rem);
+}
+
+.no-live-race-check-button:focus-visible {
+  outline: 0.125rem solid var(--color-f1-red);
+  outline-offset: 0.1875rem;
+}
+
+.no-live-race-check-button:disabled {
+  @apply cursor-wait opacity-50;
+}
+
+@keyframes no-live-race-fade-in { from { opacity: 0; } }
+@keyframes no-live-race-enter { from { opacity: 0; transform: translateY(0.5rem); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .no-live-race-backdrop,
+  .no-live-race-modal {
+    animation: none;
+  }
 }
 
 .dashboard-state-card {
@@ -262,6 +358,11 @@
 
   .dashboard-layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-stack--leaderboard {
+    contain: none;
+    overflow: visible;
   }
 
   .dashboard-state-card {

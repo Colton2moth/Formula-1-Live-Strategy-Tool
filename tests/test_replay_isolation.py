@@ -83,7 +83,7 @@ def _seed_live_session() -> None:
     )
 
 
-def test_location_update_projects_map_position():
+def test_location_update_projects_progress():
     from formula1_strategy_tool.track.models import load_layout
 
     layout = load_layout(2)
@@ -102,10 +102,8 @@ def test_location_update_projects_map_position():
             time.sleep(1.0)
             event = websocket.receive_json()
             assert event["type"] == "location_update"
-            assert event["map_x"] is not None
-            assert event["map_y"] is not None
-            assert 0.0 <= event["map_x"] <= 100.0
-            assert 0.0 <= event["map_y"] <= 85.0
+            assert event["progress"] is not None
+            assert 0.0 <= event["progress"] < 1.0
 
 
 def test_replay_race_state_reads_replay_state_not_live(monkeypatch):
@@ -328,7 +326,7 @@ def test_replay_controls_do_not_control_live_mqtt(monkeypatch):
     controller.seek_lap(12)
     assert started.wait(timeout=1.0)
 
-    assert controller.set_speed(20.0) is True
+    assert controller.set_speed(2.0) is True
     controller.stop()
 
     assert calls == []

@@ -32,7 +32,14 @@ function App() {
         <LoadingScreen variant="connecting" embedded />
       ) : (
         <div className="dashboard-container">
-          <RaceDashboard raceState={raceState} track={track} trackStatus={trackStatus} source={liveSource} />
+          <RaceDashboard
+            raceState={raceState}
+            track={track}
+            trackStatus={trackStatus}
+            source={liveSource}
+            checkingLiveRace={raceStateStatus === "loading"}
+            onCheckLiveRace={() => setReloadKey((key) => key + 1)}
+          />
         </div>
       )}
       <Footer />

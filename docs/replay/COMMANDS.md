@@ -3,7 +3,7 @@
 Practical cheat sheet. All commands assume Windows PowerShell, run from the
 repository root, and use the project virtualenv explicitly
 (`.\.venv\Scripts\python.exe`). The backend must be running (see
-[Start the backend](#start-the-backend)) before any `/api/replay/...` command
+[Start the backend](#start-the-backend)) before any replay API command
 below works.
 
 For endpoint details and valid ranges, see [API.md](./API.md).
@@ -16,9 +16,7 @@ For endpoint details and valid ranges, see [API.md](./API.md).
    `.\.venv\Scripts\python.exe -m formula1_strategy_tool.acquisition.cache_replays --local`
 3. List races and readiness:
    `Invoke-RestMethod http://127.0.0.1:8000/api/replay/sessions | Format-Table year, country_name, session_key, readiness`
-4. Inspect the current replay status:
-   `Invoke-RestMethod http://127.0.0.1:8000/api/replay/status`
-5. Inspect recent cache failures:
+4. Inspect recent cache failures:
    `Get-Content data\replay\cache_failures.txt -Tail 50`
 
 ## Cache / prepare races
@@ -103,16 +101,6 @@ ran), `not_ready` (not yet prepared), and `failed` (blocking preparation
 failure). See [CACHE.md](./CACHE.md#readiness-states) for what each state
 means.
 
-## Inspect replay status
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/api/replay/status
-```
-
-Use when: you want to see the replay controller state (`idle` / `downloading` /
-`running` / `paused` / `finished` / `error`) and current replay progress
-(`current_time`, `total_duration`, `current_lap`, `total_laps`).
-
 ## Inspect cache failures
 
 ```powershell
@@ -134,29 +122,35 @@ to make a race show as `ready`.
 
 ## Manual replay API controls
 
-All control endpoints live under `/api/replay/`. Speed is a multiplier
-(1x = real time) accepted in the range `0.25`–`100`.
+Speeds are limited to `1`, `2`, `5`, or `10` (`1x` = real time). Creating a
+replay returns the private `replay_id` required by every later control call.
 
 ### Start a replay
 
 ```powershell
-Invoke-RestMethod `
+$replay = Invoke-RestMethod `
   -Method Post `
-  -Uri http://127.0.0.1:8000/api/replay/start `
+  -Uri http://127.0.0.1:8000/api/replays `
   -ContentType "application/json" `
-  -Body '{"session_key":9693,"speed":20}'
+  -Body '{"session_key":9693,"speed":10}'
+$replayId = $replay.replay_id
 ```
 
 Use when: you want to start a replay by hand (equivalent to pressing Play on
-the Replay page). `session_key` may be omitted to fall back to
-`REPLAY_SESSION_KEY`, then `INFERENCE_SESSION_KEY`.
+the Replay page).
+
+### Inspect replay status
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:8000/api/replays/$replayId/status"
+```
 
 ### Pause
 
 ```powershell
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://127.0.0.1:8000/api/replay/pause
+  -Uri "http://127.0.0.1:8000/api/replays/$replayId/pause"
 ```
 
 ### Resume
@@ -164,7 +158,7 @@ Invoke-RestMethod `
 ```powershell
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://127.0.0.1:8000/api/replay/resume
+  -Uri "http://127.0.0.1:8000/api/replays/$replayId/resume"
 ```
 
 ### Stop
@@ -172,7 +166,7 @@ Invoke-RestMethod `
 ```powershell
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://127.0.0.1:8000/api/replay/stop
+  -Uri "http://127.0.0.1:8000/api/replays/$replayId/stop"
 ```
 
 Use when: you want to halt the replay and restore the live MQTT listener.
@@ -182,7 +176,7 @@ Use when: you want to halt the replay and restore the live MQTT listener.
 ```powershell
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://127.0.0.1:8000/api/replay/seek `
+  -Uri "http://127.0.0.1:8000/api/replays/$replayId/seek" `
   -ContentType "application/json" `
   -Body '{"time":540.5}'
 ```
@@ -190,7 +184,7 @@ Invoke-RestMethod `
 ```powershell
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://127.0.0.1:8000/api/replay/seek `
+  -Uri "http://127.0.0.1:8000/api/replays/$replayId/seek" `
   -ContentType "application/json" `
   -Body '{"lap":12}'
 ```
@@ -203,9 +197,9 @@ Exactly one of `time` (>= 0) or `lap` (>= 1) is required.
 ```powershell
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://127.0.0.1:8000/api/replay/speed `
+  -Uri "http://127.0.0.1:8000/api/replays/$replayId/speed" `
   -ContentType "application/json" `
-  -Body '{"speed":40}'
+  -Body '{"speed":5}'
 ```
 
 Use when: you want to change speed without restarting the replay. Only valid
@@ -214,7 +208,7 @@ while the replay is `running` or `paused` (returns 409 otherwise).
 ## Standalone producer
 
 ```powershell
-.\.venv\Scripts\python.exe -m formula1_strategy_tool.acquisition.replay --session-key <key> --speed 20
+.\.venv\Scripts\python.exe -m formula1_strategy_tool.acquisition.replay --session-key <key> --speed 10
 ```
 
 Use when: you want to exercise the producer directly without the API server or

@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
-import { useRaceStream } from "../../hooks/useLiveState";
+import { liveSource, useRaceStream } from "../../hooks/useLiveState";
 import type { DashboardSource } from "../../hooks/useLiveState";
 import type { ApiDriver, RaceState, TrackState } from "../../types/race";
 import { Leaderboard } from "../leaderboard/Leaderboard";
 import { RaceHeader } from "../race-header/RaceHeader";
 import { StrategyPanel } from "../strategy-panel/StrategyPanel";
 import { TrackMap } from "../track-map/TrackMap";
+import type { MarkerAnimationMode } from "../track-map/useDriverMarkers";
+import { NoLiveRaceModal } from "./NoLiveRaceModal";
 import type { ResourceStatus } from "./useRaceData";
 
 type RaceDashboardProps = {
@@ -13,9 +15,12 @@ type RaceDashboardProps = {
   track: TrackState | null;
   trackStatus: ResourceStatus;
   source: DashboardSource;
+  animationMode?: MarkerAnimationMode;
+  checkingLiveRace?: boolean;
+  onCheckLiveRace?: () => void;
 };
 
-export function RaceDashboard({ raceState, track, trackStatus, source }: RaceDashboardProps) {
+export function RaceDashboard({ raceState, track, trackStatus, source, animationMode = { type: "live" }, checkingLiveRace = false, onCheckLiveRace }: RaceDashboardProps) {
   const [selectedDriverNumber, setSelectedDriverNumber] = useState<number | null>(null);
 
   const stream = useRaceStream(raceState, source);
@@ -33,11 +38,15 @@ export function RaceDashboard({ raceState, track, trackStatus, source }: RaceDas
   };
 
   const session = stream.session ?? raceState.session;
+  const isActiveRace =
+    session.session_name.trim().toLowerCase() === "race" &&
+    session.session_status.trim().toLowerCase() === "active";
+  const showNoLiveRaceModal = source.socketPath === liveSource.socketPath && !isActiveRace;
 
   return (
     <>
       <div className="dashboard-layout">
-        <div className="dashboard-stack">
+        <div className="dashboard-stack dashboard-stack--leaderboard">
           <StrategyPanel
             selectedDriver={selectedDriver}
             prediction={selectedPrediction}
@@ -56,12 +65,17 @@ export function RaceDashboard({ raceState, track, trackStatus, source }: RaceDas
             trackStatus={trackStatus}
             session={session}
             drivers={sortedDrivers}
-            locations={stream.locations}
+            progress={stream.progress}
+            resetGeneration={stream.resetGeneration}
+            animationMode={animationMode}
             selectedDriver={selectedDriver}
             onSelectDriver={toggleSelectedDriver}
           />
         </div>
       </div>
+      {showNoLiveRaceModal && onCheckLiveRace ? (
+        <NoLiveRaceModal checking={checkingLiveRace} onCheckAgain={onCheckLiveRace} />
+      ) : null}
     </>
   );
 }

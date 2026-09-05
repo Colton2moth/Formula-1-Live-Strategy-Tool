@@ -361,3 +361,9 @@
 2026-08-17T08:33:50.341910+00:00 | 11299 | 2026 Monaco | location window 0030 missing
 2026-08-17T08:35:11.183924+00:00 | 11315 | 2026 Austria | location window 0019 missing
 2026-08-17T08:36:30.394969+00:00 | 11334 | 2026 Belgium | location window 0019 missing
+2026-09-01T01:29:43.302174+00:00 | 7779 | 2023 Saudi Arabia | download: Failed GET pit with {'session_key': 7779} (HTTP 404: '{"detail":"No results found."}')
+2026-09-01T01:30:49.672630+00:00 | 7787 | 2023 Australia | download: Failed GET pit with {'session_key': 7787} (HTTP 404: '{"detail":"No results found."}')
+2026-09-01T01:31:57.786088+00:00 | 7953 | 2023 Bahrain | download: Failed GET pit with {'session_key': 7953} (HTTP 404: '{"detail":"No results found."}')
+2026-09-01T01:33:06.514676+00:00 | 9070 | 2023 Azerbaijan | download: Failed GET pit with {'session_key': 9070} (HTTP 404: '{"detail":"No results found."}')
+2026-09-01T01:34:14.307858+00:00 | 9078 | 2023 United States | download: Failed GET pit with {'session_key': 9078} (HTTP 404: '{"detail":"No results found."}')
+2026-09-01T01:35:21.013145+00:00 | 9094 | 2023 Monaco | download: Failed GET pit with {'session_key': 9094} (HTTP 404: '{"detail":"No results found."}')

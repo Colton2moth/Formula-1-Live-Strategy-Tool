@@ -49,9 +49,11 @@ timestamps:
 | location      | `v1/location`       | `date`                                        |
 | stints        | `v1/stints`         | the `date_start` of the stint's first lap     |
 
-The prepared timeline is persisted as `timeline.json` with a format version;
-when the format version or session key no longer matches, the timeline is
-rebuilt from the raw cache instead of being trusted.
+The prepared timeline is persisted under `timeline/`: `index.json` contains
+only format/session totals and chunk ranges, while each `chunk-*.json` holds up
+to five minutes of race-clock events. When the format version, session key, or
+referenced chunks no longer validate, the timeline is rebuilt from the raw
+cache instead of being trusted.
 
 ## No future leakage
 
@@ -74,12 +76,14 @@ Before replaying, the controller's private `LiveState` is cleared so stale
 replay/test data cannot mix with the new historical race. Live `LIVE_STATE` is
 never touched. Identity rows are seeded, then the worker advances a race clock
 scaled by the replay speed, emitting every event whose offset is due and
-sleeping until the next event.
+sleeping until the next event. Its reader holds the current chunk and
+prefetches the next; after a boundary it releases the prior chunk before
+loading another.
 
 A `pause_event` suspends the clock: the paused wall-clock time is excluded from
 the scaled elapsed time, so resume continues from the same position. The
 authoritative clock is written back to a shared progress dict so
-`/api/replay/status` can report `current_time`, `total_duration`,
+`/api/replays/{replay_id}/status` can report `current_time`, `total_duration`,
 `current_lap`, and `total_laps` — the frontend never estimates progress on its
 own.
 
@@ -90,11 +94,12 @@ At race end the final state is left visible rather than cleared.
 `build_checkpoints` replays the prepared events through a `LiveState` and
 snapshots the buffer at each completed lap (immediately after the lap-completing
 event, so no future state leaks in). Each checkpoint stores the lap number, its
-race-clock time, the cursor into the event list, and the snapshot. A lightweight
+race-clock time, the global event cursor, and the snapshot. A lightweight
 `index.json` records lap / time / cursor / file per checkpoint.
 
-Seek restores the nearest checkpoint at or before the requested target, then
-fast-forwards by applying only the events up to that target. This makes a
+Seek restores the nearest checkpoint at or before the requested target, uses
+the timeline index to open the chunk containing that cursor, then fast-forwards
+by applying only the events up to the target. This makes a
 replay jump to an arbitrary timeline time or lap without replaying earlier laps
 and without exposing future events. See [API.md](./API.md) for the seek
 endpoint and [USAGE.md](./USAGE.md) for the Replay page's seekable timeline and

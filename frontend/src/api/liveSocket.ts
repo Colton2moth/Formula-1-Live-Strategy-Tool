@@ -1,4 +1,4 @@
-import type { ApiCompoundProbabilities } from "../types/race";
+import type { ApiCompoundProbabilities, TrackRoute } from "../types/race";
 import { apiBaseUrl } from "./raceState";
 
 export type LocationUpdate = {
@@ -6,8 +6,10 @@ export type LocationUpdate = {
   driver_number: number;
   x: number | null;
   y: number | null;
-  map_x: number | null;
-  map_y: number | null;
+  progress: number | null;
+  route: TrackRoute;
+  pit_lane_progress: number | null;
+  timestamp: string | null;
 };
 
 export type DriverUpdate = {
@@ -18,7 +20,7 @@ export type DriverUpdate = {
   compound: string;
   tyre_age: number;
   last_lap_time: number;
-  gap_to_leader: number;
+  gap_to_leader: number | string | null;
   interval_ahead: number | null;
   interval_behind: number | null;
   pit_stops: number;
@@ -76,6 +78,27 @@ function toNullableNumber(value: unknown): number | null {
   return isNumber(value) ? value : null;
 }
 
+function toGap(value: unknown): number | string | null {
+  if (isNumber(value)) return value;
+  if (typeof value === "string") return value;
+  if (value === null) return null;
+  return "UNKNOWN";
+}
+
+function toProgress(value: unknown): number | null {
+  if (!isNumber(value) || value < 0 || value >= 1) {
+    return null;
+  }
+  return value;
+}
+
+function toPitLaneProgress(value: unknown): number | null {
+  if (!isNumber(value) || value < 0 || value > 1) {
+    return null;
+  }
+  return value;
+}
+
 function parseCompoundProbabilities(value: unknown): ApiCompoundProbabilities | null {
   if (value === null || !isRecord(value)) {
     return null;
@@ -90,7 +113,10 @@ function parseCompoundProbabilities(value: unknown): ApiCompoundProbabilities | 
 }
 
 function parseLocationUpdate(value: Record<string, unknown>): LocationUpdate | null {
-  if (!isNumber(value.driver_number)) {
+  if (
+    !isNumber(value.driver_number) ||
+    (value.route !== "track" && value.route !== "pit_lane")
+  ) {
     return null;
   }
   return {
@@ -98,8 +124,10 @@ function parseLocationUpdate(value: Record<string, unknown>): LocationUpdate | n
     driver_number: value.driver_number,
     x: isNumber(value.x) ? value.x : null,
     y: isNumber(value.y) ? value.y : null,
-    map_x: isNumber(value.map_x) ? value.map_x : null,
-    map_y: isNumber(value.map_y) ? value.map_y : null,
+    progress: toProgress(value.progress),
+    route: value.route,
+    pit_lane_progress: toPitLaneProgress(value.pit_lane_progress),
+    timestamp: typeof value.timestamp === "string" ? value.timestamp : null,
   };
 }
 
@@ -120,7 +148,7 @@ function parseDriverUpdate(value: Record<string, unknown>): DriverUpdate | null 
     compound: typeof value.compound === "string" ? value.compound : "",
     tyre_age: value.tyre_age,
     last_lap_time: value.last_lap_time,
-    gap_to_leader: isNumber(value.gap_to_leader) ? value.gap_to_leader : 0,
+    gap_to_leader: toGap(value.gap_to_leader),
     interval_ahead: toNullableNumber(value.interval_ahead),
     interval_behind: toNullableNumber(value.interval_behind),
     pit_stops: isNumber(value.pit_stops) ? value.pit_stops : 0,

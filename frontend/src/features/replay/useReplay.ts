@@ -11,20 +11,14 @@ import {
   stopReplay,
 } from "../../api/replay";
 import type { ReplaySessionOption, ReplayStatusValue } from "../../api/replay";
+import { isApiError } from "../../api/raceState";
 import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../activity/useActivity";
 
-export const SPEED_PRESETS = [1, 2, 5, 10, 20, 50, 100] as const;
-export const MIN_SPEED = 0.25;
-export const MAX_SPEED = 100;
-
-function clampSpeed(value: number): number {
-  if (!Number.isFinite(value)) return 10;
-  return Math.min(MAX_SPEED, Math.max(MIN_SPEED, value));
-}
+export const SPEED_PRESETS = [1, 2, 5, 10] as const;
 
 function defaultSpeed(): number {
   const env = Number(import.meta.env.VITE_REPLAY_SPEED);
-  return (SPEED_PRESETS as readonly number[]).includes(env) ? env : 10;
+  return (SPEED_PRESETS as readonly number[]).includes(env) ? env : 1;
 }
 
 export type ReplayProgress = {
@@ -82,6 +76,7 @@ export function useReplay(onSeeded: () => void) {
   const [replayId, setReplayId] = useState<string | null>(null);
   const [progress, setProgress] = useState<ReplayProgress>(EMPTY_PROGRESS);
   const [busy, setBusy] = useState<boolean>(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingSessions, setLoadingSessions] = useState<boolean>(true);
   const [sessionIdInput, setSessionIdInput] = useState<string>("");
@@ -120,8 +115,17 @@ export function useReplay(onSeeded: () => void) {
           setSessionKey(first ? String(first.session_key) : "");
         }
       })
-      .catch(() => {
-        if (!cancelled) setError("Could not load race list");
+      .catch((requestError: unknown) => {
+        if (cancelled) return;
+        if (isApiError(requestError)) {
+          setError(requestError.serverDetail ?? requestError.message);
+        } else {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Could not load race list",
+          );
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingSessions(false);
@@ -196,13 +200,19 @@ export function useReplay(onSeeded: () => void) {
   }, []);
 
   const setSpeed = useCallback(
-    (nextSpeed: number) => {
-      const clamped = clampSpeed(nextSpeed);
-      setSpeedState(clamped);
+    async (nextSpeed: number) => {
+      if (!(SPEED_PRESETS as readonly number[]).includes(nextSpeed)) return;
+      setSpeedState(nextSpeed);
       if (replayId && (status === "running" || status === "paused")) {
-        void setReplaySpeed(replayId, clamped)
-          .then((result) => setStatus(result.status))
-          .catch(() => setError("Failed to change replay speed"));
+        setPendingAction("speed");
+        try {
+          const result = await setReplaySpeed(replayId, nextSpeed);
+          setStatus(result.status);
+        } catch {
+          setError("Failed to change replay speed");
+        } finally {
+          setPendingAction(null);
+        }
       }
     },
     [replayId, status],
@@ -236,11 +246,12 @@ export function useReplay(onSeeded: () => void) {
       return;
     }
     setBusy(true);
+    setPendingAction("start");
     setError(null);
     seededRef.current = false;
     setProgress(EMPTY_PROGRESS);
     try {
-      const next = await createReplay(key, Number(speed) || 10);
+      const next = await createReplay(key, speed);
       setReplayId(next.replay_id);
       setStatus(next.status);
     } catch (requestError) {
@@ -249,12 +260,14 @@ export function useReplay(onSeeded: () => void) {
       );
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   }, [sessionKey, speed]);
 
   const pause = useCallback(async () => {
     if (!replayId) return;
     setBusy(true);
+    setPendingAction("pause");
     setError(null);
     try {
       const next = await pauseReplay(replayId);
@@ -265,12 +278,14 @@ export function useReplay(onSeeded: () => void) {
       );
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   }, [replayId]);
 
   const resume = useCallback(async () => {
     if (!replayId) return;
     setBusy(true);
+    setPendingAction("resume");
     setError(null);
     try {
       const next = await resumeReplay(replayId);
@@ -281,12 +296,14 @@ export function useReplay(onSeeded: () => void) {
       );
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   }, [replayId]);
 
   const stop = useCallback(async () => {
     if (!replayId) return;
     setBusy(true);
+    setPendingAction("stop");
     setError(null);
     seededRef.current = false;
     try {
@@ -300,6 +317,7 @@ export function useReplay(onSeeded: () => void) {
       );
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   }, [replayId]);
 
@@ -311,6 +329,7 @@ export function useReplay(onSeeded: () => void) {
       }
       if (!replayId) return;
       setBusy(true);
+      setPendingAction("seek");
       setError(null);
       seededRef.current = false;
       try {
@@ -322,6 +341,7 @@ export function useReplay(onSeeded: () => void) {
         );
       } finally {
         setBusy(false);
+        setPendingAction(null);
       }
     },
     [replayId],
@@ -335,6 +355,7 @@ export function useReplay(onSeeded: () => void) {
       }
       if (!replayId) return;
       setBusy(true);
+      setPendingAction("seek");
       setError(null);
       seededRef.current = false;
       try {
@@ -346,6 +367,7 @@ export function useReplay(onSeeded: () => void) {
         );
       } finally {
         setBusy(false);
+        setPendingAction(null);
       }
     },
     [replayId],
@@ -364,6 +386,7 @@ export function useReplay(onSeeded: () => void) {
     replayId,
     progress,
     busy,
+    pendingAction,
     error,
     loadingSessions,
     sessionIdInput,
