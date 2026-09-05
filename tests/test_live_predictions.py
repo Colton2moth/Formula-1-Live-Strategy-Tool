@@ -10,6 +10,9 @@ from formula1_strategy_tool.api import routes as routes_mod
 
 def test_valid_live_features_return_live_predictions(monkeypatch):
     feat = pd.DataFrame({"driver_number": [4], "lap_number": [25]})
+    monkeypatch.setattr(
+        routes_mod, "latest_session_doc", lambda state: {"session_type": "Race"}
+    )
     monkeypatch.setattr(routes_mod, "features_from_live", lambda state: feat)
     monkeypatch.setattr(
         routes_mod,
@@ -62,12 +65,30 @@ def test_predictions_endpoint_survives_inference_exception(monkeypatch):
     def boom(state):
         raise RuntimeError("model failure")
 
+    monkeypatch.setattr(
+        routes_mod, "latest_session_doc", lambda state: {"session_type": "Race"}
+    )
     monkeypatch.setattr(routes_mod, "features_from_live", boom)
     monkeypatch.delenv("INFERENCE_CSV_FALLBACK", raising=False)
 
     response = TestClient(app).get("/api/predictions")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_qualifying_session_skips_race_strategy_inference(monkeypatch):
+    monkeypatch.setattr(
+        routes_mod,
+        "latest_session_doc",
+        lambda state: {"session_type": "Qualifying"},
+    )
+    feature_calls: list[int] = []
+    monkeypatch.setattr(
+        routes_mod, "features_from_live", lambda state: feature_calls.append(1)
+    )
+
+    assert routes_mod._predictions_from_state(LiveState()) is None
+    assert feature_calls == []
 
 
 def test_websocket_broadcaster_sends_driver_update_when_prediction_fails():

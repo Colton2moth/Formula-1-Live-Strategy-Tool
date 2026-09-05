@@ -86,7 +86,16 @@ def bootstrap_live_state(
         for row in meetings:
             buffer.update("v1/meetings", row)
 
-    for endpoint in _SEED_ENDPOINTS:
+    session_type = str(
+        session.get("session_type") or session.get("session_name") or ""
+    ).casefold()
+    seed_endpoints = (
+        _SEED_ENDPOINTS
+        if session_type == "race"
+        else tuple(endpoint for endpoint in _SEED_ENDPOINTS if endpoint != "intervals")
+    )
+
+    for endpoint in seed_endpoints:
         rows = openf1_get(endpoint, params)
         # Position/intervals streams are huge — one row per driver is enough to
         # score the *current* lap after merge_asof.
