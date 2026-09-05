@@ -86,7 +86,7 @@ export function RaceDashboard({ raceState, track, trackStatus, source, animation
           />
         </div>
         <div className="dashboard-stack">
-          <RaceHeader session={session} connectionStatus={stream.status} stale={stream.stale} />
+          <RaceHeader session={session} connectionStatus={stream.status} stale={stream.stale} isLiveSource={isLiveSource} />
           <TrackMap
             track={track}
             trackStatus={trackStatus}

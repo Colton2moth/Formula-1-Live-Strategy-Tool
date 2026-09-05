@@ -2,23 +2,13 @@ import type { ApiSession } from "../../types/race";
 import type { LiveSocketStatus } from "../../api/liveSocket";
 import { Panel } from "../../components/Panel";
 import { StatusChip } from "../../components/StatusChip";
+import { resolveSessionStatusChip } from "../dashboard/noLiveRace";
 
 type RaceHeaderProps = {
   session: ApiSession;
   connectionStatus: LiveSocketStatus;
   stale?: boolean;
-};
-
-const LIVE_STATUS_TONES: Record<LiveSocketStatus, "green" | "amber" | "red" | "neutral"> = {
-  connecting: "neutral",
-  open: "green",
-  reconnecting: "amber",
-};
-
-const LIVE_STATUS_LABELS: Record<LiveSocketStatus, string> = {
-  connecting: "Connecting",
-  open: "Live",
-  reconnecting: "Reconnecting",
+  isLiveSource?: boolean;
 };
 
 type FlagTone = "green" | "yellow" | "red" | "blue" | "neutral";
@@ -41,9 +31,10 @@ const raceControlStates: Record<string, { label: string; tone: FlagTone }> = {
   "SESSION ABORTED": { label: "Aborted", tone: "red" },
 };
 
-export function RaceHeader({ session, connectionStatus, stale = false }: RaceHeaderProps) {
+export function RaceHeader({ session, connectionStatus, stale = false, isLiveSource = true }: RaceHeaderProps) {
   const raceControl = getRaceControlState(session.race_control_status);
   const weatherIcon = session.rainfall ? "rainy" : "clear_day";
+  const statusChip = resolveSessionStatusChip({ isLiveSource, connectionStatus, session });
 
   return (
     <Panel
@@ -51,7 +42,7 @@ export function RaceHeader({ session, connectionStatus, stale = false }: RaceHea
       icon="sports_motorsports"
       headerContent={
         <div className="flex items-center gap-2">
-          <StatusChip label={LIVE_STATUS_LABELS[connectionStatus]} tone={LIVE_STATUS_TONES[connectionStatus]} />
+          <StatusChip label={statusChip.label} tone={statusChip.tone} />
           {stale ? <StatusChip label="Stale" tone="amber" /> : null}
         </div>
       }

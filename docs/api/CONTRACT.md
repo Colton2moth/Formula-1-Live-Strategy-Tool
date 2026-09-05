@@ -47,6 +47,11 @@ denominator. A completed replay that knows the final lap count from its
 prepared timeline returns a real number. The frontend shows `14` when the
 total is unknown and `14 / 72` when it is known.
 
+`session_status` is the authoritative normalized liveness signal and is one of
+`active`, `upcoming`, `completed`, or `cancelled`. The frontend uses it (never
+`session_name`) to decide whether a session is live: the status chip shows
+`No Live Session` when it is anything other than `active`.
+
 ### GET `/api/drivers`
 
 Returns the current state of every driver.

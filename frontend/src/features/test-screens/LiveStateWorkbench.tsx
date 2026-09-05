@@ -47,7 +47,7 @@ const staleExamples: StaleExample[] = [
 const baseSession: ApiSession = {
   meeting_name: "Bahrain Grand Prix",
   session_name: "Race",
-  session_status: "Running",
+  session_status: "active",
   current_lap: 42,
   total_laps: 57,
   track_temperature: 31.4,
