@@ -107,11 +107,10 @@ def test_tracks_lists_generated_layouts():
 
 def test_replay_sessions_include_readiness(monkeypatch):
     from formula1_strategy_tool.acquisition import cache_replays
-    from formula1_strategy_tool.acquisition import replay as replay_mod
 
     monkeypatch.setattr(
-        replay_mod,
-        "list_replay_sessions",
+        cache_replays,
+        "list_local_sessions",
         lambda: [
             {
                 "session_key": 9963,
@@ -128,6 +127,23 @@ def test_replay_sessions_include_readiness(monkeypatch):
     response = client.get("/api/replay/sessions")
     assert response.status_code == 200
     assert response.json()[0]["readiness"] == "ready"
+
+
+def test_replay_sessions_does_not_call_openf1(monkeypatch):
+    from formula1_strategy_tool.acquisition import cache_replays
+    from formula1_strategy_tool.acquisition.client import OpenF1Client
+
+    def explode(*args, **kwargs):
+        raise AssertionError("OpenF1 must not be called by /api/replay/sessions")
+
+    monkeypatch.setattr(OpenF1Client, "__init__", explode)
+    monkeypatch.setattr(OpenF1Client, "get", explode)
+    monkeypatch.setattr(cache_replays, "list_local_sessions", lambda: [])
+    monkeypatch.setattr(cache_replays, "replay_readiness", lambda key: "ready")
+
+    response = client.get("/api/replay/sessions")
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_replay_speed_requires_running_runtime(monkeypatch):

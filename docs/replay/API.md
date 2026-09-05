@@ -49,8 +49,8 @@ Current replay controller state and progress. Returns the status object above.
 
 ## GET `/api/replay/sessions`
 
-Completed Race sessions for the year → country replay picker (2023 onward).
-Returns a list where each entry has:
+Race sessions discovered from the locally cached replay data under
+`data/replay/` (no OpenF1 request). Returns a list where each entry has:
 
 | Field               | Type             | Meaning                        |
 | ------------------- | ---------------- | ------------------------------ |
@@ -63,7 +63,7 @@ Returns a list where each entry has:
 | `readiness`         | string           | `ready` \| `partial` \| `cancelled` \| `not_ready` \| `failed` \| `unknown` |
 
 Readiness is documented in [CACHE.md](./CACHE.md#readiness-states). Returns
-`503` when the OpenF1 session list cannot be fetched.
+`200` with an empty list when no cached sessions exist.
 
 ## GET `/api/replays/{replay_id}/race-state`
 

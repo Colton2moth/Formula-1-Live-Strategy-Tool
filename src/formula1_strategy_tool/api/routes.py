@@ -348,20 +348,25 @@ def _runtime(replay_id: str) -> ReplayRuntime:
 
 @router.get("/replay/sessions", response_model=list[ReplaySessionOption])
 def get_replay_sessions() -> list[ReplaySessionOption]:
-    """Completed Race sessions, for the year → country replay picker."""
-    from formula1_strategy_tool.acquisition.cache_replays import replay_readiness
-    from formula1_strategy_tool.acquisition.replay import list_replay_sessions
+    """Completed Race sessions, discovered from the locally cached replay data.
 
-    try:
-        sessions = list_replay_sessions()
-    except Exception as exc:  # noqa: BLE001 — surface OpenF1 failures cleanly
-        raise HTTPException(
-            status_code=503, detail=f"Could not list sessions: {exc}"
-        ) from exc
-    return [
-        ReplaySessionOption(**row, readiness=replay_readiness(row["session_key"]))
-        for row in sessions
-    ]
+    Never contacts OpenF1: the picker reflects the replay data actually
+    deployed on the server under ``data/replay``.
+    """
+    from formula1_strategy_tool.acquisition.cache_replays import (
+        list_local_sessions,
+        replay_readiness,
+    )
+
+    options: list[ReplaySessionOption] = []
+    for row in list_local_sessions():
+        key = row["session_key"]
+        try:
+            readiness = replay_readiness(key)
+        except Exception:  # noqa: BLE001 — one bad cache must not break the library
+            readiness = "unknown"
+        options.append(ReplaySessionOption(**row, readiness=readiness))
+    return options
 
 
 @router.post("/replays", response_model=ReplayCreated)

@@ -11,6 +11,7 @@ import {
   stopReplay,
 } from "../../api/replay";
 import type { ReplaySessionOption, ReplayStatusValue } from "../../api/replay";
+import { isApiError } from "../../api/raceState";
 import { ACTIVITY_IDS, ACTIVITY_MESSAGES, useActivity } from "../activity/useActivity";
 
 export const SPEED_PRESETS = [1, 2, 5, 10] as const;
@@ -113,8 +114,17 @@ export function useReplay(onSeeded: () => void) {
           setSessionKey(first ? String(first.session_key) : "");
         }
       })
-      .catch(() => {
-        if (!cancelled) setError("Could not load race list");
+      .catch((requestError: unknown) => {
+        if (cancelled) return;
+        if (isApiError(requestError)) {
+          setError(requestError.serverDetail ?? requestError.message);
+        } else {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Could not load race list",
+          );
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingSessions(false);

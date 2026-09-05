@@ -125,6 +125,8 @@ async function readErrorDetail(response: Response): Promise<string | null> {
   return readJsonDetail(trimmed) ?? normalizeErrorText(trimmed);
 }
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 async function requestJson<T>(
   method: string,
   path: string,
@@ -137,16 +139,29 @@ async function requestJson<T>(
     init.body = JSON.stringify(body);
   }
 
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}${path}`, init);
+    response = await fetch(`${apiBaseUrl}${path}`, { ...init, signal: controller.signal });
   } catch (error) {
+    if (controller.signal.aborted) {
+      throw new ApiError({
+        type: "timeout",
+        method,
+        path,
+        message: `Request timed out after ${REQUEST_TIMEOUT_MS}ms.`,
+      });
+    }
     throw new ApiError({
       type: "network",
       method,
       path,
       message: error instanceof Error ? error.message : "Network request failed.",
     });
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 
   if (!response.ok) {

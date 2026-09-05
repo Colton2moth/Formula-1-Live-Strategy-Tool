@@ -1159,14 +1159,19 @@ def test_replay_readiness_not_ready(monkeypatch, tmp_path):
     assert cache_replays.replay_readiness(99) == "not_ready"
 
 
-def test_replay_readiness_rejects_missing_timeline_chunk(monkeypatch, tmp_path):
+def test_replay_readiness_skips_chunk_validation(monkeypatch, tmp_path):
     cache = tmp_path / "1"
     cache_replays.prepare_timeline(cache, _data())
     missing = next((cache / "timeline").glob("chunk-*.json"))
     missing.unlink()
     monkeypatch.setattr(cache_replays, "replay_dir", lambda key: tmp_path / str(key))
     monkeypatch.setattr(cache_replays, "FAILURES_PATH", tmp_path / "failures.txt")
-    assert cache_replays.replay_readiness(1) == "not_ready"
+
+    # Full validation (cache-preparation path) still detects the missing chunk.
+    assert load_timeline(cache, 1, validate_chunks=True) is None
+    # The runtime library path uses the lightweight index only, so the race is
+    # still listed as ready without deserializing every chunk.
+    assert cache_replays.replay_readiness(1) == "ready"
 
 
 def test_replay_readiness_failed(monkeypatch, tmp_path):
@@ -1182,6 +1187,60 @@ def test_replay_readiness_failed(monkeypatch, tmp_path):
 
 def test_classify_location_gaps_complete():
     assert replay_mod.classify_location_gaps(4, [0, 1, 2, 3]) == "complete"
+
+
+def test_list_local_sessions_missing_directory(tmp_path):
+    assert cache_replays.list_local_sessions(tmp_path / "nope") == []
+
+
+def test_list_local_sessions_returns_normalized_rows(tmp_path):
+    root = tmp_path / "replay"
+    cache = root / "10006"
+    cache.mkdir(parents=True)
+    atomic_write_json(
+        cache / "sessions.json",
+        [
+            {
+                "session_key": 10006,
+                "year": 2025,
+                "country_name": "Japan",
+                "location": "Suzuka",
+                "circuit_short_name": "Suzuka",
+                "date_start": "2025-04-06T05:00:00+00:00",
+                "extra": "ignored",
+            }
+        ],
+    )
+    assert cache_replays.list_local_sessions(root) == [
+        {
+            "session_key": 10006,
+            "year": 2025,
+            "country_name": "Japan",
+            "location": "Suzuka",
+            "circuit_short_name": "Suzuka",
+            "date_start": "2025-04-06T05:00:00+00:00",
+        }
+    ]
+
+
+def test_list_local_sessions_dedupes_and_skips_malformed(tmp_path):
+    root = tmp_path / "replay"
+    first = root / "1"
+    second = root / "2"
+    malformed = root / "bad"
+    for directory in (first, second, malformed):
+        directory.mkdir(parents=True)
+    atomic_write_json(
+        first / "sessions.json",
+        [{"session_key": 1, "year": 2025, "country_name": "A"}],
+    )
+    atomic_write_json(
+        second / "sessions.json",
+        [{"session_key": 1, "year": 2025, "country_name": "A"}],
+    )
+    (malformed / "sessions.json").write_text("{not json", encoding="utf-8")
+    rows = cache_replays.list_local_sessions(root)
+    assert [row["session_key"] for row in rows] == [1]
 
 
 def test_classify_location_gaps_one_trailing_missing():

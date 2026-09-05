@@ -11,7 +11,7 @@ Normal developer/user workflows. For the terminal command cheat sheet, see
 2. Open the **Race Replay** link in the header to navigate to `/replay`.
 3. Pick a **year**, then a **race** (by country / Grand Prix) from the
    dropdowns. The dropdowns are backed by `GET /api/replay/sessions`, which
-   lists completed Race sessions from 2023 onward.
+   lists Race sessions already cached under `data/replay/`.
 4. Check the race's **readiness** (see [CACHE.md](./CACHE.md#readiness-states)).
    A race must be `ready` or `partial` before Play is enabled; `cancelled`,
    `not_ready`, and `failed` races cannot be played.
