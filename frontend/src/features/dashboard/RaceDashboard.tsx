@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { liveSource, useRaceStream } from "../../hooks/useLiveState";
 import type { DashboardSource } from "../../hooks/useLiveState";
 import type { ApiDriver, RaceState, TrackState } from "../../types/race";
@@ -8,6 +8,7 @@ import { StrategyPanel } from "../strategy-panel/StrategyPanel";
 import { TrackMap } from "../track-map/TrackMap";
 import type { MarkerAnimationMode } from "../track-map/useDriverMarkers";
 import { NoLiveRaceModal } from "./NoLiveRaceModal";
+import { noLiveConditionKey, shouldShowNoLiveRaceModal } from "./noLiveRace";
 import type { ResourceStatus } from "./useRaceData";
 
 type RaceDashboardProps = {
@@ -38,8 +39,36 @@ export function RaceDashboard({ raceState, track, trackStatus, source, animation
   };
 
   const session = stream.session ?? raceState.session;
-  const isActiveSession = session.session_status.trim().toLowerCase() === "active";
-  const showNoLiveRaceModal = source.socketPath === liveSource.socketPath && !isActiveSession;
+  const isLiveSource = source.socketPath === liveSource.socketPath;
+  const noLiveKey = noLiveConditionKey(session);
+
+  const [dismissedNoLiveKey, setDismissedNoLiveKey] = useState<string | null>(null);
+
+  // A no-live condition exists whenever the live source reports a non-active
+  // session, regardless of any prior dismissal.
+  const noLiveConditionActive = shouldShowNoLiveRaceModal({
+    isLiveSource,
+    session,
+    dismissedKey: null,
+  });
+
+  // Reset the dismissal when a genuinely new no-live condition appears (the
+  // session went active and then non-live again), so the notice is not
+  // permanently suppressed for the whole app lifetime.
+  const prevNoLiveRef = useRef(noLiveConditionActive);
+  useEffect(() => {
+    if (noLiveConditionActive && !prevNoLiveRef.current) {
+      setDismissedNoLiveKey(null);
+    }
+    prevNoLiveRef.current = noLiveConditionActive;
+  }, [noLiveConditionActive]);
+
+  const showNoLiveRaceModal = shouldShowNoLiveRaceModal({
+    isLiveSource,
+    session,
+    dismissedKey: dismissedNoLiveKey,
+  });
+  const closeNoLiveRaceModal = () => setDismissedNoLiveKey(noLiveKey);
 
   return (
     <>
@@ -72,7 +101,11 @@ export function RaceDashboard({ raceState, track, trackStatus, source, animation
         </div>
       </div>
       {showNoLiveRaceModal && onCheckLiveRace ? (
-        <NoLiveRaceModal checking={checkingLiveRace} onCheckAgain={onCheckLiveRace} />
+        <NoLiveRaceModal
+          checking={checkingLiveRace}
+          onCheckAgain={onCheckLiveRace}
+          onClose={closeNoLiveRaceModal}
+        />
       ) : null}
     </>
   );

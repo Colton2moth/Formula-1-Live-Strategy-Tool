@@ -123,11 +123,14 @@ Three pit-window probabilities (3 / 5 / 7 laps) plus next-compound multiclass:
 available. `predicted_pit_window_start` / `predicted_pit_window_end` are a
 placeholder window for the strategy panel (not from a dedicated model yet).
 
-Live predictions are scored only from the current live session's features.
-When live inference cannot produce a prediction, the endpoint returns `[]`
-(and the single-driver endpoint returns `404`) rather than substituting a
-historical CSV snapshot. A historical snapshot is used only when the backend's
-opt-in `INFERENCE_CSV_FALLBACK` development flag is set.
+Live predictions are scored only from the current live session's features
+(`LIVE_STATE`). Predictions are attempted for any session type — Race,
+Qualifying, Sprint, and Practice — whenever sufficient lap features exist.
+When inference cannot produce a prediction, the endpoint returns `[]` (and the
+single-driver endpoint returns `404`). There is no historical CSV fallback:
+a missing interval stream simply leaves `gap_to_leader` and `interval_ahead`
+absent, and the model applies its own missing-value handling instead of any
+invented zero values.
 
 ### GET `/api/drivers/{driver_number}/prediction`
 

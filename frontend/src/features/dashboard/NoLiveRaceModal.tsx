@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 type NoLiveRaceModalProps = {
   checking: boolean;
   onCheckAgain: () => void;
+  onClose: () => void;
 };
 
-export function NoLiveRaceModal({ checking, onCheckAgain }: NoLiveRaceModalProps) {
+export function NoLiveRaceModal({ checking, onCheckAgain, onClose }: NoLiveRaceModalProps) {
   return (
     <div className="no-live-race-backdrop">
       <div
@@ -15,6 +16,16 @@ export function NoLiveRaceModal({ checking, onCheckAgain }: NoLiveRaceModalProps
         aria-labelledby="no-live-race-title"
         aria-describedby="no-live-race-description"
       >
+        <button
+          type="button"
+          className="no-live-race-close-button"
+          aria-label="Close no live race notice"
+          onClick={onClose}
+        >
+          <span className="material-symbols-rounded" aria-hidden="true">
+            close
+          </span>
+        </button>
         <span className="material-symbols-rounded no-live-race-icon" aria-hidden="true">
           sports_score
         </span>

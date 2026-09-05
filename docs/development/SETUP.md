@@ -36,21 +36,13 @@ OpenF1 credentials used by the downloader and replay mode).
 
 ### Required local data
 
-When no race is live, `/api/race-state` serves predictions from a historical
-CSV snapshot, and the prediction models are read from `data/models`. The
-commands differ depending on whether you only run the dashboard or also train.
+Live predictions are scored from the current live session's features using the
+trained models under `data/models`. The historical driver-lap CSV is needed only
+to train those models, not to serve predictions.
 
-Just run the dashboard (recommended): download only the season containing the
-configured `INFERENCE_SESSION_KEY` (default `9979`, the 2025 Monaco Grand
-Prix), then build the CSV:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-f1-download-openf1 --start-year 2025 --end-year 2025
-f1-process-races
-```
-
-Train or retrain the models (full historical dataset required):
+To run the dashboard against live data, make sure `data/models` contains the
+trained model files (see [models/TRAINING.md](../models/TRAINING.md)). To train
+or retrain the models from the full historical dataset:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -113,9 +105,6 @@ URL, usually `http://127.0.0.1:4173/`.
 
 - If the website loads without data, confirm FastAPI is running and
   `http://127.0.0.1:8000/api/race-state` returns JSON.
-- If `/api/race-state` errors with `FileNotFoundError:
-  data/processed/driver_laps_all.csv`, the historical data has not been
-  generated yet. Run `f1-download-openf1` then `f1-process-races`.
 - If `fastapi` is not recognized, reactivate `.venv` and rerun
   `pip install -r requirements.txt`.
 - If `npm run dev` fails, run `npm install` inside `frontend`.
