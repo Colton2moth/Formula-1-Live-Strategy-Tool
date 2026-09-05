@@ -19,7 +19,7 @@ export function NoLiveRaceModal({ checking, onCheckAgain, onClose }: NoLiveRaceM
         <button
           type="button"
           className="no-live-race-close-button"
-          aria-label="Close no live race notice"
+          aria-label="Close no live session notice"
           onClick={onClose}
         >
           <span className="material-symbols-rounded" aria-hidden="true">
@@ -30,10 +30,10 @@ export function NoLiveRaceModal({ checking, onCheckAgain, onClose }: NoLiveRaceM
           sports_score
         </span>
         <div id="no-live-race-title" className="no-live-race-title" role="heading" aria-level={2}>
-          No Live Race
+          No Live Session
         </div>
         <div id="no-live-race-description" className="no-live-race-description">
-          Currently there is no Live Formula 1 race.
+          There is no live Formula 1 session right now.
         </div>
         <div className="no-live-race-supporting-copy">
           Want to explore PitPit while you wait? Watch a previous Grand Prix in Replay Mode.
@@ -49,7 +49,7 @@ export function NoLiveRaceModal({ checking, onCheckAgain, onClose }: NoLiveRaceM
           disabled={checking}
         >
           <span className="material-symbols-rounded" aria-hidden="true">refresh</span>
-          <span>{checking ? "Checking…" : "Check Again For Live Race"}</span>
+          <span>{checking ? "Checking…" : "Check Again For Live Session"}</span>
         </button>
       </div>
     </div>
