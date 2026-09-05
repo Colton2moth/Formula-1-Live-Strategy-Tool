@@ -46,7 +46,7 @@ from formula1_strategy_tool.api.schemas import (
     TrackPoint,
     TrackState,
 )
-from formula1_strategy_tool.inference import predict_feature_rows, predict_snapshot
+from formula1_strategy_tool.inference import predict_feature_rows
 from formula1_strategy_tool.track.models import CircuitLayout, layouts_dir, load_layout
 
 # Load .env from the project root when the API process starts.
@@ -54,9 +54,6 @@ load_dotenv()
 
 # All contract REST paths live under /api (see docs/api/CONTRACT.md).
 router = APIRouter(prefix="/api", tags=["strategy-api"])
-
-# CSV fallback cache; used only by the opt-in dev fallback (off by default).
-_prediction_cache: list[PredictionState] | None = None
 
 
 def _drivers(state: LiveState) -> list[DriverState]:
@@ -108,50 +105,15 @@ def _drivers_by_number() -> dict[int, DriverState]:
     return {d.driver_number: d for d in _active_drivers()}
 
 
-def _csv_predictions() -> list[PredictionState]:
-    """
-    Predictions from the configured historical CSV snapshot.
-
-    Not used by the normal live path: a live prediction must come from the
-    current live session. This is consulted only when the opt-in
-    ``INFERENCE_CSV_FALLBACK`` dev flag is enabled (see ``_csv_fallback_enabled``).
-    """
-    global _prediction_cache
-    if _prediction_cache is not None:
-        return _prediction_cache
-
-    csv_path = Path(os.getenv("INFERENCE_CSV", "data/processed/driver_laps_all.csv"))
-    model_dir = Path(os.getenv("INFERENCE_MODEL_DIR", "data/models"))
-    session_key = int(os.getenv("INFERENCE_SESSION_KEY", "9979"))
-    lap_number = int(os.getenv("INFERENCE_LAP", "20"))
-
-    if not csv_path.exists():
-        return []
-
-    try:
-        raw = predict_snapshot(csv_path, model_dir, session_key, lap_number)
-        _prediction_cache = [PredictionState.model_validate(row) for row in raw]
-    except Exception as exc:  # noqa: BLE001 — keep API up without a snapshot
-        print(f"CSV predictions unavailable: {exc}")
-        return []
-
-    return _prediction_cache
-
-
 def _predictions_from_state(state: LiveState) -> list[PredictionState] | None:
     """
     Score the latest lap features from ``state``; None when unusable.
 
     Shared scoring path for live and replay: both build features from a
-    supplied LiveState so replay never reads live data.
+    supplied LiveState so replay never reads live data. Runs for any session
+    type (Race, Qualifying, Sprint, Practice); missing interval features are
+    left absent so the model applies its own missing-value handling.
     """
-    session = latest_session_doc(state)
-    session_type = str(
-        (session or {}).get("session_type") or (session or {}).get("session_name") or ""
-    ).casefold()
-    if session_type != "race":
-        return None
-
     model_dir = Path(os.getenv("INFERENCE_MODEL_DIR", "data/models"))
     try:
         feat = features_from_live(state)
@@ -160,41 +122,28 @@ def _predictions_from_state(state: LiveState) -> list[PredictionState] | None:
             raw = predict_feature_rows(latest, model_dir)
             if raw:
                 return [PredictionState.model_validate(row) for row in raw]
-    except Exception as exc:  # noqa: BLE001 — keep API up; caller decides fallback
+    except Exception as exc:  # noqa: BLE001 — keep API up; surface unavailable state
         print(f"predictions from state failed: {exc}")
     return None
-
-
-def _csv_fallback_enabled() -> bool:
-    """True only when the explicit dev fallback flag is set (default OFF)."""
-    flag = os.getenv("INFERENCE_CSV_FALLBACK", "0").strip().lower()
-    return flag in {"1", "true", "yes", "on"}
 
 
 def _model_predictions() -> list[PredictionState]:
     """
     Live predictions for the current live session.
 
-    A prediction shown as live must come from the current live session. When
-    live feature generation/inference cannot produce one, return no prediction
-    (the frontend then shows its unavailable state) rather than silently
-    substituting a historical CSV snapshot. The CSV path is only consulted when
-    ``INFERENCE_CSV_FALLBACK`` is explicitly enabled for development.
+    Scored only from ``LIVE_STATE``; never from a historical CSV snapshot.
+    Returns an empty list (the frontend's unavailable state) when feature
+    generation or inference cannot produce a prediction.
     """
-    from_state = _predictions_from_state(LIVE_STATE)
-    if from_state:
-        return from_state
-    if _csv_fallback_enabled():
-        return _csv_predictions()
-    return []
+    return _predictions_from_state(LIVE_STATE) or []
 
 
 def replay_predictions(state: LiveState) -> list[PredictionState]:
     """
     Score the latest lap features from a replay runtime's state.
 
-    Deliberately no CSV fallback (that snapshot is unrelated to the replay
-    session) and no live-feature read.
+    Reads only the supplied replay ``LiveState`` — never the process-wide
+    ``LIVE_STATE`` — so replay predictions stay isolated from live data.
     """
     return _predictions_from_state(state) or []
 

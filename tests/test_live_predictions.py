@@ -1,4 +1,4 @@
-"""Tests that live predictions never silently fall back to a historical snapshot."""
+"""Tests that live predictions are scored from live state only, for any session type."""
 
 import asyncio
 
@@ -10,9 +10,6 @@ from formula1_strategy_tool.api import routes as routes_mod
 
 def test_valid_live_features_return_live_predictions(monkeypatch):
     feat = pd.DataFrame({"driver_number": [4], "lap_number": [25]})
-    monkeypatch.setattr(
-        routes_mod, "latest_session_doc", lambda state: {"session_type": "Race"}
-    )
     monkeypatch.setattr(routes_mod, "features_from_live", lambda state: feat)
     monkeypatch.setattr(
         routes_mod,
@@ -32,7 +29,6 @@ def test_valid_live_features_return_live_predictions(monkeypatch):
             }
         ],
     )
-    monkeypatch.delenv("INFERENCE_CSV_FALLBACK", raising=False)
 
     result = routes_mod._model_predictions()
 
@@ -43,18 +39,16 @@ def test_valid_live_features_return_live_predictions(monkeypatch):
     assert result[0].lap_number == 25
 
 
-def test_no_live_features_yields_no_prediction_and_no_csv_fallback(monkeypatch):
+def test_no_live_features_yields_no_prediction(monkeypatch):
     monkeypatch.setattr(routes_mod, "features_from_live", lambda state: None)
-    csv_calls: list[int] = []
-    monkeypatch.setattr(
-        routes_mod, "_csv_predictions", lambda: csv_calls.append(1) or []
-    )
-    monkeypatch.delenv("INFERENCE_CSV_FALLBACK", raising=False)
 
     result = routes_mod._model_predictions()
 
     assert result == []
-    assert csv_calls == []
+    # The historical CSV fallback was removed, so an empty live buffer can
+    # never silently substitute historical predictions.
+    assert not hasattr(routes_mod, "_csv_predictions")
+    assert not hasattr(routes_mod, "_csv_fallback_enabled")
 
 
 def test_predictions_endpoint_survives_inference_exception(monkeypatch):
@@ -65,30 +59,114 @@ def test_predictions_endpoint_survives_inference_exception(monkeypatch):
     def boom(state):
         raise RuntimeError("model failure")
 
-    monkeypatch.setattr(
-        routes_mod, "latest_session_doc", lambda state: {"session_type": "Race"}
-    )
     monkeypatch.setattr(routes_mod, "features_from_live", boom)
-    monkeypatch.delenv("INFERENCE_CSV_FALLBACK", raising=False)
 
     response = TestClient(app).get("/api/predictions")
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_qualifying_session_skips_race_strategy_inference(monkeypatch):
-    monkeypatch.setattr(
-        routes_mod,
-        "latest_session_doc",
-        lambda state: {"session_type": "Qualifying"},
+def test_qualifying_without_intervals_builds_features():
+    """A Qualifying buffer with laps but no intervals still yields features."""
+    state = LiveState()
+    state.update(
+        "v1/sessions",
+        {
+            "session_key": 1,
+            "session_type": "Qualifying",
+            "session_name": "Qualifying",
+            "year": 2026,
+        },
     )
-    feature_calls: list[int] = []
-    monkeypatch.setattr(
-        routes_mod, "features_from_live", lambda state: feature_calls.append(1)
+    state.update(
+        "v1/laps",
+        {
+            "meeting_key": 100,
+            "session_key": 1,
+            "driver_number": 4,
+            "lap_number": 12,
+            "date_start": "2026-07-26T13:00:00+00:00",
+            "lap_duration": 90.0,
+            "duration_sector_1": 30.0,
+            "duration_sector_2": 30.0,
+            "duration_sector_3": 30.0,
+            "is_pit_out_lap": False,
+        },
+    )
+    state.update(
+        "v1/stints",
+        {
+            "meeting_key": 100,
+            "session_key": 1,
+            "driver_number": 4,
+            "stint_number": 1,
+            "lap_start": 1,
+            "lap_end": None,
+            "compound": "SOFT",
+            "tyre_age_at_start": 0,
+        },
+    )
+    state.update(
+        "v1/position",
+        {"driver_number": 4, "date": "2026-07-26T13:01:30+00:00", "position": 1},
     )
 
-    assert routes_mod._predictions_from_state(LiveState()) is None
-    assert feature_calls == []
+    feat = routes_mod.features_from_live(state)
+
+    assert feat is not None
+    assert not feat.empty
+    # No interval stream means no interval features — never invented zeros.
+    assert "gap_to_leader" not in feat.columns
+    assert "interval_ahead" not in feat.columns
+
+
+def test_non_race_session_reaches_inference(monkeypatch):
+    """A Qualifying session with features still runs model inference."""
+    state = LiveState()
+    state.update(
+        "v1/sessions",
+        {
+            "session_key": 1,
+            "session_type": "Qualifying",
+            "session_name": "Qualifying",
+            "date_start": "2026-07-26T13:00:00+00:00",
+            "date_end": "2026-07-26T15:00:00+00:00",
+        },
+    )
+    state.update(
+        "v1/laps", {"driver_number": 4, "lap_number": 12, "lap_duration": 90.0}
+    )
+
+    feat = pd.DataFrame({"driver_number": [4], "lap_number": [12]})
+    monkeypatch.setattr(routes_mod, "features_from_live", lambda s: feat)
+
+    captured: list[pd.DataFrame] = []
+    monkeypatch.setattr(
+        routes_mod,
+        "predict_feature_rows",
+        lambda latest, model_dir: captured.append(latest)
+        or [
+            {
+                "driver_number": 4,
+                "lap_number": 12,
+                "pit_within_3_laps": 0.1,
+                "pit_within_5_laps": 0.2,
+                "pit_within_7_laps": 0.3,
+                "predicted_next_compound": "SOFT",
+                "predicted_pit_window_start": 13,
+                "predicted_pit_window_end": 17,
+                "compound_probabilities": None,
+                "updated_at": "2026-06-14T18:34:10Z",
+            }
+        ],
+    )
+
+    result = routes_mod._predictions_from_state(state)
+
+    assert len(captured) == 1
+    assert list(captured[0]["driver_number"]) == [4]
+    assert len(result) == 1
+    assert result[0].driver_number == 4
 
 
 def test_websocket_broadcaster_sends_driver_update_when_prediction_fails():

@@ -227,15 +227,38 @@ def test_websocket_replay_ignores_live_updates(monkeypatch):
 def test_live_predictions_use_live_state(monkeypatch):
     from formula1_strategy_tool.api import routes as routes_mod
 
+    # Seed a non-race (Qualifying) session: the feature builder must still be
+    # reached for non-race sessions now that live predictions are
+    # session-agnostic.
+    LIVE_STATE.update(
+        "v1/sessions",
+        {
+            "session_key": 1,
+            "circuit_key": 4,
+            "session_name": "Qualifying",
+            "session_type": "Qualifying",
+            "location": "Budapest",
+            "date_start": "2026-07-26T13:00:00+00:00",
+            "date_end": "2026-07-26T15:00:00+00:00",
+            "is_cancelled": False,
+        },
+    )
+
     supplied: list[object] = []
     monkeypatch.setattr(
         routes_mod, "features_from_live", lambda state: supplied.append(state) or None
     )
-    monkeypatch.setattr(routes_mod, "_csv_predictions", lambda: [])
 
-    routes_mod._model_predictions()
+    assert routes_mod._model_predictions() == []
 
+    # Live predictions reached the feature builder with the shared live state,
+    # even for a non-race (Qualifying) session, and used no replay state.
     assert supplied == [LIVE_STATE]
+
+    # The historical CSV fallback was removed entirely, so live predictions can
+    # never silently read a historical snapshot.
+    assert not hasattr(routes_mod, "_csv_predictions")
+    assert not hasattr(routes_mod, "_csv_fallback_enabled")
 
 
 def test_replay_predictions_use_replay_state_not_live(monkeypatch):
@@ -261,7 +284,6 @@ def test_race_state_endpoints_score_their_own_state(monkeypatch):
     monkeypatch.setattr(
         routes_mod, "features_from_live", lambda state: supplied.append(state) or None
     )
-    monkeypatch.setattr(routes_mod, "_csv_predictions", lambda: [])
 
     _seed_live_session()
     runtime = _make_runtime(monkeypatch, circuit_key=23)
